@@ -1,0 +1,317 @@
+package internal
+
+import (
+	"fmt"
+	"os"
+	"path/filepath"
+	"strings"
+	"time"
+)
+
+type Manager struct {
+	config     *Config
+	gitManager *GitManager
+	envMapping *EnvMapping
+	repoPath   string
+	gbmDir     string
+}
+
+type WorktreeListInfo struct {
+	Path           string
+	ExpectedBranch string
+	CurrentBranch  string
+	GitStatus      *GitStatus
+}
+
+type SyncStatus struct {
+	InSync          bool
+	MissingWorktrees []string
+	OrphanedWorktrees []string
+	BranchChanges   map[string]BranchChange
+}
+
+type BranchChange struct {
+	OldBranch string
+	NewBranch string
+}
+
+func NewManager(repoPath string) (*Manager, error) {
+	gitManager, err := NewGitManager(repoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	gbmDir := filepath.Join(repoPath, ".gbm")
+	config, err := LoadConfig(gbmDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	return &Manager{
+		config:     config,
+		gitManager: gitManager,
+		repoPath:   repoPath,
+		gbmDir:     gbmDir,
+	}, nil
+}
+
+
+func (m *Manager) LoadEnvMapping(envrcPath string) error {
+	if envrcPath == "" {
+		envrcPath = filepath.Join(m.repoPath, ".envrc")
+	}
+
+	if !filepath.IsAbs(envrcPath) {
+		envrcPath = filepath.Join(m.repoPath, envrcPath)
+	}
+
+	mapping, err := ParseEnvrc(envrcPath)
+	if err != nil {
+		return err
+	}
+
+	m.envMapping = mapping
+	return nil
+}
+
+func (m *Manager) Initialize(force, fetch bool) error {
+	if !m.gitManager.IsGitRepository() {
+		return fmt.Errorf("not a git repository")
+	}
+
+	if m.envMapping == nil {
+		return fmt.Errorf("no .envrc mapping loaded")
+	}
+
+	if fetch {
+		if err := m.gitManager.FetchAll(); err != nil {
+			return fmt.Errorf("failed to fetch: %w", err)
+		}
+	}
+
+	worktreeDir := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)
+	if !force {
+		if _, err := os.Stat(worktreeDir); !os.IsNotExist(err) {
+			return fmt.Errorf("worktree directory already exists, use --force to override")
+		}
+	}
+
+	for envVar, branchName := range m.envMapping.Variables {
+		err := m.gitManager.CreateWorktree(envVar, branchName, m.config.Settings.WorktreePrefix)
+		if err != nil {
+			return fmt.Errorf("failed to create worktree for %s: %w", envVar, err)
+		}
+	}
+
+	var trackedVars []string
+	for envVar := range m.envMapping.Variables {
+		trackedVars = append(trackedVars, envVar)
+	}
+	m.config.State.TrackedVars = trackedVars
+	m.config.State.LastSync = time.Now()
+
+	return m.config.Save(m.gbmDir)
+}
+
+func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
+	if m.envMapping == nil {
+		return nil, fmt.Errorf("no .envrc mapping loaded")
+	}
+
+	status := &SyncStatus{
+		InSync:          true,
+		MissingWorktrees: []string{},
+		OrphanedWorktrees: []string{},
+		BranchChanges:   make(map[string]BranchChange),
+	}
+
+	worktrees, err := m.gitManager.GetWorktrees()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get worktrees: %w", err)
+	}
+
+	worktreeMap := make(map[string]*WorktreeInfo)
+	for _, wt := range worktrees {
+		if strings.HasPrefix(wt.Path, filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)) {
+			worktreeMap[wt.Name] = wt
+		}
+	}
+
+	for envVar, expectedBranch := range m.envMapping.Variables {
+		if wt, exists := worktreeMap[envVar]; exists {
+			if wt.Branch != expectedBranch {
+				status.BranchChanges[envVar] = BranchChange{
+					OldBranch: wt.Branch,
+					NewBranch: expectedBranch,
+				}
+				status.InSync = false
+			}
+			delete(worktreeMap, envVar)
+		} else {
+			status.MissingWorktrees = append(status.MissingWorktrees, envVar)
+			status.InSync = false
+		}
+	}
+
+	for envVar := range worktreeMap {
+		status.OrphanedWorktrees = append(status.OrphanedWorktrees, envVar)
+		status.InSync = false
+	}
+
+	return status, nil
+}
+
+func (m *Manager) Sync(dryRun, force, fetch bool) error {
+	if m.envMapping == nil {
+		return fmt.Errorf("no .envrc mapping loaded")
+	}
+
+	if fetch {
+		if err := m.gitManager.FetchAll(); err != nil {
+			return fmt.Errorf("failed to fetch: %w", err)
+		}
+	}
+
+	status, err := m.GetSyncStatus()
+	if err != nil {
+		return err
+	}
+
+	if status.InSync {
+		return nil
+	}
+
+	if dryRun {
+		return nil
+	}
+
+	for _, envVar := range status.MissingWorktrees {
+		branchName := m.envMapping.Variables[envVar]
+		err := m.gitManager.CreateWorktree(envVar, branchName, m.config.Settings.WorktreePrefix)
+		if err != nil {
+			return fmt.Errorf("failed to create worktree for %s: %w", envVar, err)
+		}
+	}
+
+	for envVar, change := range status.BranchChanges {
+		worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
+		err := m.gitManager.UpdateWorktree(worktreePath, change.NewBranch)
+		if err != nil {
+			return fmt.Errorf("failed to update worktree for %s: %w", envVar, err)
+		}
+	}
+
+	if force {
+		for _, envVar := range status.OrphanedWorktrees {
+			worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
+			err := m.gitManager.RemoveWorktree(worktreePath)
+			if err != nil {
+				return fmt.Errorf("failed to remove orphaned worktree %s: %w", envVar, err)
+			}
+		}
+	}
+
+	var trackedVars []string
+	for envVar := range m.envMapping.Variables {
+		trackedVars = append(trackedVars, envVar)
+	}
+	m.config.State.TrackedVars = trackedVars
+	m.config.State.LastSync = time.Now()
+
+	return m.config.Save(m.gbmDir)
+}
+
+func (m *Manager) ValidateEnvrc() error {
+	if m.envMapping == nil {
+		return fmt.Errorf("no .envrc mapping loaded")
+	}
+
+	for envVar, branchName := range m.envMapping.Variables {
+		exists, err := m.gitManager.BranchExists(branchName)
+		if err != nil {
+			return fmt.Errorf("failed to check branch %s for %s: %w", branchName, envVar, err)
+		}
+		if !exists {
+			return fmt.Errorf("branch '%s' for environment variable '%s' does not exist", branchName, envVar)
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) CleanOrphaned(force bool) error {
+	status, err := m.GetSyncStatus()
+	if err != nil {
+		return err
+	}
+
+	for _, envVar := range status.OrphanedWorktrees {
+		worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
+
+		if !force {
+			fmt.Printf("Remove orphaned worktree %s? [y/N]: ", envVar)
+			var response string
+			fmt.Scanln(&response)
+			if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
+				continue
+			}
+		}
+
+		err := m.gitManager.RemoveWorktree(worktreePath)
+		if err != nil {
+			return fmt.Errorf("failed to remove orphaned worktree %s: %w", envVar, err)
+		}
+	}
+
+	return nil
+}
+
+func (m *Manager) GetEnvMapping() (map[string]string, error) {
+	if m.envMapping == nil {
+		return nil, fmt.Errorf("no .envrc mapping loaded")
+	}
+	return m.envMapping.Variables, nil
+}
+
+func (m *Manager) GetWorktreeList() (map[string]*WorktreeListInfo, error) {
+	if m.envMapping == nil {
+		return nil, fmt.Errorf("no .envrc mapping loaded")
+	}
+
+	result := make(map[string]*WorktreeListInfo)
+
+	for envVar, expectedBranch := range m.envMapping.Variables {
+		worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
+
+		info := &WorktreeListInfo{
+			Path:           worktreePath,
+			ExpectedBranch: expectedBranch,
+			CurrentBranch:  "",
+		}
+
+		if _, err := os.Stat(worktreePath); err == nil {
+			worktrees, err := m.gitManager.GetWorktrees()
+			if err == nil {
+				for _, wt := range worktrees {
+					if wt.Path == worktreePath {
+						info.CurrentBranch = wt.Branch
+						break
+					}
+				}
+			}
+
+			// Get git status for the worktree
+			if gitStatus, err := m.gitManager.GetWorktreeStatus(worktreePath); err == nil {
+				info.GitStatus = gitStatus
+			}
+		}
+
+		result[envVar] = info
+	}
+
+	return result, nil
+}
+
+func (m *Manager) GetStatusIcon(gitStatus *GitStatus) string {
+	return m.gitManager.GetStatusIcon(gitStatus)
+}
