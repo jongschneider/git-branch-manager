@@ -22,31 +22,37 @@ Shows environment variable mappings and indicates sync status for each entry.`,
 		if err != nil {
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
+		PrintVerbose("Listing worktrees from working directory: %s", wd)
 
 		manager, err := internal.NewManager(wd)
 		if err != nil {
 			return err
 		}
 
+		PrintVerbose("Loading .envrc configuration from: %s", GetConfigPath())
 		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
 			return fmt.Errorf("failed to load .envrc: %w", err)
 		}
 
+		PrintVerbose("Retrieving sync status for list operation")
 		status, err := manager.GetSyncStatus()
 		if err != nil {
 			return err
 		}
 
+		PrintVerbose("Fetching detailed worktree information")
 		// Get worktree information
 		worktrees, err := manager.GetWorktreeList()
 		if err != nil {
 			return fmt.Errorf("failed to get worktree list: %w", err)
 		}
 
+		PrintVerbose("Found %d worktrees to display", len(worktrees))
 		if len(worktrees) == 0 {
 			return nil
 		}
 
+		PrintVerbose("Building worktree list table")
 		table := internal.NewTable([]string{"ENV VAR", "BRANCH", "STATUS", "PATH"})
 
 		for envVar, info := range worktrees {

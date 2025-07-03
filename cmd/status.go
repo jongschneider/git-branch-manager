@@ -20,27 +20,32 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 		if err != nil {
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
+		PrintVerbose("Checking status from working directory: %s", wd)
 
 		manager, err := internal.NewManager(wd)
 		if err != nil {
 			return err
 		}
 
+		PrintVerbose("Loading .envrc configuration from: %s", GetConfigPath())
 		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
 			return fmt.Errorf("failed to load .envrc: %w", err)
 		}
 
+		PrintVerbose("Retrieving sync status from manager")
 		status, err := manager.GetSyncStatus()
 		if err != nil {
 			return err
 		}
 
+		PrintVerbose("Fetching worktree list for status display")
 		// Get worktree information for table
 		worktrees, err := manager.GetWorktreeList()
 		if err != nil {
 			return fmt.Errorf("failed to get worktree list: %w", err)
 		}
 
+		PrintVerbose("Building status table with %d worktrees", len(worktrees))
 		table := internal.NewTable([]string{"ENV VAR", "BRANCH", "GIT STATUS", "SYNC STATUS"})
 
 		// Add rows for each worktree

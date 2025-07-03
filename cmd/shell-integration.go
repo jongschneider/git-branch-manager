@@ -20,6 +20,7 @@ Example usage:
 Or add to your shell configuration:
   echo 'eval "$(gbm shell-integration)"' >> ~/.bashrc`,
 	RunE: func(cmd *cobra.Command, args []string) error {
+		PrintVerbose("Generating shell integration code")
 		shellCode := `
 # Git Branch Manager (gbm) shell integration
 # Automatically check for worktree drift and display status
@@ -50,6 +51,7 @@ gbm-sync() {
     gbm sync "$@"
 }
 `
+		PrintVerbose("Outputting shell integration script")
 		fmt.Print(shellCode)
 		return nil
 	},

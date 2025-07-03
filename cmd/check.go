@@ -32,6 +32,7 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 		if err != nil {
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
+		PrintVerbose("Performing check from working directory: %s", wd)
 
 		manager, err := internal.NewManager(wd)
 		if err != nil {
@@ -41,6 +42,7 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 			return err
 		}
 
+		PrintVerbose("Loading .envrc configuration from: %s", GetConfigPath())
 		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
 			if checkExitCode {
 				os.Exit(1)
@@ -48,6 +50,7 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 			return fmt.Errorf("failed to load .envrc: %w", err)
 		}
 
+		PrintVerbose("Retrieving sync status for check operation")
 		status, err := manager.GetSyncStatus()
 		if err != nil {
 			if checkExitCode {
@@ -81,6 +84,7 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 			}
 		}
 
+		PrintVerbose("Formatting output as: %s", checkFormat)
 		switch checkFormat {
 		case "json":
 			encoder := json.NewEncoder(os.Stdout)
@@ -98,6 +102,7 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 			if err != nil {
 				return fmt.Errorf("failed to get worktree list: %w", err)
 			}
+			PrintVerbose("Generating table format for %d worktrees", len(worktrees))
 
 			table := internal.NewTable([]string{"ENV VAR", "BRANCH", "STATUS", "ISSUES"})
 
@@ -138,10 +143,8 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 				PrintInfo("%s All worktrees in sync", output.Indicator)
 			} else {
 				PrintInfo("%s %d issue(s) detected", output.Indicator, len(output.Issues))
-				if IsVerbose() {
-					for _, issue := range output.Issues {
-						PrintInfo("  • %s", issue)
-					}
+				for _, issue := range output.Issues {
+					PrintInfo("  • %s", issue)
 				}
 			}
 		}
