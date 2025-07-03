@@ -22,9 +22,14 @@ Shows environment variable mappings and indicates sync status for each entry.`,
 		if err != nil {
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
-		PrintVerbose("Listing worktrees from working directory: %s", wd)
 
-		manager, err := internal.NewManager(wd)
+		repoRoot, err := internal.FindGitRoot(wd)
+		if err != nil {
+			return fmt.Errorf("failed to find git repository root: %w", err)
+		}
+		PrintVerbose("Listing worktrees from repository root: %s", repoRoot)
+
+		manager, err := internal.NewManager(repoRoot)
 		if err != nil {
 			return err
 		}

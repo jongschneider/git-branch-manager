@@ -47,6 +47,125 @@ func execCommandRun(cmd *exec.Cmd) error {
 	return err
 }
 
+// FindGitRoot finds the root directory of the git repository
+func FindGitRoot(startPath string) (string, error) {
+	// First, try direct git commands from the current directory
+	cmd := exec.Command("git", "rev-parse", "--git-dir")
+	cmd.Dir = startPath
+	gitDirOutput, err := cmd.Output()
+	if err == nil {
+		gitDir := strings.TrimSpace(string(gitDirOutput))
+		
+		// If .git-dir contains "worktrees", we're in a worktree
+		if strings.Contains(gitDir, "worktrees") {
+			// Extract the main repository path from the worktree git dir
+			// Format: /path/to/main/repo/.git/worktrees/worktree-name
+			parts := strings.Split(gitDir, "/.git/worktrees/")
+			if len(parts) >= 2 {
+				return parts[0], nil
+			}
+		}
+		
+		// Check if this is a bare repository
+		cmd = exec.Command("git", "rev-parse", "--is-bare-repository")
+		cmd.Dir = startPath
+		output, err := cmd.Output()
+		if err == nil && strings.TrimSpace(string(output)) == "true" {
+			// For bare repositories, the git directory is the repository root
+			if filepath.IsAbs(gitDir) {
+				return filepath.Dir(gitDir), nil
+			} else {
+				// gitDir is relative (e.g., ".git"), so repository root is startPath
+				return startPath, nil
+			}
+		}
+		
+		// Standard git root detection if we're in a regular repo
+		cmd = exec.Command("git", "rev-parse", "--show-toplevel")
+		cmd.Dir = startPath
+		output, err = cmd.Output()
+		if err == nil {
+			return strings.TrimSpace(string(output)), nil
+		}
+		
+		// If show-toplevel failed, try alternative detection methods
+		// Check if we have a .git directory or file
+		gitPath := filepath.Join(startPath, ".git")
+		if _, err := os.Stat(gitPath); err == nil {
+			// We have a .git entry, so this is likely the repository root
+			return startPath, nil
+		}
+		
+		// If gitDir is absolute, we can derive the repository root
+		if filepath.IsAbs(gitDir) {
+			// Remove .git suffix to get repository root
+			if strings.HasSuffix(gitDir, ".git") {
+				return strings.TrimSuffix(gitDir, ".git"), nil
+			}
+			return filepath.Dir(gitDir), nil
+		}
+	}
+	
+	// If we're not in a git repository, check for git repositories in subdirectories
+	// This handles the case where we're in a directory that contains worktrees
+	// but isn't itself a git repository
+	entries, err := os.ReadDir(startPath)
+	if err == nil {
+		var foundRepos []string
+		
+		for _, entry := range entries {
+			if entry.IsDir() {
+				subPath := filepath.Join(startPath, entry.Name())
+				
+				// Check if this subdirectory is a git repository
+				cmd := exec.Command("git", "rev-parse", "--git-dir")
+				cmd.Dir = subPath
+				gitDirOutput, err := cmd.Output()
+				if err == nil {
+					gitDir := strings.TrimSpace(string(gitDirOutput))
+					
+					// If this is a worktree, get the main repository path
+					if strings.Contains(gitDir, "worktrees") {
+						parts := strings.Split(gitDir, "/.git/worktrees/")
+						if len(parts) >= 2 {
+							foundRepos = append(foundRepos, parts[0])
+						}
+					} else {
+						// Check if this is a bare repository
+						cmd = exec.Command("git", "rev-parse", "--is-bare-repository")
+						cmd.Dir = subPath
+						output, err := cmd.Output()
+						if err == nil && strings.TrimSpace(string(output)) == "true" {
+							// For bare repositories, the git directory is the repository root
+							if filepath.IsAbs(gitDir) {
+								foundRepos = append(foundRepos, filepath.Dir(gitDir))
+							} else {
+								// gitDir is relative (e.g., ".git"), so repository root is subPath
+								foundRepos = append(foundRepos, subPath)
+							}
+						} else {
+							// If this is a regular git repository, return its root
+							cmd = exec.Command("git", "rev-parse", "--show-toplevel")
+							cmd.Dir = subPath
+							output, err := cmd.Output()
+							if err == nil {
+								foundRepos = append(foundRepos, strings.TrimSpace(string(output)))
+							}
+						}
+					}
+				}
+			}
+		}
+		
+		// If we found repositories in subdirectories, use the first one
+		if len(foundRepos) > 0 {
+			return foundRepos[0], nil
+		}
+	}
+	
+	return "", fmt.Errorf("not in a git repository and no git repositories found in subdirectories")
+}
+
 func NewGitManager(repoPath string) (*GitManager, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {

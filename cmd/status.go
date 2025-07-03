@@ -20,9 +20,14 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 		if err != nil {
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
-		PrintVerbose("Checking status from working directory: %s", wd)
 
-		manager, err := internal.NewManager(wd)
+		repoRoot, err := internal.FindGitRoot(wd)
+		if err != nil {
+			return fmt.Errorf("failed to find git repository root: %w", err)
+		}
+		PrintVerbose("Checking status from repository root: %s", repoRoot)
+
+		manager, err := internal.NewManager(repoRoot)
 		if err != nil {
 			return err
 		}

@@ -24,9 +24,14 @@ each orphaned worktree. Use --force to skip confirmations.`,
 		if err != nil {
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
-		PrintVerbose("Starting cleanup from working directory: %s", wd)
 
-		manager, err := internal.NewManager(wd)
+		repoRoot, err := internal.FindGitRoot(wd)
+		if err != nil {
+			return fmt.Errorf("failed to find git repository root: %w", err)
+		}
+		PrintVerbose("Starting cleanup from repository root: %s", repoRoot)
+
+		manager, err := internal.NewManager(repoRoot)
 		if err != nil {
 			return err
 		}

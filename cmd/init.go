@@ -26,7 +26,12 @@ Validates that the repository is a valid Git repo and creates .gbm/ directory fo
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
 
-		manager, err := internal.NewManager(wd)
+		repoRoot, err := internal.FindGitRoot(wd)
+		if err != nil {
+			return fmt.Errorf("failed to find git repository root: %w", err)
+		}
+
+		manager, err := internal.NewManager(repoRoot)
 		if err != nil {
 			return err
 		}

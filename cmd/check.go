@@ -32,9 +32,14 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 		if err != nil {
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
-		PrintVerbose("Performing check from working directory: %s", wd)
 
-		manager, err := internal.NewManager(wd)
+		repoRoot, err := internal.FindGitRoot(wd)
+		if err != nil {
+			return fmt.Errorf("failed to find git repository root: %w", err)
+		}
+		PrintVerbose("Performing check from repository root: %s", repoRoot)
+
+		manager, err := internal.NewManager(repoRoot)
 		if err != nil {
 			if checkExitCode {
 				os.Exit(1)
