@@ -2,84 +2,47 @@ package internal
 
 import (
 	"fmt"
-	"strings"
+
+	"github.com/charmbracelet/lipgloss"
+	"github.com/charmbracelet/lipgloss/table"
 )
 
 type Table struct {
-	Headers []string
-	Rows    [][]string
-	widths  []int
+	table *table.Table
 }
 
 func NewTable(headers []string) *Table {
+	t := table.New().
+		Border(lipgloss.NormalBorder()).
+		BorderStyle(TableBorderStyle).
+		StyleFunc(func(row, col int) lipgloss.Style {
+			if row == table.HeaderRow {
+				return TableHeaderStyle
+			}
+			return TableCellStyle
+		}).
+		Headers(headers...)
+
 	return &Table{
-		Headers: headers,
-		Rows:    make([][]string, 0),
-		widths:  make([]int, len(headers)),
+		table: t,
 	}
 }
 
 func (t *Table) AddRow(row []string) {
-	if len(row) != len(t.Headers) {
-		panic(fmt.Sprintf("row length %d does not match header length %d", len(row), len(t.Headers)))
-	}
-	t.Rows = append(t.Rows, row)
-}
-
-func (t *Table) calculateWidths() {
-	// Initialize with header widths
-	for i, header := range t.Headers {
-		t.widths[i] = len(header)
-	}
-
-	// Check all rows for maximum width
-	for _, row := range t.Rows {
-		for i, cell := range row {
-			if len(cell) > t.widths[i] {
-				t.widths[i] = len(cell)
-			}
-		}
-	}
+	t.table.Row(row...)
 }
 
 func (t *Table) Print() {
-	if len(t.Rows) == 0 {
+	if t.table == nil {
 		return
 	}
+	fmt.Println(t.table.String())
+}
 
-	t.calculateWidths()
-
-	// Ensure minimum column spacing
-	spacing := 4
-
-	// Print header
-	for i, header := range t.Headers {
-		fmt.Printf("%-*s", t.widths[i], header)
-		if i < len(t.Headers)-1 {
-			fmt.Print(strings.Repeat(" ", spacing))
-		}
+func (t *Table) String() string {
+	if t.table == nil {
+		return ""
 	}
-	fmt.Println()
-
-	// Print separator
-	totalWidth := 0
-	for i, width := range t.widths {
-		totalWidth += width
-		if i < len(t.widths)-1 {
-			totalWidth += spacing
-		}
-	}
-	fmt.Println(strings.Repeat("-", totalWidth))
-
-	// Print rows
-	for _, row := range t.Rows {
-		for i, cell := range row {
-			fmt.Printf("%-*s", t.widths[i], cell)
-			if i < len(row)-1 {
-				fmt.Print(strings.Repeat(" ", spacing))
-			}
-		}
-		fmt.Println()
-	}
+	return t.table.String()
 }
 
