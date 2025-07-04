@@ -68,9 +68,22 @@ Examples:
 func switchToWorktree(manager *internal.Manager, worktreeName string) error {
 	PrintVerbose("Switching to worktree: %s", worktreeName)
 
+	// Try exact match first
 	targetPath, err := manager.GetWorktreePath(worktreeName)
 	if err != nil {
-		return err
+		// If exact match fails, try fuzzy matching
+		PrintVerbose("Exact match failed, trying fuzzy matching")
+		matchedName := findFuzzyMatch(manager, worktreeName)
+		if matchedName != "" {
+			PrintInfo("Fuzzy matched '%s' to '%s'", worktreeName, matchedName)
+			targetPath, err = manager.GetWorktreePath(matchedName)
+			if err != nil {
+				return err
+			}
+			worktreeName = matchedName // Update for display
+		} else {
+			return err
+		}
 	}
 
 	if printPath {
@@ -84,11 +97,49 @@ func switchToWorktree(manager *internal.Manager, worktreeName string) error {
 		fmt.Printf("cd %s\n", targetPath)
 		return nil
 	}
-	
+
 	fmt.Printf("Worktree %s is located at: %s\n", worktreeName, targetPath)
 	fmt.Println("Use shell integration 'gbm-switch' function to automatically change directory")
 	fmt.Println("Or run: cd " + targetPath)
 	return nil
+}
+
+func findFuzzyMatch(manager *internal.Manager, target string) string {
+	worktrees, err := manager.GetAllWorktrees()
+	if err != nil {
+		return ""
+	}
+
+	target = strings.ToUpper(target)
+
+	// Look for case-insensitive substring matches
+	var matches []string
+	for name := range worktrees {
+		upperName := strings.ToUpper(name)
+		if strings.Contains(upperName, target) {
+			matches = append(matches, name)
+		}
+	}
+
+	// If we have exactly one match, return it
+	if len(matches) == 1 {
+		return matches[0]
+	}
+
+	// If we have multiple matches, prefer the one that starts with the target
+	for _, match := range matches {
+		upperMatch := strings.ToUpper(match)
+		if strings.HasPrefix(upperMatch, target) {
+			return match
+		}
+	}
+
+	// If no prefix match, return the first match (if any)
+	if len(matches) > 0 {
+		return matches[0]
+	}
+
+	return ""
 }
 
 func listWorktrees(manager *internal.Manager) error {
@@ -134,7 +185,7 @@ func listWorktrees(manager *internal.Manager) error {
 func init() {
 	rootCmd.AddCommand(switchCmd)
 	switchCmd.Flags().BoolVar(&printPath, "print-path", false, "Print the worktree path only (for shell integration)")
-	
+
 	// Add completion for worktree names
 	switchCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) != 0 {
@@ -171,4 +222,3 @@ func getWorktreeNames() []string {
 	}
 	return names
 }
-

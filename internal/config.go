@@ -18,8 +18,8 @@ type Config struct {
 }
 
 type ConfigSettings struct {
-	WorktreePrefix       string `toml:"worktree_prefix"`
-	AutoFetch           bool   `toml:"auto_fetch"`
+	WorktreePrefix        string `toml:"worktree_prefix"`
+	AutoFetch             bool   `toml:"auto_fetch"`
 	CreateMissingBranches bool   `toml:"create_missing_branches"`
 }
 
@@ -35,8 +35,8 @@ type EnvMapping struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Settings: ConfigSettings{
-			WorktreePrefix:       "worktrees",
-			AutoFetch:           true,
+			WorktreePrefix:        "worktrees",
+			AutoFetch:             true,
 			CreateMissingBranches: false,
 		},
 		State: ConfigState{

@@ -168,4 +168,3 @@ func init() {
 	checkCmd.Flags().StringVar(&checkFormat, "format", "text", "output format (prompt|json|text|table)")
 	checkCmd.Flags().BoolVar(&checkExitCode, "exit-code", false, "return status code only")
 }
-

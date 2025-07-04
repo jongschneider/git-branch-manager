@@ -10,7 +10,7 @@ The `.envrc` file serves as the source of truth for branch management, where eac
 
 ```bash
 PROD=production/2025-05-1
-PREVIEW=production/2025-06-1  
+PREVIEW=production/2025-06-1
 MAIN=master
 STAGING=feature/new-api
 ```
@@ -129,7 +129,7 @@ Changes needed:
 
 Actions:
   [s] Sync all changes
-  [r] Review changes individually  
+  [r] Review changes individually
   [i] Ignore for this session
   [q] Quit
 ```

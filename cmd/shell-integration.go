@@ -106,4 +106,3 @@ gbm() {
 func init() {
 	rootCmd.AddCommand(shellIntegrationCmd)
 }
-

@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"gbm/internal"
+
 	"github.com/spf13/cobra"
 )
 
@@ -36,7 +37,6 @@ if branch references have changed, and optionally removes orphaned worktrees.`,
 		if err != nil {
 			return err
 		}
-
 
 		PrintVerbose("Loading .envrc configuration from: %s", GetConfigPath())
 		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
@@ -95,3 +95,4 @@ func init() {
 	syncCmd.Flags().BoolVar(&syncForce, "force", false, "skip confirmation prompts and remove orphaned worktrees")
 	syncCmd.Flags().BoolVar(&syncFetch, "fetch", false, "update remote tracking before sync")
 }
+

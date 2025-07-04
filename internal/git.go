@@ -55,7 +55,7 @@ func FindGitRoot(startPath string) (string, error) {
 	gitDirOutput, err := cmd.Output()
 	if err == nil {
 		gitDir := strings.TrimSpace(string(gitDirOutput))
-		
+
 		// If .git-dir contains "worktrees", we're in a worktree
 		if strings.Contains(gitDir, "worktrees") {
 			// Extract the main repository path from the worktree git dir
@@ -65,7 +65,7 @@ func FindGitRoot(startPath string) (string, error) {
 				return parts[0], nil
 			}
 		}
-		
+
 		// Check if this is a bare repository
 		cmd = exec.Command("git", "rev-parse", "--is-bare-repository")
 		cmd.Dir = startPath
@@ -79,7 +79,7 @@ func FindGitRoot(startPath string) (string, error) {
 				return startPath, nil
 			}
 		}
-		
+
 		// Standard git root detection if we're in a regular repo
 		cmd = exec.Command("git", "rev-parse", "--show-toplevel")
 		cmd.Dir = startPath
@@ -87,7 +87,7 @@ func FindGitRoot(startPath string) (string, error) {
 		if err == nil {
 			return strings.TrimSpace(string(output)), nil
 		}
-		
+
 		// If show-toplevel failed, try alternative detection methods
 		// Check if we have a .git directory or file
 		gitPath := filepath.Join(startPath, ".git")
@@ -95,7 +95,7 @@ func FindGitRoot(startPath string) (string, error) {
 			// We have a .git entry, so this is likely the repository root
 			return startPath, nil
 		}
-		
+
 		// If gitDir is absolute, we can derive the repository root
 		if filepath.IsAbs(gitDir) {
 			// Remove .git suffix to get repository root
@@ -105,25 +105,25 @@ func FindGitRoot(startPath string) (string, error) {
 			return filepath.Dir(gitDir), nil
 		}
 	}
-	
+
 	// If we're not in a git repository, check for git repositories in subdirectories
 	// This handles the case where we're in a directory that contains worktrees
 	// but isn't itself a git repository
 	entries, err := os.ReadDir(startPath)
 	if err == nil {
 		var foundRepos []string
-		
+
 		for _, entry := range entries {
 			if entry.IsDir() {
 				subPath := filepath.Join(startPath, entry.Name())
-				
+
 				// Check if this subdirectory is a git repository
 				cmd := exec.Command("git", "rev-parse", "--git-dir")
 				cmd.Dir = subPath
 				gitDirOutput, err := cmd.Output()
 				if err == nil {
 					gitDir := strings.TrimSpace(string(gitDirOutput))
-					
+
 					// If this is a worktree, get the main repository path
 					if strings.Contains(gitDir, "worktrees") {
 						parts := strings.Split(gitDir, "/.git/worktrees/")
@@ -156,13 +156,13 @@ func FindGitRoot(startPath string) (string, error) {
 				}
 			}
 		}
-		
+
 		// If we found repositories in subdirectories, use the first one
 		if len(foundRepos) > 0 {
 			return foundRepos[0], nil
 		}
 	}
-	
+
 	return "", fmt.Errorf("not in a git repository and no git repositories found in subdirectories")
 }
 
@@ -405,4 +405,165 @@ func (gm *GitManager) GetStatusIcon(gitStatus *GitStatus) string {
 	}
 
 	return strings.Join(icons, "")
+}
+
+func (gm *GitManager) CreateBranch(branchName, baseBranch string) error {
+	if baseBranch == "" {
+		baseBranch = "HEAD"
+	}
+
+	cmd := exec.Command("git", "branch", branchName, baseBranch)
+	cmd.Dir = gm.repoPath
+	if err := execCommandRun(cmd); err != nil {
+		return fmt.Errorf("failed to create branch: %w", err)
+	}
+
+	return nil
+}
+
+func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch bool) error {
+	worktreeDir := filepath.Join(gm.repoPath, "worktrees")
+	worktreePath := filepath.Join(worktreeDir, worktreeName)
+
+	// Check if worktree already exists
+	if _, err := os.Stat(worktreePath); !os.IsNotExist(err) {
+		return fmt.Errorf("worktree '%s' already exists", worktreeName)
+	}
+
+	// Create worktrees directory if it doesn't exist
+	if err := os.MkdirAll(worktreeDir, 0755); err != nil {
+		return fmt.Errorf("failed to create worktrees directory: %w", err)
+	}
+
+	var cmd *exec.Cmd
+	if createBranch {
+		// Create new branch and worktree
+		cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath)
+	} else {
+		// Create worktree on existing branch
+		branchExists, err := gm.BranchExists(branchName)
+		if err != nil {
+			return fmt.Errorf("failed to check if branch exists: %w", err)
+		}
+
+		if !branchExists {
+			return fmt.Errorf("branch '%s' does not exist", branchName)
+		}
+
+		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+	}
+
+	cmd.Dir = gm.repoPath
+	if err := execCommandRun(cmd); err != nil {
+		return fmt.Errorf("failed to add worktree: %w", err)
+	}
+
+	return nil
+}
+
+func (gm *GitManager) GetCurrentBranch() (string, error) {
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = gm.repoPath
+	output, err := execCommand(cmd)
+	if err != nil {
+		return "", fmt.Errorf("failed to get current branch: %w", err)
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
+func (gm *GitManager) GetRemoteBranches() ([]string, error) {
+	cmd := exec.Command("git", "branch", "-r")
+	cmd.Dir = gm.repoPath
+	output, err := execCommand(cmd)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get remote branches: %w", err)
+	}
+
+	var branches []string
+	lines := strings.Split(string(output), "\n")
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		if line == "" || strings.Contains(line, "HEAD") {
+			continue
+		}
+
+		// Remove "origin/" prefix
+		if strings.HasPrefix(line, "origin/") {
+			branch := strings.TrimPrefix(line, "origin/")
+			branches = append(branches, branch)
+		}
+	}
+
+	return branches, nil
+}
+
+func (gm *GitManager) PushWorktree(worktreePath string) error {
+	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
+		return fmt.Errorf("worktree path does not exist: %s", worktreePath)
+	}
+
+	// Get the current branch
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = worktreePath
+	output, err := execCommand(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to get current branch: %w", err)
+	}
+
+	currentBranch := strings.TrimSpace(string(output))
+
+	// Check if upstream is set
+	cmd = exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
+	cmd.Dir = worktreePath
+	_, err = execCommand(cmd)
+
+	if err != nil {
+		// No upstream set, push with -u flag
+		cmd = exec.Command("git", "push", "-u", "origin", currentBranch)
+	} else {
+		// Upstream is set, simple push
+		cmd = exec.Command("git", "push")
+	}
+
+	cmd.Dir = worktreePath
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func (gm *GitManager) PullWorktree(worktreePath string) error {
+	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
+		return fmt.Errorf("worktree path does not exist: %s", worktreePath)
+	}
+
+	// Simple pull
+	cmd := exec.Command("git", "pull")
+	cmd.Dir = worktreePath
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
+}
+
+func (gm *GitManager) IsInWorktree(currentPath string) (bool, string, error) {
+	// Check if we're in a worktree
+	cmd := exec.Command("git", "rev-parse", "--show-toplevel")
+	cmd.Dir = currentPath
+	output, err := execCommand(cmd)
+	if err != nil {
+		return false, "", fmt.Errorf("not in a git repository: %w", err)
+	}
+
+	worktreePath := strings.TrimSpace(string(output))
+
+	// Check if this is a worktree by checking if it's under the worktrees directory
+	worktreePrefix := filepath.Join(gm.repoPath, "worktrees")
+	if strings.HasPrefix(worktreePath, worktreePrefix) {
+		worktreeName := filepath.Base(worktreePath)
+		return true, worktreeName, nil
+	}
+
+	return false, "", nil
 }

@@ -369,3 +369,64 @@ func (m *Manager) GetAllWorktrees() (map[string]*WorktreeListInfo, error) {
 	return result, nil
 }
 
+func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool) error {
+	return m.gitManager.AddWorktree(worktreeName, branchName, createBranch)
+}
+
+func (m *Manager) GetRemoteBranches() ([]string, error) {
+	return m.gitManager.GetRemoteBranches()
+}
+
+func (m *Manager) GetCurrentBranch() (string, error) {
+	return m.gitManager.GetCurrentBranch()
+}
+
+func (m *Manager) PushWorktree(worktreeName string) error {
+	worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, worktreeName)
+	return m.gitManager.PushWorktree(worktreePath)
+}
+
+func (m *Manager) PullWorktree(worktreeName string) error {
+	worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, worktreeName)
+	return m.gitManager.PullWorktree(worktreePath)
+}
+
+func (m *Manager) IsInWorktree(currentPath string) (bool, string, error) {
+	return m.gitManager.IsInWorktree(currentPath)
+}
+
+func (m *Manager) PushAllWorktrees() error {
+	worktrees, err := m.GetAllWorktrees()
+	if err != nil {
+		return fmt.Errorf("failed to get worktrees: %w", err)
+	}
+
+	for name, info := range worktrees {
+		fmt.Printf("Pushing worktree '%s'...\n", name)
+		if err := m.gitManager.PushWorktree(info.Path); err != nil {
+			fmt.Printf("Failed to push worktree '%s': %v\n", name, err)
+			continue
+		}
+		fmt.Printf("Successfully pushed worktree '%s'\n", name)
+	}
+
+	return nil
+}
+
+func (m *Manager) PullAllWorktrees() error {
+	worktrees, err := m.GetAllWorktrees()
+	if err != nil {
+		return fmt.Errorf("failed to get worktrees: %w", err)
+	}
+
+	for name, info := range worktrees {
+		fmt.Printf("Pulling worktree '%s'...\n", name)
+		if err := m.gitManager.PullWorktree(info.Path); err != nil {
+			fmt.Printf("Failed to pull worktree '%s': %v\n", name, err)
+			continue
+		}
+		fmt.Printf("Successfully pulled worktree '%s'\n", name)
+	}
+
+	return nil
+}

@@ -82,3 +82,4 @@ func (t *Table) Print() {
 		fmt.Println()
 	}
 }
+

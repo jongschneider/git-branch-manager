@@ -13,7 +13,7 @@ go build -o gbm
 1. Create a `.envrc` file in your Git repository:
 ```bash
 PROD=production/2025-05-1
-PREVIEW=production/2025-06-1  
+PREVIEW=production/2025-06-1
 MAIN=master
 STAGING=feature/new-api
 ```

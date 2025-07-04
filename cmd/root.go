@@ -5,15 +5,16 @@ import (
 	"os"
 	"runtime"
 	"time"
-	"github.com/charmbracelet/bubbletea"
+
+	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
 
 var (
-	configPath string
+	configPath  string
 	worktreeDir string
-	debug      bool
-	logFile    *os.File
+	debug       bool
+	logFile     *os.File
 )
 
 var rootCmd = &cobra.Command{
@@ -91,7 +92,6 @@ func PrintError(format string, args ...interface{}) {
 		fmt.Fprintf(logFile, "%s [ERROR] %s:%d %s\n", timestamp, file, line, msg)
 	}
 }
-
 
 func CloseLogFile() {
 	if logFile != nil {

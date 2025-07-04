@@ -5,6 +5,7 @@ import (
 	"os"
 
 	"gbm/internal"
+
 	"github.com/spf13/cobra"
 )
 
@@ -62,3 +63,4 @@ and ensuring configuration correctness before syncing.`,
 func init() {
 	rootCmd.AddCommand(validateCmd)
 }
+
