@@ -38,22 +38,45 @@ and ensuring configuration correctness before syncing.`,
 		}
 
 		PrintVerbose("Validating branch references...")
-		if err := manager.ValidateEnvrc(); err != nil {
-			PrintError("%v", err)
-			return fmt.Errorf("validation failed")
-		}
 
-		PrintInfo("✅ .envrc validation passed")
-		PrintInfo("📋 Configuration summary:")
-
-		// Get the mapping to show what was validated
+		// Get the mapping to validate
 		mapping, err := manager.GetEnvMapping()
 		if err != nil {
 			return err
 		}
 
-		for envVar, branch := range mapping {
-			PrintInfo("  • %s → %s", envVar, branch)
+		// Create table for validation results
+		table := internal.NewTable([]string{"ENV VARIABLE", "BRANCH", "STATUS"})
+
+		allValid := true
+		for envVar, branchName := range mapping {
+			exists, err := manager.BranchExists(branchName)
+			if err != nil {
+				table.AddRow([]string{envVar, branchName, internal.FormatStatusIcon("❌", "ERROR")})
+				allValid = false
+				continue
+			}
+
+			if exists {
+				table.AddRow([]string{envVar, branchName, internal.FormatStatusIcon("✅", "VALID")})
+			} else {
+				table.AddRow([]string{envVar, branchName, internal.FormatStatusIcon("❌", "NOT FOUND")})
+				allValid = false
+			}
+		}
+
+		// Display validation header
+		if allValid {
+			PrintInfo("%s", internal.FormatStatusIcon("✅", ".envrc validation passed"))
+		} else {
+			PrintError("%s", internal.FormatStatusIcon("❌", ".envrc validation failed"))
+		}
+
+		fmt.Println()
+		table.Print()
+
+		if !allValid {
+			return fmt.Errorf("validation failed - one or more branches do not exist")
 		}
 
 		return nil
