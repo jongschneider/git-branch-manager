@@ -56,10 +56,11 @@ Global Flags:
 
 ERROR: Error: exit status 1
 ```
+- [x] add completion support (cobra built-in bash/zsh/fish/powershell)
 - [x] add configuration for controlling the icons for git status, repo validations, etc
     - [x] ./.gbm/config.toml
+- [ ] configuration for copying files into new worktrees (.env, anything not tracked by git)
 - [ ] track merge backs... not sure how yet and how to prompt the user.
     - [ ] helper to create a merge worktree
-- [ ] configuration for copying files into new worktrees (.env, anything not tracked by git)
-- [x] add completion support (cobra built-in bash/zsh/fish/powershell)
 - [ ] add carapace completion
+- [ ] jira-cli support
