@@ -44,33 +44,33 @@ if branch references have changed, and optionally removes orphaned worktrees.`,
 		}
 
 		if syncDryRun {
-			PrintInfo("🔍 Dry run mode - showing what would be changed:")
+			PrintInfo("%s", internal.FormatStatusIcon("🔍", "Dry run mode - showing what would be changed:"))
 			status, err := manager.GetSyncStatus()
 			if err != nil {
 				return err
 			}
 
 			if status.InSync {
-				PrintInfo("✅ All worktrees are in sync")
+				PrintInfo("%s", internal.FormatStatusIcon("✅", "All worktrees are in sync"))
 				return nil
 			}
 
 			if len(status.MissingWorktrees) > 0 {
-				PrintInfo("📁 Missing worktrees:")
+				PrintInfo("%s", internal.FormatStatusIcon("📁", "Missing worktrees:"))
 				for _, envVar := range status.MissingWorktrees {
 					PrintInfo("  • %s", envVar)
 				}
 			}
 
 			if len(status.BranchChanges) > 0 {
-				PrintInfo("🔄 Branch changes needed:")
+				PrintInfo("%s", internal.FormatStatusIcon("🔄", "Branch changes needed:"))
 				for envVar, change := range status.BranchChanges {
 					PrintInfo("  • %s: %s → %s", envVar, change.OldBranch, change.NewBranch)
 				}
 			}
 
 			if len(status.OrphanedWorktrees) > 0 {
-				PrintInfo("🗑️  Orphaned worktrees (use --force to remove):")
+				PrintInfo("%s", internal.FormatStatusIcon("🗑️", "Orphaned worktrees (use --force to remove):"))
 				for _, envVar := range status.OrphanedWorktrees {
 					PrintInfo("  • %s", envVar)
 				}
@@ -84,7 +84,7 @@ if branch references have changed, and optionally removes orphaned worktrees.`,
 			return err
 		}
 
-		PrintInfo("✅ Successfully synchronized worktrees")
+		PrintInfo("%s", internal.FormatStatusIcon("✅", "Successfully synchronized worktrees"))
 		return nil
 	},
 }

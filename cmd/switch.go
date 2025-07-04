@@ -98,9 +98,9 @@ func switchToWorktree(manager *internal.Manager, worktreeName string) error {
 		return nil
 	}
 
-	fmt.Printf("Worktree %s is located at: %s\n", worktreeName, targetPath)
-	fmt.Println("Use shell integration 'gbm-switch' function to automatically change directory")
-	fmt.Println("Or run: cd " + targetPath)
+	fmt.Printf("%s\n", internal.FormatInfo(fmt.Sprintf("Worktree %s is located at: %s", worktreeName, targetPath)))
+	fmt.Println(internal.FormatSubtle("Use shell integration 'gbm-switch' function to automatically change directory"))
+	fmt.Println(internal.FormatSubtle("Or run: cd " + targetPath))
 	return nil
 }
 
@@ -151,11 +151,11 @@ func listWorktrees(manager *internal.Manager) error {
 	}
 
 	if len(worktrees) == 0 {
-		fmt.Println("No worktrees found. Run 'gbm init' to create worktrees.")
+		fmt.Println(internal.FormatInfo("No worktrees found. Run 'gbm init' to create worktrees."))
 		return nil
 	}
 
-	fmt.Println("Available worktrees:")
+	fmt.Println(internal.FormatSubHeader("Available worktrees:"))
 
 	// Sort worktree names for consistent output
 	var names []string

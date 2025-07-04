@@ -133,14 +133,14 @@ func handleInteractive(manager *internal.Manager) (string, error) {
 		return "", fmt.Errorf("failed to get remote branches: %w", err)
 	}
 
-	fmt.Println("Available branches:")
+	fmt.Println(internal.FormatSubHeader("Available branches:"))
 	for i, branch := range branches {
-		fmt.Printf("%d. %s\n", i+1, branch)
+		fmt.Printf("  %s\n", internal.FormatInfo(fmt.Sprintf("%d. %s", i+1, branch)))
 	}
-	fmt.Printf("%d. Create new branch\n", len(branches)+1)
+	fmt.Printf("  %s\n", internal.FormatInfo(fmt.Sprintf("%d. Create new branch", len(branches)+1)))
 
 	var choice int
-	fmt.Print("Select a branch: ")
+	fmt.Print(internal.FormatPrompt("Select a branch: "))
 	if _, err := fmt.Scanln(&choice); err != nil {
 		return "", fmt.Errorf("failed to read choice: %w", err)
 	}
@@ -152,7 +152,7 @@ func handleInteractive(manager *internal.Manager) (string, error) {
 	if choice == len(branches)+1 {
 		// Create new branch
 		newBranch = true
-		fmt.Print("Enter new branch name: ")
+		fmt.Print(internal.FormatPrompt("Enter new branch name: "))
 		var branchName string
 		if _, err := fmt.Scanln(&branchName); err != nil {
 			return "", fmt.Errorf("failed to read branch name: %w", err)

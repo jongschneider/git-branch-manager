@@ -50,11 +50,11 @@ each orphaned worktree. Use --force to skip confirmations.`,
 
 		PrintVerbose("Found %d orphaned worktrees to process", len(status.OrphanedWorktrees))
 		if len(status.OrphanedWorktrees) == 0 {
-			PrintInfo("✅ No orphaned worktrees found")
+			PrintInfo("%s", internal.FormatStatusIcon("✅", "No orphaned worktrees found"))
 			return nil
 		}
 
-		PrintInfo("🗑️  Found %d orphaned worktree(s):", len(status.OrphanedWorktrees))
+		PrintInfo("%s", internal.FormatStatusIcon("🗑️", fmt.Sprintf("Found %d orphaned worktree(s):", len(status.OrphanedWorktrees))))
 		for _, envVar := range status.OrphanedWorktrees {
 			PrintInfo("  • %s", envVar)
 		}
@@ -62,9 +62,9 @@ each orphaned worktree. Use --force to skip confirmations.`,
 
 		PrintVerbose("Cleanup mode: force=%v", cleanForce)
 		if cleanForce {
-			PrintInfo("🔥 Force mode enabled - removing all orphaned worktrees...")
+			PrintInfo("%s", internal.FormatStatusIcon("🔥", "Force mode enabled - removing all orphaned worktrees..."))
 		} else {
-			PrintInfo("ℹ️  Interactive mode - you will be prompted for each worktree")
+			PrintInfo("%s", internal.FormatStatusIcon("ℹ️", "Interactive mode - you will be prompted for each worktree"))
 		}
 
 		PrintVerbose("Initiating cleanup of orphaned worktrees")
@@ -72,7 +72,7 @@ each orphaned worktree. Use --force to skip confirmations.`,
 			return err
 		}
 
-		PrintInfo("✅ Orphaned worktree cleanup completed")
+		PrintInfo("%s", internal.FormatStatusIcon("✅", "Orphaned worktree cleanup completed"))
 		return nil
 	},
 }
