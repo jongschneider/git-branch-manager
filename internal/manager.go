@@ -272,6 +272,10 @@ func (m *Manager) GetEnvMapping() (map[string]string, error) {
 	return m.envMapping.Variables, nil
 }
 
+func (m *Manager) BranchExists(branchName string) (bool, error) {
+	return m.gitManager.BranchExists(branchName)
+}
+
 func (m *Manager) GetWorktreeList() (map[string]*WorktreeListInfo, error) {
 	if m.envMapping == nil {
 		return nil, fmt.Errorf("no .envrc mapping loaded")

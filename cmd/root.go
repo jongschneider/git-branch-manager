@@ -6,6 +6,8 @@ import (
 	"runtime"
 	"time"
 
+	"gbm/internal"
+
 	tea "github.com/charmbracelet/bubbletea"
 	"github.com/spf13/cobra"
 )
@@ -66,7 +68,7 @@ func InitializeLogging() {
 
 func PrintInfo(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(os.Stderr, "%s\n", msg)
+	fmt.Fprintf(os.Stderr, "%s\n", internal.FormatInfo(msg))
 	if logFile != nil {
 		_, file, line, _ := runtime.Caller(1)
 		timestamp := time.Now().Format("2006-01-02T15:04:05.000")
@@ -76,6 +78,9 @@ func PrintInfo(format string, args ...interface{}) {
 
 func PrintVerbose(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
+	if debug {
+		fmt.Fprintf(os.Stderr, "%s\n", internal.FormatVerbose(msg))
+	}
 	if logFile != nil {
 		_, file, line, _ := runtime.Caller(1)
 		timestamp := time.Now().Format("2006-01-02T15:04:05.000")
@@ -85,7 +90,7 @@ func PrintVerbose(format string, args ...interface{}) {
 
 func PrintError(format string, args ...interface{}) {
 	msg := fmt.Sprintf(format, args...)
-	fmt.Fprintf(os.Stderr, "ERROR: %s\n", msg)
+	fmt.Fprintf(os.Stderr, "%s\n", internal.FormatError("ERROR: "+msg))
 	if logFile != nil {
 		_, file, line, _ := runtime.Caller(1)
 		timestamp := time.Now().Format("2006-01-02T15:04:05.000")
