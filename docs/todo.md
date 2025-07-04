@@ -26,7 +26,7 @@
     - [x] `gbm pull <worktree_name>` pulls named worktree - no matter what directoy you are in
     - [x] `gbm pull --all` pulls all managed worktrees
 - [x] use lipgloss for tables and styling
-- [ ] fix `gbm pull`
+- [x] fix `gbm pull`
 ```sh
 󰀵 jschneider  ~/code/scratch/integrator/worktrees/MAIN   master  󰟓 v1.24.4
   gbm pull
@@ -56,8 +56,8 @@ Global Flags:
 
 ERROR: Error: exit status 1
 ```
-- [ ] add configuration for controlling the icons for git status, repo validations, etc
-    - [ ] ./.gbm/config.toml
+- [x] add configuration for controlling the icons for git status, repo validations, etc
+    - [x] ./.gbm/config.toml
 - [ ] track merge backs... not sure how yet and how to prompt the user.
     - [ ] helper to create a merge worktree
 - [ ] configuration for copying files into new worktrees (.env, anything not tracked by git)

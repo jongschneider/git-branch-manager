@@ -15,6 +15,7 @@ import (
 type Config struct {
 	Settings ConfigSettings `toml:"settings"`
 	State    ConfigState    `toml:"state"`
+	Icons    ConfigIcons    `toml:"icons"`
 }
 
 type ConfigSettings struct {
@@ -26,6 +27,26 @@ type ConfigSettings struct {
 type ConfigState struct {
 	LastSync    time.Time `toml:"last_sync"`
 	TrackedVars []string  `toml:"tracked_vars"`
+}
+
+type ConfigIcons struct {
+	// Status icons
+	Success  string `toml:"success"`
+	Warning  string `toml:"warning"`
+	Error    string `toml:"error"`
+	Info     string `toml:"info"`
+	Orphaned string `toml:"orphaned"`
+	DryRun   string `toml:"dry_run"`
+	Missing  string `toml:"missing"`
+	Changes  string `toml:"changes"`
+
+	// Git status icons
+	GitClean    string `toml:"git_clean"`
+	GitDirty    string `toml:"git_dirty"`
+	GitAhead    string `toml:"git_ahead"`
+	GitBehind   string `toml:"git_behind"`
+	GitDiverged string `toml:"git_diverged"`
+	GitUnknown  string `toml:"git_unknown"`
 }
 
 type EnvMapping struct {
@@ -42,6 +63,25 @@ func DefaultConfig() *Config {
 		State: ConfigState{
 			LastSync:    time.Time{},
 			TrackedVars: []string{},
+		},
+		Icons: ConfigIcons{
+			// Status icons
+			Success:  "✅",
+			Warning:  "⚠️",
+			Error:    "❌",
+			Info:     "💡",
+			Orphaned: "🗑️",
+			DryRun:   "🔍",
+			Missing:  "📁",
+			Changes:  "🔄",
+
+			// Git status icons
+			GitClean:    "✓",
+			GitDirty:    "~",
+			GitAhead:    "↑",
+			GitBehind:   "↓",
+			GitDiverged: "⇕",
+			GitUnknown:  "?",
 		},
 	}
 }

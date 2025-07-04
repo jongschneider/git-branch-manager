@@ -75,7 +75,7 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 
 			// Default to in sync if no issues
 			if syncStatus == "" {
-				syncStatus = internal.FormatStatusIcon("✅", "IN_SYNC")
+				syncStatus = internal.FormatSuccess("IN_SYNC")
 			}
 
 			// Get git status icon
@@ -88,7 +88,7 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 
 		if !status.InSync {
 			fmt.Println()
-			PrintInfo("%s", internal.FormatStatusIcon("💡", "Run 'gbm sync' to synchronize changes"))
+			PrintInfo("%s", internal.FormatInfo("Run 'gbm sync' to synchronize changes"))
 		}
 		return nil
 	},

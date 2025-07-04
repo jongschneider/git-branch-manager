@@ -59,24 +59,25 @@ Shows environment variable mappings and indicates sync status for each entry.`,
 		PrintVerbose("Building worktree list table")
 		table := internal.NewTable([]string{"ENV VAR", "BRANCH", "STATUS", "PATH"})
 
+		iconManager := internal.GetGlobalIconManager()
 		for envVar, info := range worktrees {
-			statusIcon := "✅"
+			statusIcon := iconManager.Success()
 			statusText := "OK"
 
 			// Check if this worktree has issues
 			if slices.Contains(status.MissingWorktrees, envVar) {
-				statusIcon = "❌"
+				statusIcon = iconManager.Error()
 				statusText = "MISSING"
 			}
 
 			if change, exists := status.BranchChanges[envVar]; exists {
-				statusIcon = "⚠️"
+				statusIcon = iconManager.Warning()
 				statusText = "OUT_OF_SYNC"
 				info.CurrentBranch = change.OldBranch
 			}
 
 			if slices.Contains(status.OrphanedWorktrees, envVar) {
-				statusIcon = "🗑️"
+				statusIcon = iconManager.Orphaned()
 				statusText = "ORPHANED"
 			}
 
@@ -87,7 +88,7 @@ Shows environment variable mappings and indicates sync status for each entry.`,
 
 		fmt.Println()
 		if !status.InSync {
-			PrintInfo("%s", internal.FormatStatusIcon("💡", "Run 'gbm status' for detailed information or 'gbm sync' to fix issues"))
+			PrintInfo("%s", internal.FormatInfo("Run 'gbm status' for detailed information or 'gbm sync' to fix issues"))
 		}
 
 		return nil

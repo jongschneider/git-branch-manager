@@ -215,4 +215,3 @@ func init() {
 	addCmd.Flags().BoolVarP(&jiraTicket, "jira", "j", false, "Create worktree based on JIRA ticket")
 	addCmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Interactive mode to select branch")
 }
-

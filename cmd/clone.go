@@ -156,4 +156,3 @@ func copyFile(src, dst string) error {
 func init() {
 	rootCmd.AddCommand(cloneCmd)
 }
-

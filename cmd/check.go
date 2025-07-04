@@ -71,12 +71,13 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 			Issues: []string{},
 		}
 
+		iconManager := internal.GetGlobalIconManager()
 		if status.InSync {
 			output.Status = "in_sync"
-			output.Indicator = "✅"
+			output.Indicator = iconManager.Success()
 		} else {
 			output.Status = "out_of_sync"
-			output.Indicator = "⚠️"
+			output.Indicator = iconManager.Warning()
 
 			for _, envVar := range status.MissingWorktrees {
 				output.Issues = append(output.Issues, fmt.Sprintf("Missing worktree: %s", envVar))

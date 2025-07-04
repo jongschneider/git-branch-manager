@@ -52,24 +52,24 @@ and ensuring configuration correctness before syncing.`,
 		for envVar, branchName := range mapping {
 			exists, err := manager.BranchExists(branchName)
 			if err != nil {
-				table.AddRow([]string{envVar, branchName, internal.FormatStatusIcon("❌", "ERROR")})
+				table.AddRow([]string{envVar, branchName, internal.FormatError("ERROR")})
 				allValid = false
 				continue
 			}
 
 			if exists {
-				table.AddRow([]string{envVar, branchName, internal.FormatStatusIcon("✅", "VALID")})
+				table.AddRow([]string{envVar, branchName, internal.FormatSuccess("VALID")})
 			} else {
-				table.AddRow([]string{envVar, branchName, internal.FormatStatusIcon("❌", "NOT FOUND")})
+				table.AddRow([]string{envVar, branchName, internal.FormatError("NOT FOUND")})
 				allValid = false
 			}
 		}
 
 		// Display validation header
 		if allValid {
-			PrintInfo("%s", internal.FormatStatusIcon("✅", ".envrc validation passed"))
+			PrintInfo("%s", internal.FormatSuccess(".envrc validation passed"))
 		} else {
-			PrintError("%s", internal.FormatStatusIcon("❌", ".envrc validation failed"))
+			PrintError("%s", internal.FormatError(".envrc validation failed"))
 		}
 
 		fmt.Println()
@@ -86,4 +86,3 @@ and ensuring configuration correctness before syncing.`,
 func init() {
 	rootCmd.AddCommand(validateCmd)
 }
-

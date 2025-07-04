@@ -98,4 +98,3 @@ func init() {
 		return getWorktreeNames(), cobra.ShellCompDirectiveNoFileComp
 	}
 }
-

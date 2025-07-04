@@ -44,33 +44,37 @@ if branch references have changed, and optionally removes orphaned worktrees.`,
 		}
 
 		if syncDryRun {
-			PrintInfo("%s", internal.FormatStatusIcon("🔍", "Dry run mode - showing what would be changed:"))
+			iconManager := internal.GetGlobalIconManager()
+			PrintInfo("%s", internal.FormatStatusIcon(iconManager.DryRun(), "Dry run mode - showing what would be changed:"))
 			status, err := manager.GetSyncStatus()
 			if err != nil {
 				return err
 			}
 
 			if status.InSync {
-				PrintInfo("%s", internal.FormatStatusIcon("✅", "All worktrees are in sync"))
+				PrintInfo("%s", internal.FormatSuccess("All worktrees are in sync"))
 				return nil
 			}
 
 			if len(status.MissingWorktrees) > 0 {
-				PrintInfo("%s", internal.FormatStatusIcon("📁", "Missing worktrees:"))
+				iconManager := internal.GetGlobalIconManager()
+				PrintInfo("%s", internal.FormatStatusIcon(iconManager.Missing(), "Missing worktrees:"))
 				for _, envVar := range status.MissingWorktrees {
 					PrintInfo("  • %s", envVar)
 				}
 			}
 
 			if len(status.BranchChanges) > 0 {
-				PrintInfo("%s", internal.FormatStatusIcon("🔄", "Branch changes needed:"))
+				iconManager := internal.GetGlobalIconManager()
+				PrintInfo("%s", internal.FormatStatusIcon(iconManager.Changes(), "Branch changes needed:"))
 				for envVar, change := range status.BranchChanges {
 					PrintInfo("  • %s: %s → %s", envVar, change.OldBranch, change.NewBranch)
 				}
 			}
 
 			if len(status.OrphanedWorktrees) > 0 {
-				PrintInfo("%s", internal.FormatStatusIcon("🗑️", "Orphaned worktrees (use --force to remove):"))
+				iconManager := internal.GetGlobalIconManager()
+				PrintInfo("%s", internal.FormatStatusIcon(iconManager.Orphaned(), "Orphaned worktrees (use --force to remove):"))
 				for _, envVar := range status.OrphanedWorktrees {
 					PrintInfo("  • %s", envVar)
 				}
@@ -84,7 +88,7 @@ if branch references have changed, and optionally removes orphaned worktrees.`,
 			return err
 		}
 
-		PrintInfo("%s", internal.FormatStatusIcon("✅", "Successfully synchronized worktrees"))
+		PrintInfo("%s", internal.FormatSuccess("Successfully synchronized worktrees"))
 		return nil
 	},
 }
@@ -95,4 +99,3 @@ func init() {
 	syncCmd.Flags().BoolVar(&syncForce, "force", false, "skip confirmation prompts and remove orphaned worktrees")
 	syncCmd.Flags().BoolVar(&syncFetch, "fetch", false, "update remote tracking before sync")
 }
-

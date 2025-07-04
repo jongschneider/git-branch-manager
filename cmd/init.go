@@ -47,7 +47,7 @@ Validates that the repository is a valid Git repo and creates .gbm/ directory fo
 			return err
 		}
 
-		PrintInfo("%s", internal.FormatStatusIcon("✅", "Successfully initialized Git Branch Manager"))
+		PrintInfo("%s", internal.FormatSuccess("Successfully initialized Git Branch Manager"))
 		return nil
 	},
 }

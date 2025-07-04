@@ -385,19 +385,21 @@ func (gm *GitManager) GetWorktreeStatus(worktreePath string) (*GitStatus, error)
 }
 
 func (gm *GitManager) GetStatusIcon(gitStatus *GitStatus) string {
+	iconManager := GetGlobalIconManager()
+
 	if gitStatus == nil {
-		return "❌"
+		return iconManager.Error()
 	}
 
 	var icons []string
 
 	// Check ahead/behind first
 	if gitStatus.Ahead > 0 && gitStatus.Behind > 0 {
-		icons = append(icons, "⇕")
+		icons = append(icons, iconManager.GitDiverged())
 	} else if gitStatus.Ahead > 0 {
-		icons = append(icons, "↑")
+		icons = append(icons, iconManager.GitAhead())
 	} else if gitStatus.Behind > 0 {
-		icons = append(icons, "↓")
+		icons = append(icons, iconManager.GitBehind())
 	}
 
 	// Check dirty status
@@ -414,7 +416,7 @@ func (gm *GitManager) GetStatusIcon(gitStatus *GitStatus) string {
 	}
 
 	if len(icons) == 0 {
-		return "✅"
+		return iconManager.Success()
 	}
 
 	return strings.Join(icons, "")

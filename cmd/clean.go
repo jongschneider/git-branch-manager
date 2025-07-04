@@ -50,11 +50,12 @@ each orphaned worktree. Use --force to skip confirmations.`,
 
 		PrintVerbose("Found %d orphaned worktrees to process", len(status.OrphanedWorktrees))
 		if len(status.OrphanedWorktrees) == 0 {
-			PrintInfo("%s", internal.FormatStatusIcon("✅", "No orphaned worktrees found"))
+			PrintInfo("%s", internal.FormatSuccess("No orphaned worktrees found"))
 			return nil
 		}
 
-		PrintInfo("%s", internal.FormatStatusIcon("🗑️", fmt.Sprintf("Found %d orphaned worktree(s):", len(status.OrphanedWorktrees))))
+		iconManager := internal.GetGlobalIconManager()
+		PrintInfo("%s", internal.FormatStatusIcon(iconManager.Orphaned(), fmt.Sprintf("Found %d orphaned worktree(s):", len(status.OrphanedWorktrees))))
 		for _, envVar := range status.OrphanedWorktrees {
 			PrintInfo("  • %s", envVar)
 		}
@@ -64,7 +65,7 @@ each orphaned worktree. Use --force to skip confirmations.`,
 		if cleanForce {
 			PrintInfo("%s", internal.FormatStatusIcon("🔥", "Force mode enabled - removing all orphaned worktrees..."))
 		} else {
-			PrintInfo("%s", internal.FormatStatusIcon("ℹ️", "Interactive mode - you will be prompted for each worktree"))
+			PrintInfo("%s", internal.FormatInfo("Interactive mode - you will be prompted for each worktree"))
 		}
 
 		PrintVerbose("Initiating cleanup of orphaned worktrees")
@@ -72,7 +73,7 @@ each orphaned worktree. Use --force to skip confirmations.`,
 			return err
 		}
 
-		PrintInfo("%s", internal.FormatStatusIcon("✅", "Orphaned worktree cleanup completed"))
+		PrintInfo("%s", internal.FormatSuccess("Orphaned worktree cleanup completed"))
 		return nil
 	},
 }

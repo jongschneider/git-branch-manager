@@ -45,4 +45,3 @@ func (t *Table) String() string {
 	}
 	return t.table.String()
 }
-

@@ -47,6 +47,10 @@ func NewManager(repoPath string) (*Manager, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
+	// Initialize the global icon manager with the loaded config
+	iconManager := NewIconManager(config)
+	SetGlobalIconManager(iconManager)
+
 	return &Manager{
 		config:     config,
 		gitManager: gitManager,
