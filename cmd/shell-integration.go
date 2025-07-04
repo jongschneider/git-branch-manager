@@ -70,7 +70,7 @@ gbm-switch() {
         gbm switch
         return
     fi
-    
+
     local target_dir=$(gbm switch --print-path "$1" 2>/dev/null)
     if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
         cd "$target_dir"
