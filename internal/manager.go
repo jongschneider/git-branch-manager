@@ -24,10 +24,10 @@ type WorktreeListInfo struct {
 }
 
 type SyncStatus struct {
-	InSync          bool
-	MissingWorktrees []string
+	InSync            bool
+	MissingWorktrees  []string
 	OrphanedWorktrees []string
-	BranchChanges   map[string]BranchChange
+	BranchChanges     map[string]BranchChange
 }
 
 type BranchChange struct {
@@ -54,7 +54,6 @@ func NewManager(repoPath string) (*Manager, error) {
 		gbmDir:     gbmDir,
 	}, nil
 }
-
 
 func (m *Manager) LoadEnvMapping(envrcPath string) error {
 	if envrcPath == "" {
@@ -119,10 +118,10 @@ func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 	}
 
 	status := &SyncStatus{
-		InSync:          true,
-		MissingWorktrees: []string{},
+		InSync:            true,
+		MissingWorktrees:  []string{},
 		OrphanedWorktrees: []string{},
-		BranchChanges:   make(map[string]BranchChange),
+		BranchChanges:     make(map[string]BranchChange),
 	}
 
 	worktrees, err := m.gitManager.GetWorktrees()
@@ -315,3 +314,58 @@ func (m *Manager) GetWorktreeList() (map[string]*WorktreeListInfo, error) {
 func (m *Manager) GetStatusIcon(gitStatus *GitStatus) string {
 	return m.gitManager.GetStatusIcon(gitStatus)
 }
+
+func (m *Manager) GetWorktreePath(worktreeName string) (string, error) {
+	worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, worktreeName)
+
+	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
+		return "", fmt.Errorf("worktree directory '%s' does not exist", worktreeName)
+	}
+
+	return worktreePath, nil
+}
+
+func (m *Manager) GetAllWorktrees() (map[string]*WorktreeListInfo, error) {
+	result := make(map[string]*WorktreeListInfo)
+
+	// Get all actual worktrees from git
+	worktrees, err := m.gitManager.GetWorktrees()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get worktrees: %w", err)
+	}
+
+	worktreePrefix := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)
+
+	for _, wt := range worktrees {
+		if strings.HasPrefix(wt.Path, worktreePrefix) {
+			// Extract worktree name from path
+			worktreeName := filepath.Base(wt.Path)
+
+			info := &WorktreeListInfo{
+				Path:          wt.Path,
+				CurrentBranch: wt.Branch,
+			}
+
+			// Set expected branch if it's tracked in .envrc
+			if m.envMapping != nil {
+				if expectedBranch, exists := m.envMapping.Variables[worktreeName]; exists {
+					info.ExpectedBranch = expectedBranch
+				} else {
+					info.ExpectedBranch = wt.Branch // Use current branch as expected for ad hoc worktrees
+				}
+			} else {
+				info.ExpectedBranch = wt.Branch
+			}
+
+			// Get git status for the worktree
+			if gitStatus, err := m.gitManager.GetWorktreeStatus(wt.Path); err == nil {
+				info.GitStatus = gitStatus
+			}
+
+			result[worktreeName] = info
+		}
+	}
+
+	return result, nil
+}
+
