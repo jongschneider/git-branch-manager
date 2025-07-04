@@ -4,10 +4,9 @@ import (
 	"encoding/json"
 	"fmt"
 	"os"
+	"slices"
 
 	"gbm/internal"
-
-	"slices"
 
 	"github.com/spf13/cobra"
 )
@@ -142,9 +141,9 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 			fallthrough
 		default:
 			if status.InSync {
-				PrintInfo("%s All worktrees in sync", output.Indicator)
+				PrintInfo("%s", internal.FormatStatusIcon(output.Indicator, "All worktrees in sync"))
 			} else {
-				PrintInfo("%s %d issue(s) detected", output.Indicator, len(output.Issues))
+				PrintInfo("%s", internal.FormatStatusIcon(output.Indicator, fmt.Sprintf("%d issue(s) detected", len(output.Issues))))
 				for _, issue := range output.Issues {
 					PrintInfo("  • %s", issue)
 				}

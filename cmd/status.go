@@ -3,10 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"gbm/internal"
-
-	"slices"
 
 	"github.com/spf13/cobra"
 )
@@ -76,11 +75,11 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 
 			// Default to in sync if no issues
 			if syncStatus == "" {
-				syncStatus = "✅ IN_SYNC"
+				syncStatus = internal.FormatStatusIcon("✅", "IN_SYNC")
 			}
 
 			// Get git status icon
-			gitStatusIcon := manager.GetStatusIcon(info.GitStatus)
+			gitStatusIcon := internal.FormatGitStatus(info.GitStatus)
 
 			table.AddRow([]string{envVar, info.ExpectedBranch, gitStatusIcon, syncStatus})
 		}
@@ -89,7 +88,7 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 
 		if !status.InSync {
 			fmt.Println()
-			PrintInfo("💡 Run 'gbm sync' to synchronize changes")
+			PrintInfo("%s", internal.FormatStatusIcon("💡", "Run 'gbm sync' to synchronize changes"))
 		}
 		return nil
 	},

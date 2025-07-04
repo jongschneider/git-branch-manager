@@ -3,10 +3,9 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"slices"
 
 	"gbm/internal"
-
-	"slices"
 
 	"github.com/spf13/cobra"
 )
@@ -81,14 +80,14 @@ Shows environment variable mappings and indicates sync status for each entry.`,
 				statusText = "ORPHANED"
 			}
 
-			table.AddRow([]string{envVar, info.ExpectedBranch, statusIcon + " " + statusText, info.Path})
+			table.AddRow([]string{envVar, info.ExpectedBranch, internal.FormatStatusIcon(statusIcon, statusText), info.Path})
 		}
 
 		table.Print()
 
 		fmt.Println()
 		if !status.InSync {
-			PrintInfo("💡 Run 'gbm status' for detailed information or 'gbm sync' to fix issues")
+			PrintInfo("%s", internal.FormatStatusIcon("💡", "Run 'gbm status' for detailed information or 'gbm sync' to fix issues"))
 		}
 
 		return nil
