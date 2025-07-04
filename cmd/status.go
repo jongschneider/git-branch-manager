@@ -6,6 +6,8 @@ import (
 
 	"gbm/internal"
 
+	"slices"
+
 	"github.com/spf13/cobra"
 )
 
@@ -58,11 +60,8 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 			var syncStatus string
 
 			// Check for missing worktrees
-			for _, missing := range status.MissingWorktrees {
-				if missing == envVar {
-					syncStatus = "MISSING"
-					break
-				}
+			if slices.Contains(status.MissingWorktrees, envVar) {
+				syncStatus = "MISSING"
 			}
 
 			// Check for branch changes
@@ -71,11 +70,8 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 			}
 
 			// Check for orphaned worktrees
-			for _, orphaned := range status.OrphanedWorktrees {
-				if orphaned == envVar {
-					syncStatus = "ORPHANED"
-					break
-				}
+			if slices.Contains(status.OrphanedWorktrees, envVar) {
+				syncStatus = "ORPHANED"
 			}
 
 			// Default to in sync if no issues
@@ -102,4 +98,3 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 func init() {
 	rootCmd.AddCommand(statusCmd)
 }
-

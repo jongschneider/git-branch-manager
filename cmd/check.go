@@ -6,6 +6,9 @@ import (
 	"os"
 
 	"gbm/internal"
+
+	"slices"
+
 	"github.com/spf13/cobra"
 )
 
@@ -116,12 +119,9 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 				issues := ""
 
 				// Check for issues
-				for _, missing := range status.MissingWorktrees {
-					if missing == envVar {
-						statusText = "MISSING"
-						issues = "Worktree missing"
-						break
-					}
+				if slices.Contains(status.MissingWorktrees, envVar) {
+					statusText = "MISSING"
+					issues = "Worktree missing"
 				}
 
 				if change, exists := status.BranchChanges[envVar]; exists {
@@ -129,12 +129,9 @@ Can be used for shell integration or automated checking. Returns non-zero exit c
 					issues = fmt.Sprintf("%s → %s", change.OldBranch, change.NewBranch)
 				}
 
-				for _, orphaned := range status.OrphanedWorktrees {
-					if orphaned == envVar {
-						statusText = "ORPHANED"
-						issues = "Variable removed"
-						break
-					}
+				if slices.Contains(status.OrphanedWorktrees, envVar) {
+					statusText = "ORPHANED"
+					issues = "Variable removed"
 				}
 
 				table.AddRow([]string{envVar, info.ExpectedBranch, statusText, issues})
@@ -171,3 +168,4 @@ func init() {
 	checkCmd.Flags().StringVar(&checkFormat, "format", "text", "output format (prompt|json|text|table)")
 	checkCmd.Flags().BoolVar(&checkExitCode, "exit-code", false, "return status code only")
 }
+
