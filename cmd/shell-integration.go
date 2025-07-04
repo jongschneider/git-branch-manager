@@ -25,11 +25,24 @@ Or add to your shell configuration:
 # Git Branch Manager (gbm) shell integration
 # Automatically check for worktree drift and display status
 
+# Set environment variable to indicate shell integration is active
+export GBM_SHELL_INTEGRATION=1
+
+# Enable completion
+if [ -n "$ZSH_VERSION" ]; then
+    # For zsh, enable completion
+    autoload -U compinit && compinit
+    source <(gbm completion zsh)
+elif [ -n "$BASH_VERSION" ]; then
+    # For bash, enable completion
+    source <(gbm completion bash)
+fi
+
 __gbm_prompt() {
     if [ -f ".envrc" ] && [ -d ".git" ]; then
-        local status=$(gbm check --format=prompt 2>/dev/null)
-        if [ $? -eq 0 ] && [ -n "$status" ]; then
-            echo "$status"
+        local gbm_status=$(gbm check --format=prompt 2>/dev/null)
+        if [ $? -eq 0 ] && [ -n "$gbm_status" ]; then
+            echo "$gbm_status"
         fi
     fi
 }
@@ -50,6 +63,39 @@ gbm-status() {
 gbm-sync() {
     gbm sync "$@"
 }
+
+# Function to switch between worktrees
+gbm-switch() {
+    if [ $# -eq 0 ]; then
+        gbm switch
+        return
+    fi
+    
+    local target_dir=$(gbm switch --print-path "$1" 2>/dev/null)
+    if [ $? -eq 0 ] && [ -n "$target_dir" ]; then
+        cd "$target_dir"
+        echo "Switched to worktree: $1"
+    else
+        gbm switch "$@"
+    fi
+}
+
+# Override gbm function to handle switch command specially
+gbm() {
+    if [ "$1" = "switch" ] && [ $# -gt 1 ]; then
+        # For switch command with arguments, execute the cd command
+        local cmd_output=$(command gbm "$@" 2>/dev/null)
+        if [ $? -eq 0 ] && [[ "$cmd_output" =~ ^cd ]]; then
+            eval "$cmd_output"
+            echo "Switched to worktree: $2"
+        else
+            command gbm "$@"
+        fi
+    else
+        # For all other commands, just pass through
+        command gbm "$@"
+    fi
+}
 `
 		PrintVerbose("Outputting shell integration script")
 		fmt.Print(shellCode)
@@ -60,3 +106,4 @@ gbm-sync() {
 func init() {
 	rootCmd.AddCommand(shellIntegrationCmd)
 }
+
