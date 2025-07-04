@@ -25,7 +25,37 @@
     - [x] `gbm pull` pulls worktree if in a worktree - otherwise error
     - [x] `gbm pull <worktree_name>` pulls named worktree - no matter what directoy you are in
     - [x] `gbm pull --all` pulls all managed worktrees
-- [ ] use lipgloss for tables and styling
+- [x] use lipgloss for tables and styling
+- [ ] fix `gbm pull`
+```sh
+󰀵 jschneider  ~/code/scratch/integrator/worktrees/MAIN   master  󰟓 v1.24.4
+  gbm pull
+Pulling current worktree 'MAIN'...
+There is no tracking information for the current branch.
+Please specify which branch you want to merge with.
+See git-pull(1) for details.
+
+    git pull <remote> <branch>
+
+If you wish to set tracking information for this branch you can do so with:
+
+    git branch --set-upstream-to=origin/<branch> master
+
+Error: exit status 1
+Usage:
+  gbm pull [worktree-name] [flags]
+
+Flags:
+      --all    Pull all worktrees
+  -h, --help   help for pull
+
+Global Flags:
+  -c, --config string         specify custom .envrc path
+  -d, --debug                 enable debug logging to ./gbm.log
+  -w, --worktree-dir string   override worktree directory location
+
+ERROR: Error: exit status 1
+```
 - [ ] add configuration for controlling the icons for git status, repo validations, etc
     - [ ] ./.gbm/config.toml
 - [ ] track merge backs... not sure how yet and how to prompt the user.
