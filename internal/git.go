@@ -265,7 +265,20 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 		return fmt.Errorf("branch '%s' does not exist", branchName)
 	}
 
-	cmd := exec.Command("git", "worktree", "add", worktreePath, branchName)
+	// Check if remote tracking branch exists
+	remoteBranch := fmt.Sprintf("origin/%s", branchName)
+	cmd := exec.Command("git", "rev-parse", "--verify", remoteBranch)
+	cmd.Dir = gm.repoPath
+	_, err = execCommand(cmd)
+
+	if err == nil {
+		// Remote tracking branch exists, use --track
+		cmd = exec.Command("git", "worktree", "add", "--track", "-b", branchName, worktreePath, remoteBranch)
+	} else {
+		// No remote tracking branch, create worktree without tracking
+		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+	}
+
 	cmd.Dir = gm.repoPath
 	if err := execCommandRun(cmd); err != nil {
 		return fmt.Errorf("failed to create worktree: %w", err)
@@ -450,7 +463,19 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 			return fmt.Errorf("branch '%s' does not exist", branchName)
 		}
 
-		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+		// Check if remote tracking branch exists
+		remoteBranch := fmt.Sprintf("origin/%s", branchName)
+		checkCmd := exec.Command("git", "rev-parse", "--verify", remoteBranch)
+		checkCmd.Dir = gm.repoPath
+		_, err = execCommand(checkCmd)
+
+		if err == nil {
+			// Remote tracking branch exists, use --track
+			cmd = exec.Command("git", "worktree", "add", "--track", "-b", branchName, worktreePath, remoteBranch)
+		} else {
+			// No remote tracking branch, create worktree without tracking
+			cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+		}
 	}
 
 	cmd.Dir = gm.repoPath
@@ -538,8 +563,49 @@ func (gm *GitManager) PullWorktree(worktreePath string) error {
 		return fmt.Errorf("worktree path does not exist: %s", worktreePath)
 	}
 
-	// Simple pull
-	cmd := exec.Command("git", "pull")
+	// Get the current branch
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
+	cmd.Dir = worktreePath
+	output, err := execCommand(cmd)
+	if err != nil {
+		return fmt.Errorf("failed to get current branch: %w", err)
+	}
+
+	currentBranch := strings.TrimSpace(string(output))
+
+	// Check if upstream is set
+	cmd = exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
+	cmd.Dir = worktreePath
+	_, err = execCommand(cmd)
+
+	if err != nil {
+		// No upstream set, try to set it and pull
+		remoteBranch := fmt.Sprintf("origin/%s", currentBranch)
+
+		// Check if remote branch exists
+		cmd = exec.Command("git", "rev-parse", "--verify", remoteBranch)
+		cmd.Dir = worktreePath
+		_, err = execCommand(cmd)
+
+		if err == nil {
+			// Remote branch exists, set upstream and pull
+			cmd = exec.Command("git", "branch", "--set-upstream-to", remoteBranch)
+			cmd.Dir = worktreePath
+			if err := execCommandRun(cmd); err != nil {
+				return fmt.Errorf("failed to set upstream: %w", err)
+			}
+
+			// Now pull
+			cmd = exec.Command("git", "pull")
+		} else {
+			// Remote branch doesn't exist, try to pull with explicit remote and branch
+			cmd = exec.Command("git", "pull", "origin", currentBranch)
+		}
+	} else {
+		// Upstream is set, simple pull
+		cmd = exec.Command("git", "pull")
+	}
+
 	cmd.Dir = worktreePath
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
