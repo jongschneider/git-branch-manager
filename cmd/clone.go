@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
-	"path/filepath"
 	"strings"
 
 	"github.com/spf13/cobra"
@@ -20,44 +19,66 @@ worktree-based development.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		repoUrl := args[0]
 
-		// Extract repository name from URL
-		repoName := extractRepoName(repoUrl)
-		bareRepoPath := repoName + ".git"
-
-		PrintInfo("Cloning repository as bare...")
-		if err := cloneBareRepo(repoUrl, bareRepoPath); err != nil {
-			return fmt.Errorf("failed to clone bare repository: %w", err)
-		}
-
-		PrintInfo("Creating main worktree...")
-		mainWorktreePath := filepath.Join(bareRepoPath, "worktrees", "MAIN")
-		if err := createMainWorktree(bareRepoPath, mainWorktreePath); err != nil {
-			return fmt.Errorf("failed to create main worktree: %w", err)
-		}
-
-		PrintInfo("Checking for .envrc file...")
-		envrcPath := filepath.Join(mainWorktreePath, ".envrc")
-		if _, err := os.Stat(envrcPath); err == nil {
-			PrintInfo("Found .envrc file in main worktree")
-			// Copy .envrc to repository root for reference
-			repoEnvrcPath := filepath.Join(bareRepoPath, ".envrc")
-			if err := copyFile(envrcPath, repoEnvrcPath); err != nil {
-				PrintError("Failed to copy .envrc to repository root: %v", err)
-			} else {
-				PrintInfo("Copied .envrc to repository root")
-			}
-		} else {
-			PrintInfo("No .envrc file found in main worktree")
-			PrintInfo("Consider creating a .envrc file to define environment variables for your worktrees")
-			PrintInfo("You can generate one based on the initial worktree structure")
+		PrintInfo("Cloning repository using git-bare-clone.sh...")
+		if err := runGitBareClone(repoUrl); err != nil {
+			return fmt.Errorf("failed to clone repository: %w", err)
 		}
 
 		PrintInfo("Repository cloned successfully!")
-		PrintInfo("Bare repository: %s", bareRepoPath)
-		PrintInfo("Main worktree: %s", mainWorktreePath)
-
 		return nil
 	},
+}
+
+func runGitBareClone(repoUrl string) error {
+	// Extract repository name from URL
+	repo := extractRepoName(repoUrl)
+	
+	// Create directory for the repository
+	if err := os.MkdirAll(repo, 0755); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", repo, err)
+	}
+
+	// Change to the repository directory
+	if err := os.Chdir(repo); err != nil {
+		return fmt.Errorf("failed to change to directory %s: %w", repo, err)
+	}
+
+	PrintInfo("Cloning bare repository to .git...")
+	// Clone bare repository to .git
+	cmd := exec.Command("git", "clone", "--bare", repoUrl, ".git")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to clone bare repository: %w", err)
+	}
+
+	PrintInfo("Adjusting origin fetch locations...")
+	// Change to .git directory and configure remote
+	if err := os.Chdir(".git"); err != nil {
+		return fmt.Errorf("failed to change to .git directory: %w", err)
+	}
+
+	// Set remote origin fetch configuration
+	cmd = exec.Command("git", "config", "remote.origin.fetch", "+refs/heads/*:refs/remotes/origin/*")
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to configure remote origin fetch: %w", err)
+	}
+
+	PrintInfo("Fetching all branches from remote...")
+	// Fetch all branches from remote
+	cmd = exec.Command("git", "fetch", "origin")
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+	if err := cmd.Run(); err != nil {
+		return fmt.Errorf("failed to fetch from origin: %w", err)
+	}
+
+	// Change back to repository root
+	if err := os.Chdir(".."); err != nil {
+		return fmt.Errorf("failed to change back to repository root: %w", err)
+	}
+
+	return nil
 }
 
 func extractRepoName(repoUrl string) string {
@@ -71,86 +92,6 @@ func extractRepoName(repoUrl string) string {
 	}
 
 	return "repository"
-}
-
-func cloneBareRepo(repoUrl, bareRepoPath string) error {
-	cmd := exec.Command("git", "clone", "--bare", repoUrl, bareRepoPath)
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
-}
-
-func createMainWorktree(bareRepoPath, mainWorktreePath string) error {
-	// Create worktrees directory
-	worktreesDir := filepath.Dir(mainWorktreePath)
-	if err := os.MkdirAll(worktreesDir, 0755); err != nil {
-		return fmt.Errorf("failed to create worktrees directory: %w", err)
-	}
-
-	// Get the default branch (HEAD)
-	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
-	cmd.Dir = bareRepoPath
-	output, err := cmd.Output()
-	if err != nil {
-		// Fallback to main/master detection
-		cmd = exec.Command("git", "branch", "-r")
-		cmd.Dir = bareRepoPath
-		output, err = cmd.Output()
-		if err != nil {
-			return fmt.Errorf("failed to get remote branches: %w", err)
-		}
-
-		branches := strings.Split(string(output), "\n")
-		var defaultBranch string
-		for _, branch := range branches {
-			branch = strings.TrimSpace(branch)
-			if strings.Contains(branch, "origin/main") {
-				defaultBranch = "main"
-				break
-			} else if strings.Contains(branch, "origin/master") {
-				defaultBranch = "master"
-				break
-			}
-		}
-
-		if defaultBranch == "" {
-			return fmt.Errorf("could not determine default branch")
-		}
-
-		// Create worktree with the detected default branch
-		cmd = exec.Command("git", "worktree", "add", mainWorktreePath, defaultBranch)
-	} else {
-		// Extract branch name from refs/remotes/origin/HEAD -> refs/remotes/origin/main
-		refPath := strings.TrimSpace(string(output))
-		branchName := strings.TrimPrefix(refPath, "refs/remotes/origin/")
-
-		// Create worktree with the HEAD branch
-		cmd = exec.Command("git", "worktree", "add", mainWorktreePath, branchName)
-	}
-
-	cmd.Dir = bareRepoPath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
-}
-
-func copyFile(src, dst string) error {
-	srcFile, err := os.Open(src)
-	if err != nil {
-		return err
-	}
-	defer srcFile.Close()
-
-	dstFile, err := os.Create(dst)
-	if err != nil {
-		return err
-	}
-	defer dstFile.Close()
-
-	_, err = srcFile.WriteTo(dstFile)
-	return err
 }
 
 func init() {
