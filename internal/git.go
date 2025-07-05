@@ -452,8 +452,19 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 
 	var cmd *exec.Cmd
 	if createBranch {
-		// Create new branch and worktree
-		cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath)
+		// Check if branch already exists
+		branchExists, err := gm.BranchExists(branchName)
+		if err != nil {
+			return fmt.Errorf("failed to check if branch exists: %w", err)
+		}
+
+		if branchExists {
+			// Branch exists, create worktree on existing branch
+			cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+		} else {
+			// Create new branch and worktree
+			cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath)
+		}
 	} else {
 		// Create worktree on existing branch
 		branchExists, err := gm.BranchExists(branchName)
@@ -482,7 +493,7 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 
 	cmd.Dir = gm.repoPath
 	if err := execCommandRun(cmd); err != nil {
-		return fmt.Errorf("failed to add worktree: %w", err)
+		return fmt.Errorf("failed to add worktree (command: %s): %w", strings.Join(cmd.Args, " "), err)
 	}
 
 	return nil

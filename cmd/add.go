@@ -19,9 +19,10 @@ var addCmd = &cobra.Command{
 	Use:   "add <worktree-name> [branch-name]",
 	Short: "Add a new worktree",
 	Long: `Add a new worktree with various options:
-- Create on existing branch
-- Create on new branch (--new-branch)
-- Interactive mode (--interactive)`,
+- Create on existing branch: gbm add INGSVC-5544 existing-branch-name
+- Create on new branch: gbm add INGSVC-5544 feature/new-branch -b
+- Interactive mode: gbm add INGSVC-5544 --interactive
+- Tab completion: Shows JIRA keys with summaries, suggests branch names when needed`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		worktreeName := args[0]
@@ -53,8 +54,12 @@ var addCmd = &cobra.Command{
 			} else if newBranch {
 				// Generate branch name from worktree name
 				branchName = generateBranchName(worktreeName)
+			} else if internal.IsJiraKey(worktreeName) {
+				// Auto-suggest branch name for JIRA keys
+				suggestedBranch := generateBranchName(worktreeName)
+				return fmt.Errorf("branch name required. Suggested: %s\n\nTry: gbm add %s %s -b", suggestedBranch, worktreeName, suggestedBranch)
 			} else {
-				return fmt.Errorf("branch name required when not creating new branch")
+				return fmt.Errorf("branch name required when not creating new branch (use -b to create new branch)")
 			}
 		}
 
@@ -111,6 +116,20 @@ func handleInteractive(manager *internal.Manager) (string, error) {
 }
 
 func generateBranchName(worktreeName string) string {
+	// Check if this is a JIRA key first
+	if internal.IsJiraKey(worktreeName) {
+		branchName, err := internal.GenerateBranchFromJira(worktreeName)
+		if err != nil {
+			PrintVerbose("Failed to generate branch name from JIRA issue %s: %v", worktreeName, err)
+			PrintInfo("Could not fetch JIRA issue details. Using default branch name format.")
+			// Generate a basic branch name from the JIRA key
+			return fmt.Sprintf("feature/%s", strings.ToLower(worktreeName))
+		} else {
+			PrintInfo("Auto-generated branch name from JIRA issue: %s", branchName)
+			return branchName
+		}
+	}
+
 	// Convert worktree name to a valid branch name
 	branchName := strings.ReplaceAll(worktreeName, " ", "-")
 	branchName = strings.ReplaceAll(branchName, "_", "-")
@@ -130,4 +149,37 @@ func init() {
 	addCmd.Flags().BoolVarP(&newBranch, "new-branch", "b", false, "Create a new branch for the worktree")
 	addCmd.Flags().StringVar(&baseBranch, "base", "", "Base branch for new branch (default: current branch)")
 	addCmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Interactive mode to select branch")
+
+	// Add JIRA key completions for the first positional argument
+	addCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			// Complete JIRA keys with summaries for context
+			jiraIssues, err := internal.GetJiraIssues()
+			if err != nil {
+				// If JIRA CLI is not available, fall back to no completions
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			var completions []string
+			for _, issue := range jiraIssues {
+				// Format: "KEY\tSummary" - clean completion of just the key with summary context
+				completion := fmt.Sprintf("%s\t%s", issue.Key, issue.Summary)
+				completions = append(completions, completion)
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
+		} else if len(args) == 1 {
+			// Complete branch name based on the JIRA key
+			worktreeName := args[0]
+			if internal.IsJiraKey(worktreeName) {
+				branchName, err := internal.GenerateBranchFromJira(worktreeName)
+				if err != nil {
+					// Fallback to default branch name generation
+					branchName = fmt.Sprintf("feature/%s", strings.ToLower(worktreeName))
+				}
+				return []string{branchName}, cobra.ShellCompDirectiveNoFileComp
+			}
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
 }
