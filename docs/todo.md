@@ -63,4 +63,8 @@ ERROR: Error: exit status 1
 - [ ] track merge backs... not sure how yet and how to prompt the user.
     - [ ] helper to create a merge worktree
 - [ ] add carapace completion
-- [ ] jira-cli support
+- [x] jira-cli support
+- [ ] track all worktrees created with `gbm` in the `list` and `status` commands
+- [ ] control branch name JIRA through config file (use current as defaults)
+- [ ] add jira me to config.toml
+- [ ]  add `remove` verb
