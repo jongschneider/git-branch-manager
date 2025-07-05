@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"time"
 
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
@@ -649,4 +650,65 @@ func (gm *GitManager) IsInWorktree(currentPath string) (bool, string, error) {
 	}
 
 	return false, "", nil
+}
+
+// WorktreeInfoData represents comprehensive information about a worktree
+type WorktreeInfoData struct {
+	Name          string
+	Path          string
+	Branch        string
+	CreatedAt     time.Time
+	GitStatus     *GitStatus
+	BaseInfo      *BranchInfo
+	Commits       []CommitInfo
+	ModifiedFiles []FileChange
+	JiraTicket    *JiraTicketDetails
+}
+
+// BranchInfo represents information about the base branch
+type BranchInfo struct {
+	Name         string
+	DivergedAt   string
+	DaysAgo      int
+	Upstream     string
+	AheadBy      int
+	BehindBy     int
+}
+
+// CommitInfo represents information about a commit
+type CommitInfo struct {
+	Hash      string
+	Message   string
+	Author    string
+	Timestamp time.Time
+}
+
+// FileChange represents a modified file
+type FileChange struct {
+	Path      string
+	Status    string
+	Additions int
+	Deletions int
+}
+
+// JiraTicketDetails represents detailed JIRA ticket information
+type JiraTicketDetails struct {
+	Key           string
+	Summary       string
+	Status        string
+	Assignee      string
+	Priority      string
+	Reporter      string
+	Created       time.Time
+	DueDate       *time.Time
+	Epic          string
+	URL           string
+	LatestComment *Comment
+}
+
+// Comment represents a JIRA comment
+type Comment struct {
+	Author    string
+	Content   string
+	Timestamp time.Time
 }

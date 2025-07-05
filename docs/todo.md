@@ -63,8 +63,7 @@ ERROR: Error: exit status 1
 - [x]  add `remove` verb
 - [x] support `gbm switch -` to go to previous worktree
 - [x] sort branches by .envrc first, then worktree createdAt DESC
-- [x] add info verb
-    - [x] worktree (createdAt, base branch, JIRA ticket/URL), git history
+- [ ] add info verb (see info_prd.md and info_ascii_mockup.md)
 - [ ] configuration for copying files into new worktrees (.env, anything not tracked by git)
 - [ ] track merge backs... not sure how yet and how to prompt the user.
     - [ ] helper to create a merge worktree
@@ -79,3 +78,4 @@ ERROR: Error: exit status 1
 - [ ] add `theme` verb with default themes
 - [ ] support `JIRA_CONFIG_FILE` env var ( see https://github.com/ankitpokhrel/jira-cli?tab=readme-ov-file#multiple-projects)
 - [ ] add https://github.com/swisscom/bitbucket-cli integration for PRs
+- [ ] make output adaptive layout.
