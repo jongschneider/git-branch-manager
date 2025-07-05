@@ -45,43 +45,57 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 		}
 
 		PrintVerbose("Fetching worktree list for status display")
-		// Get worktree information for table
-		worktrees, err := manager.GetWorktreeList()
+		// Get all worktrees (including those created with gbm add)
+		worktrees, err := manager.GetAllWorktrees()
 		if err != nil {
 			return fmt.Errorf("failed to get worktree list: %w", err)
 		}
 
 		PrintVerbose("Building status table with %d worktrees", len(worktrees))
-		table := internal.NewTable([]string{"ENV VAR", "BRANCH", "GIT STATUS", "SYNC STATUS"})
+		table := internal.NewTable([]string{"WORKTREE", "BRANCH", "GIT STATUS", "SYNC STATUS"})
 
 		// Add rows for each worktree
-		for envVar, info := range worktrees {
+		for worktreeName, info := range worktrees {
 			var syncStatus string
 
 			// Check for missing worktrees
-			if slices.Contains(status.MissingWorktrees, envVar) {
+			if slices.Contains(status.MissingWorktrees, worktreeName) {
 				syncStatus = "MISSING"
 			}
 
 			// Check for branch changes
-			if change, exists := status.BranchChanges[envVar]; exists {
+			if change, exists := status.BranchChanges[worktreeName]; exists {
 				syncStatus = fmt.Sprintf("OUT_OF_SYNC (%s → %s)", change.OldBranch, change.NewBranch)
 			}
 
 			// Check for orphaned worktrees
-			if slices.Contains(status.OrphanedWorktrees, envVar) {
-				syncStatus = "ORPHANED"
+			if slices.Contains(status.OrphanedWorktrees, worktreeName) {
+				syncStatus = "UNTRACKED"
 			}
 
-			// Default to in sync if no issues
+			// Check if this is an untracked worktree (not in .envrc)
 			if syncStatus == "" {
-				syncStatus = internal.FormatSuccess("IN_SYNC")
+				envMapping, err := manager.GetEnvMapping()
+				if err == nil {
+					if _, exists := envMapping[worktreeName]; !exists {
+						syncStatus = internal.FormatInfo("UNTRACKED")
+					} else {
+						syncStatus = internal.FormatSuccess("IN_SYNC")
+					}
+				} else {
+					syncStatus = internal.FormatSuccess("IN_SYNC")
+				}
 			}
 
 			// Get git status icon
 			gitStatusIcon := internal.FormatGitStatus(info.GitStatus)
 
-			table.AddRow([]string{envVar, info.ExpectedBranch, gitStatusIcon, syncStatus})
+			branchDisplay := info.CurrentBranch
+			if info.ExpectedBranch != "" && info.ExpectedBranch != info.CurrentBranch {
+				branchDisplay = fmt.Sprintf("%s (expected: %s)", info.CurrentBranch, info.ExpectedBranch)
+			}
+
+			table.AddRow([]string{worktreeName, branchDisplay, gitStatusIcon, syncStatus})
 		}
 
 		table.Print()

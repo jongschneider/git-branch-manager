@@ -45,8 +45,8 @@ Shows environment variable mappings and indicates sync status for each entry.`,
 		}
 
 		PrintVerbose("Fetching detailed worktree information")
-		// Get worktree information
-		worktrees, err := manager.GetWorktreeList()
+		// Get all worktrees (including those created with gbm add)
+		worktrees, err := manager.GetAllWorktrees()
 		if err != nil {
 			return fmt.Errorf("failed to get worktree list: %w", err)
 		}
@@ -57,31 +57,48 @@ Shows environment variable mappings and indicates sync status for each entry.`,
 		}
 
 		PrintVerbose("Building worktree list table")
-		table := internal.NewTable([]string{"ENV VAR", "BRANCH", "STATUS", "PATH"})
+		table := internal.NewTable([]string{"WORKTREE", "BRANCH", "STATUS", "PATH"})
 
 		iconManager := internal.GetGlobalIconManager()
-		for envVar, info := range worktrees {
+		for worktreeName, info := range worktrees {
 			statusIcon := iconManager.Success()
 			statusText := "OK"
 
 			// Check if this worktree has issues
-			if slices.Contains(status.MissingWorktrees, envVar) {
+			if slices.Contains(status.MissingWorktrees, worktreeName) {
 				statusIcon = iconManager.Error()
 				statusText = "MISSING"
 			}
 
-			if change, exists := status.BranchChanges[envVar]; exists {
+			if change, exists := status.BranchChanges[worktreeName]; exists {
 				statusIcon = iconManager.Warning()
 				statusText = "OUT_OF_SYNC"
 				info.CurrentBranch = change.OldBranch
 			}
 
-			if slices.Contains(status.OrphanedWorktrees, envVar) {
+			if slices.Contains(status.OrphanedWorktrees, worktreeName) {
 				statusIcon = iconManager.Orphaned()
-				statusText = "ORPHANED"
+				statusText = "UNTRACKED"
 			}
 
-			table.AddRow([]string{envVar, info.ExpectedBranch, internal.FormatStatusIcon(statusIcon, statusText), info.Path})
+			// For worktrees not in .envrc, mark as "UNTRACKED"
+			if info.ExpectedBranch == info.CurrentBranch && info.ExpectedBranch != "" {
+				// Check if this worktree is actually tracked in .envrc
+				envMapping, err := manager.GetEnvMapping()
+				if err == nil {
+					if _, exists := envMapping[worktreeName]; !exists {
+						statusIcon = iconManager.Info()
+						statusText = "UNTRACKED"
+					}
+				}
+			}
+
+			branchDisplay := info.CurrentBranch
+			if info.ExpectedBranch != "" && info.ExpectedBranch != info.CurrentBranch {
+				branchDisplay = fmt.Sprintf("%s (expected: %s)", info.CurrentBranch, info.ExpectedBranch)
+			}
+
+			table.AddRow([]string{worktreeName, branchDisplay, internal.FormatStatusIcon(statusIcon, statusText), info.Path})
 		}
 
 		table.Print()

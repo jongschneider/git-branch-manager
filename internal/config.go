@@ -25,8 +25,9 @@ type ConfigSettings struct {
 }
 
 type ConfigState struct {
-	LastSync    time.Time `toml:"last_sync"`
-	TrackedVars []string  `toml:"tracked_vars"`
+	LastSync         time.Time `toml:"last_sync"`
+	TrackedVars      []string  `toml:"tracked_vars"`
+	AdHocWorktrees   []string  `toml:"ad_hoc_worktrees"`
 }
 
 type ConfigIcons struct {
@@ -61,8 +62,9 @@ func DefaultConfig() *Config {
 			CreateMissingBranches: false,
 		},
 		State: ConfigState{
-			LastSync:    time.Time{},
-			TrackedVars: []string{},
+			LastSync:       time.Time{},
+			TrackedVars:    []string{},
+			AdHocWorktrees: []string{},
 		},
 		Icons: ConfigIcons{
 			// Status icons

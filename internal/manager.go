@@ -378,7 +378,37 @@ func (m *Manager) GetAllWorktrees() (map[string]*WorktreeListInfo, error) {
 }
 
 func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool) error {
-	return m.gitManager.AddWorktree(worktreeName, branchName, createBranch)
+	err := m.gitManager.AddWorktree(worktreeName, branchName, createBranch)
+	if err != nil {
+		return err
+	}
+
+	// Track this worktree as ad hoc if it's not in .envrc
+	if m.envMapping != nil {
+		if _, exists := m.envMapping.Variables[worktreeName]; !exists {
+			// Add to ad hoc worktrees list if not already there
+			if !contains(m.config.State.AdHocWorktrees, worktreeName) {
+				m.config.State.AdHocWorktrees = append(m.config.State.AdHocWorktrees, worktreeName)
+				// Save the updated config
+				if saveErr := m.config.Save(m.gbmDir); saveErr != nil {
+					// Log warning but don't fail the operation
+					fmt.Printf("Warning: failed to save config: %v\n", saveErr)
+				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// Helper function to check if a slice contains a string
+func contains(slice []string, item string) bool {
+	for _, s := range slice {
+		if s == item {
+			return true
+		}
+	}
+	return false
 }
 
 func (m *Manager) GetRemoteBranches() ([]string, error) {
@@ -437,4 +467,33 @@ func (m *Manager) PullAllWorktrees() error {
 	}
 
 	return nil
+}
+
+func (m *Manager) RemoveWorktree(worktreeName string) error {
+	worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, worktreeName)
+
+	// Remove the worktree using git
+	if err := m.gitManager.RemoveWorktree(worktreePath); err != nil {
+		return fmt.Errorf("failed to remove worktree: %w", err)
+	}
+
+	// Remove from ad hoc worktrees list if it exists there
+	for i, name := range m.config.State.AdHocWorktrees {
+		if name == worktreeName {
+			m.config.State.AdHocWorktrees = append(m.config.State.AdHocWorktrees[:i], m.config.State.AdHocWorktrees[i+1:]...)
+			break
+		}
+	}
+
+	// Save the updated config
+	if err := m.config.Save(m.gbmDir); err != nil {
+		// Log warning but don't fail the operation
+		fmt.Printf("Warning: failed to save config: %v\n", err)
+	}
+
+	return nil
+}
+
+func (m *Manager) GetWorktreeStatus(worktreePath string) (*GitStatus, error) {
+	return m.gitManager.GetWorktreeStatus(worktreePath)
 }

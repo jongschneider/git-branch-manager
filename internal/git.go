@@ -35,6 +35,10 @@ type GitStatus struct {
 	Staged    int
 }
 
+func (gs *GitStatus) HasChanges() bool {
+	return gs.IsDirty || gs.Untracked > 0 || gs.Modified > 0 || gs.Staged > 0
+}
+
 // execCommand executes a command with debug output
 func execCommand(cmd *exec.Cmd) ([]byte, error) {
 	output, err := cmd.Output()

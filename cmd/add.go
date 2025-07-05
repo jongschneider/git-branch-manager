@@ -39,6 +39,11 @@ var addCmd = &cobra.Command{
 			return fmt.Errorf("failed to create manager: %w", err)
 		}
 
+		// Load .envrc configuration to check if worktree is tracked
+		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
+			PrintVerbose("No .envrc found or failed to load, treating as ad hoc worktree: %v", err)
+		}
+
 		var branchName string
 
 		if interactive {
