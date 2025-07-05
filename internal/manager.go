@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"sort"
 	"strings"
 	"time"
 )
@@ -496,4 +497,68 @@ func (m *Manager) RemoveWorktree(worktreeName string) error {
 
 func (m *Manager) GetWorktreeStatus(worktreePath string) (*GitStatus, error) {
 	return m.gitManager.GetWorktreeStatus(worktreePath)
+}
+
+func (m *Manager) SetCurrentWorktree(worktreeName string) error {
+	// Update previous worktree before changing current
+	if m.config.State.CurrentWorktree != "" && m.config.State.CurrentWorktree != worktreeName {
+		m.config.State.PreviousWorktree = m.config.State.CurrentWorktree
+	}
+	m.config.State.CurrentWorktree = worktreeName
+	return m.config.Save(m.gbmDir)
+}
+
+func (m *Manager) GetPreviousWorktree() string {
+	return m.config.State.PreviousWorktree
+}
+
+func (m *Manager) GetCurrentWorktree() string {
+	return m.config.State.CurrentWorktree
+}
+
+func (m *Manager) GetSortedWorktreeNames(worktrees map[string]*WorktreeListInfo) []string {
+	var envrcNames []string
+	var adHocNames []string
+
+	// Get .envrc mapping if available
+	envMapping := make(map[string]string)
+	if m.envMapping != nil {
+		envMapping = m.envMapping.Variables
+	}
+
+	// Separate worktrees into .envrc tracked and ad hoc
+	for name := range worktrees {
+		if _, exists := envMapping[name]; exists {
+			envrcNames = append(envrcNames, name)
+		} else {
+			adHocNames = append(adHocNames, name)
+		}
+	}
+
+	// Sort .envrc names alphabetically
+	sort.Strings(envrcNames)
+
+	// Sort ad hoc names by creation time (directory modification time) descending
+	sort.Slice(adHocNames, func(i, j int) bool {
+		pathI := worktrees[adHocNames[i]].Path
+		pathJ := worktrees[adHocNames[j]].Path
+
+		statI, errI := os.Stat(pathI)
+		statJ, errJ := os.Stat(pathJ)
+
+		// If we can't get stats, fall back to alphabetical
+		if errI != nil || errJ != nil {
+			return adHocNames[i] < adHocNames[j]
+		}
+
+		// Sort by modification time descending (newer first)
+		return statI.ModTime().After(statJ.ModTime())
+	})
+
+	// Return .envrc worktrees first, then ad hoc worktrees
+	result := make([]string, 0, len(envrcNames)+len(adHocNames))
+	result = append(result, envrcNames...)
+	result = append(result, adHocNames...)
+
+	return result
 }

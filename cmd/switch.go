@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"sort"
 	"strings"
 
 	"gbm/internal"
@@ -36,6 +35,7 @@ Use with shell integration for automatic directory switching:
 Examples:
   gbm switch PROD      # Show path to PROD worktree
   gbm switch STAGING   # Show path to STAGING worktree
+  gbm switch -         # Switch to previous worktree
   gbm switch           # List all available worktrees`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		PrintVerbose("Running switch command")
@@ -56,11 +56,29 @@ Examples:
 			return err
 		}
 
+		// Load .envrc configuration for proper sorting
+		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
+			PrintVerbose("No .envrc found or failed to load: %v", err)
+		}
+
 		if len(args) == 0 {
 			return listWorktrees(manager)
 		}
 
-		worktreeName := strings.ToUpper(args[0])
+		worktreeName := args[0]
+
+		// Handle special case of "-" to switch to previous worktree
+		if worktreeName == "-" {
+			previous := manager.GetPreviousWorktree()
+			if previous == "" {
+				return fmt.Errorf("no previous worktree available")
+			}
+			PrintInfo("Switching to previous worktree: %s", previous)
+			worktreeName = previous
+		} else {
+			worktreeName = strings.ToUpper(worktreeName)
+		}
+
 		return switchToWorktree(manager, worktreeName)
 	},
 }
@@ -84,6 +102,11 @@ func switchToWorktree(manager *internal.Manager, worktreeName string) error {
 		} else {
 			return err
 		}
+	}
+
+	// Track this worktree switch
+	if err := manager.SetCurrentWorktree(worktreeName); err != nil {
+		PrintVerbose("Failed to track current worktree: %v", err)
 	}
 
 	if printPath {
@@ -157,12 +180,8 @@ func listWorktrees(manager *internal.Manager) error {
 
 	fmt.Println(internal.FormatSubHeader("Available worktrees:"))
 
-	// Sort worktree names for consistent output
-	var names []string
-	for name := range worktrees {
-		names = append(names, name)
-	}
-	sort.Strings(names)
+	// Get sorted worktree names (.envrc first, then ad hoc by creation time desc)
+	names := manager.GetSortedWorktreeNames(worktrees)
 
 	for _, name := range names {
 		info := worktrees[name]

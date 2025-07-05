@@ -54,8 +54,12 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 		PrintVerbose("Building status table with %d worktrees", len(worktrees))
 		table := internal.NewTable([]string{"WORKTREE", "BRANCH", "GIT STATUS", "SYNC STATUS"})
 
+		// Get sorted worktree names (.envrc first, then ad hoc by creation time desc)
+		sortedNames := manager.GetSortedWorktreeNames(worktrees)
+
 		// Add rows for each worktree
-		for worktreeName, info := range worktrees {
+		for _, worktreeName := range sortedNames {
+			info := worktrees[worktreeName]
 			var syncStatus string
 
 			// Check for missing worktrees

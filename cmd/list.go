@@ -60,7 +60,12 @@ Shows environment variable mappings and indicates sync status for each entry.`,
 		table := internal.NewTable([]string{"WORKTREE", "BRANCH", "STATUS", "PATH"})
 
 		iconManager := internal.GetGlobalIconManager()
-		for worktreeName, info := range worktrees {
+
+		// Get sorted worktree names (.envrc first, then ad hoc by creation time desc)
+		sortedNames := manager.GetSortedWorktreeNames(worktrees)
+
+		for _, worktreeName := range sortedNames {
+			info := worktrees[worktreeName]
 			statusIcon := iconManager.Success()
 			statusText := "OK"
 

@@ -59,12 +59,20 @@ ERROR: Error: exit status 1
 - [x] add completion support (cobra built-in bash/zsh/fish/powershell)
 - [x] add configuration for controlling the icons for git status, repo validations, etc
     - [x] ./.gbm/config.toml
+- [x] track all worktrees created with `gbm` in the `list` and `status` commands
+- [x]  add `remove` verb
+- [x] support `gbm switch -` to go to previous worktree
+- [x] sort branches by .envrc first, then worktree createdAt DESC
 - [ ] configuration for copying files into new worktrees (.env, anything not tracked by git)
 - [ ] track merge backs... not sure how yet and how to prompt the user.
     - [ ] helper to create a merge worktree
 - [ ] add carapace completion
 - [x] jira-cli support
-- [ ] track all worktrees created with `gbm` in the `list` and `status` commands
 - [ ] control branch name JIRA through config file (use current as defaults)
 - [ ] add jira me to config.toml
-- [ ]  add `remove` verb
+- [ ] add info verb
+    - [ ] worktree (createdAt, base branch, JIRA ticket/URL), git history
+- [ ] replace confirmation with bubbltea confirmation (lipgloss?)
+- [ ] combine list and status. they do the same thing.
+    - [ ] use `list` and remove `status`
+    - [ ] columns should be WORKTREE | BRANCH | GIT STATUS | SYNC STATUS | PATH (if not enough room in terminal, omit PATH)
