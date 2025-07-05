@@ -1,16 +1,2 @@
-# Example .envrc file for gbm (Git Branch Manager)
-# Each environment variable maps to a specific branch
-
 # Long-living environment branches
-PROD=production/2025-05-1
-PREVIEW=production/2025-06-1
-MAIN=master
-STAGING=feature/new-api
-
-# Development branches
-DEV=develop
-HOTFIX=hotfix/urgent-fix
-
-# Feature branches
-NEW_FEATURE=feature/user-auth
-API_UPDATE=feature/api-v2
+MAIN=main
