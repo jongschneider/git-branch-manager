@@ -254,11 +254,13 @@ func (gm *GitManager) GetWorktrees() ([]*WorktreeInfo, error) {
 	return infos, nil
 }
 
+var ErrWorktreeDirectoryExists = fmt.Errorf("worktree directory already exists")
+
 func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) error {
 	worktreePath := filepath.Join(gm.repoPath, worktreeDir, envVar)
 
 	if _, err := os.Stat(worktreePath); !os.IsNotExist(err) {
-		return fmt.Errorf("worktree directory already exists: %s", worktreePath)
+		return fmt.Errorf("%w: %s", ErrWorktreeDirectoryExists, worktreePath)
 	}
 
 	branchExists, err := gm.BranchExists(branchName)
@@ -280,7 +282,6 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 		// Remote tracking branch exists, use --track
 		cmd = exec.Command("git", "worktree", "add", "--track", "-b", branchName, worktreePath, remoteBranch)
 	} else {
-		// No remote tracking branch, create worktree without tracking
 		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
 	}
 
@@ -667,12 +668,12 @@ type WorktreeInfoData struct {
 
 // BranchInfo represents information about the base branch
 type BranchInfo struct {
-	Name         string
-	DivergedAt   string
-	DaysAgo      int
-	Upstream     string
-	AheadBy      int
-	BehindBy     int
+	Name       string
+	DivergedAt string
+	DaysAgo    int
+	Upstream   string
+	AheadBy    int
+	BehindBy   int
 }
 
 // CommitInfo represents information about a commit

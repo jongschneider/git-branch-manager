@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -103,6 +104,9 @@ func (m *Manager) Initialize(force, fetch bool) error {
 	for envVar, branchName := range m.envMapping.Variables {
 		err := m.gitManager.CreateWorktree(envVar, branchName, m.config.Settings.WorktreePrefix)
 		if err != nil {
+			if errors.Is(err, ErrWorktreeDirectoryExists) {
+				continue // Skip if worktree already exists
+			}
 			return fmt.Errorf("failed to create worktree for %s: %w", envVar, err)
 		}
 	}
