@@ -248,9 +248,9 @@ func initializeWorktreeManagement() error {
 		return fmt.Errorf("failed to load .envrc: %w", err)
 	}
 
-	// Initialize worktree management (force=false, fetch=false since we just cloned)
-	if err := manager.Initialize(true, false); err != nil {
-		return fmt.Errorf("failed to initialize manager: %w", err)
+	// Initialize worktree management - create worktrees for each .envrc mapping
+	if err := manager.Sync(false, false, false); err != nil {
+		return fmt.Errorf("failed to sync worktrees: %w", err)
 	}
 
 	return nil

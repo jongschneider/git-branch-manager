@@ -19,12 +19,6 @@ STAGING=feature/new-api
 
 ### Primary Commands
 
-**`gbm init`**
-- Initializes the current Git repository for branch management
-- Creates initial worktree structure based on `.envrc`
-- Validates that the repository is a valid Git repo
-- Creates `.gbm/` directory for metadata storage
-
 **`gbm sync`**
 - Synchronizes all worktrees with current `.envrc` definitions
 - Creates missing worktrees for new environment variables
@@ -36,11 +30,6 @@ STAGING=feature/new-api
 - Displays which branches are out of sync
 - Lists missing worktrees
 - Shows orphaned worktrees
-
-**`gbm check`**
-- Runs automatically on shell prompt or can be called manually
-- Quick check for drift between `.envrc` and worktrees
-- Returns non-zero exit code if out of sync (useful for shell integration)
 
 ### Utility Commands
 
@@ -105,7 +94,7 @@ project-root/
 Integration with shell prompt to show sync status:
 ```bash
 # Example shell integration
-export PS1="$(gbm check --format=prompt)$PS1"
+source <(gbm shell-integration)
 ```
 
 ### Sync Status Indicators
@@ -143,18 +132,10 @@ Actions:
 
 **Command-Specific Options:**
 
-`gbm init`:
-- `--force`: Initialize even if worktrees already exist
-- `--fetch`: Fetch remote branches during initialization
-
 `gbm sync`:
 - `--dry-run`: Show what would be changed without making changes
 - `--force`: Skip confirmation prompts
 - `--fetch`: Update remote tracking before sync
-
-`gbm check`:
-- `--format=prompt|json|text`: Output format for integration
-- `--exit-code`: Return status code only
 
 ## Error Handling
 

@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -79,47 +78,6 @@ func (m *Manager) LoadEnvMapping(envrcPath string) error {
 	return nil
 }
 
-func (m *Manager) Initialize(force, fetch bool) error {
-	if !m.gitManager.IsGitRepository() {
-		return fmt.Errorf("not a git repository")
-	}
-
-	if m.envMapping == nil {
-		return fmt.Errorf("no .envrc mapping loaded")
-	}
-
-	if fetch {
-		if err := m.gitManager.FetchAll(); err != nil {
-			return fmt.Errorf("failed to fetch: %w", err)
-		}
-	}
-
-	worktreeDir := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)
-	if !force {
-		if _, err := os.Stat(worktreeDir); !os.IsNotExist(err) {
-			return fmt.Errorf("worktree directory already exists, use --force to override")
-		}
-	}
-
-	for envVar, branchName := range m.envMapping.Variables {
-		err := m.gitManager.CreateWorktree(envVar, branchName, m.config.Settings.WorktreePrefix)
-		if err != nil {
-			if errors.Is(err, ErrWorktreeDirectoryExists) {
-				continue // Skip if worktree already exists
-			}
-			return fmt.Errorf("failed to create worktree for %s: %w", envVar, err)
-		}
-	}
-
-	var trackedVars []string
-	for envVar := range m.envMapping.Variables {
-		trackedVars = append(trackedVars, envVar)
-	}
-	m.config.State.TrackedVars = trackedVars
-	m.config.State.LastSync = time.Now()
-
-	return m.config.Save(m.gbmDir)
-}
 
 func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 	if m.envMapping == nil {
