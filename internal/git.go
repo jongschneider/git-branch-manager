@@ -279,9 +279,23 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 	_, err = execCommand(cmd)
 
 	if err == nil {
-		// Remote tracking branch exists, use --track
-		cmd = exec.Command("git", "worktree", "add", "--track", "-b", branchName, worktreePath, remoteBranch)
+		// Remote tracking branch exists, create worktree and set up tracking
+		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+		cmd.Dir = gm.repoPath
+		if err := execCommandRun(cmd); err != nil {
+			return fmt.Errorf("failed to create worktree: %w", err)
+		}
+
+		// Set up tracking for the remote branch
+		trackCmd := exec.Command("git", "branch", "--set-upstream-to", remoteBranch, branchName)
+		trackCmd.Dir = worktreePath
+		if err := execCommandRun(trackCmd); err != nil {
+			return fmt.Errorf("failed to set up tracking: %w", err)
+		}
+
+		return nil
 	} else {
+		// No remote tracking branch, create worktree normally
 		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
 	}
 

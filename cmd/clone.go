@@ -75,6 +75,9 @@ func runGitBareClone(repoUrl string) error {
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
+		// Clean up the directory if cloning fails
+		os.Chdir("..")
+		os.RemoveAll(repo)
 		return fmt.Errorf("failed to clone bare repository: %w", err)
 	}
 
@@ -113,7 +116,7 @@ func extractRepoName(repoUrl string) string {
 
 	// Extract the last part of the URL (repository name)
 	parts := strings.Split(url, "/")
-	if len(parts) > 0 {
+	if len(parts) > 0 && parts[len(parts)-1] != "" {
 		return parts[len(parts)-1]
 	}
 
@@ -121,7 +124,34 @@ func extractRepoName(repoUrl string) string {
 }
 
 func getDefaultBranch() (string, error) {
-	cmd := exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
+	// First, try to set the remote HEAD reference
+	cmd := exec.Command("git", "remote", "set-head", "origin", "-a")
+	if err := cmd.Run(); err != nil {
+		// If that fails, try to get the remote HEAD manually
+		cmd = exec.Command("git", "ls-remote", "--symref", "origin", "HEAD")
+		output, err := cmd.Output()
+		if err != nil {
+			return "", fmt.Errorf("failed to get default branch: %w", err)
+		}
+
+		// Parse the output to extract branch name
+		// Output format: ref: refs/heads/main	HEAD
+		lines := strings.Split(string(output), "\n")
+		for _, line := range lines {
+			if strings.HasPrefix(line, "ref: refs/heads/") {
+				parts := strings.Split(line, "\t")
+				if len(parts) > 0 {
+					refPath := parts[0]
+					branchName := strings.TrimPrefix(refPath, "ref: refs/heads/")
+					return branchName, nil
+				}
+			}
+		}
+		return "", fmt.Errorf("could not determine default branch from remote")
+	}
+
+	// Now try to get the symbolic ref
+	cmd = exec.Command("git", "symbolic-ref", "refs/remotes/origin/HEAD")
 	output, err := cmd.Output()
 	if err != nil {
 		return "", fmt.Errorf("failed to get default branch: %w", err)
