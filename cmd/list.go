@@ -53,6 +53,7 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 		}
 
 		PrintVerbose("Found %d worktrees to display", len(worktrees))
+
 		if len(worktrees) == 0 {
 			return nil
 		}
@@ -66,11 +67,6 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 		for _, worktreeName := range sortedNames {
 			info := worktrees[worktreeName]
 			var syncStatus string
-
-			// Check for missing worktrees
-			if slices.Contains(status.MissingWorktrees, worktreeName) {
-				syncStatus = "MISSING"
-			}
 
 			// Check for branch changes
 			if change, exists := status.BranchChanges[worktreeName]; exists {
@@ -107,11 +103,14 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 			table.AddRow([]string{worktreeName, branchDisplay, gitStatusIcon, syncStatus, info.Path})
 		}
 
-		table.Print()
+		fmt.Fprint(cmd.OutOrStdout(), table.String())
+		fmt.Fprintln(cmd.OutOrStdout())
 
-		if !status.InSync {
-			fmt.Println()
-			PrintInfo("%s", internal.FormatInfo("Run 'gbm sync' to synchronize changes"))
+		// Only show sync hint if there are actual sync issues with existing worktrees
+		hasExistingSyncIssues := len(status.BranchChanges) > 0 || len(status.OrphanedWorktrees) > 0
+		if hasExistingSyncIssues {
+			fmt.Fprintln(cmd.OutOrStdout())
+			fmt.Fprint(cmd.OutOrStdout(), internal.FormatInfo("Run 'gbm sync' to synchronize changes"))
 		}
 
 		return nil
