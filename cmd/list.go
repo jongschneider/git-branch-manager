@@ -15,7 +15,8 @@ var listCmd = &cobra.Command{
 	Short: "List all managed worktrees and their status",
 	Long: `List all managed worktrees and their status.
 
-Shows environment variable mappings and indicates sync status for each entry.`,
+Shows environment variable mappings and indicates sync status for each entry.
+Displays which branches are out of sync, lists missing worktrees, and shows orphaned worktrees.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		wd, err := os.Getwd()
 		if err != nil {
@@ -57,60 +58,60 @@ Shows environment variable mappings and indicates sync status for each entry.`,
 		}
 
 		PrintVerbose("Building worktree list table")
-		table := internal.NewTable([]string{"WORKTREE", "BRANCH", "STATUS", "PATH"})
-
-		iconManager := internal.GetGlobalIconManager()
+		table := internal.NewTable([]string{"WORKTREE", "BRANCH", "GIT STATUS", "SYNC STATUS", "PATH"})
 
 		// Get sorted worktree names (.envrc first, then ad hoc by creation time desc)
 		sortedNames := manager.GetSortedWorktreeNames(worktrees)
 
 		for _, worktreeName := range sortedNames {
 			info := worktrees[worktreeName]
-			statusIcon := iconManager.Success()
-			statusText := "OK"
+			var syncStatus string
 
-			// Check if this worktree has issues
+			// Check for missing worktrees
 			if slices.Contains(status.MissingWorktrees, worktreeName) {
-				statusIcon = iconManager.Error()
-				statusText = "MISSING"
+				syncStatus = "MISSING"
 			}
 
+			// Check for branch changes
 			if change, exists := status.BranchChanges[worktreeName]; exists {
-				statusIcon = iconManager.Warning()
-				statusText = "OUT_OF_SYNC"
-				info.CurrentBranch = change.OldBranch
+				syncStatus = fmt.Sprintf("OUT_OF_SYNC (%s → %s)", change.OldBranch, change.NewBranch)
 			}
 
+			// Check for orphaned worktrees
 			if slices.Contains(status.OrphanedWorktrees, worktreeName) {
-				statusIcon = iconManager.Orphaned()
-				statusText = "UNTRACKED"
+				syncStatus = "UNTRACKED"
 			}
 
-			// For worktrees not in .envrc, mark as "UNTRACKED"
-			if info.ExpectedBranch == info.CurrentBranch && info.ExpectedBranch != "" {
-				// Check if this worktree is actually tracked in .envrc
+			// Check if this is an untracked worktree (not in .envrc)
+			if syncStatus == "" {
 				envMapping, err := manager.GetEnvMapping()
 				if err == nil {
 					if _, exists := envMapping[worktreeName]; !exists {
-						statusIcon = iconManager.Info()
-						statusText = "UNTRACKED"
+						syncStatus = internal.FormatInfo("UNTRACKED")
+					} else {
+						syncStatus = internal.FormatSuccess("IN_SYNC")
 					}
+				} else {
+					syncStatus = internal.FormatSuccess("IN_SYNC")
 				}
 			}
+
+			// Get git status icon
+			gitStatusIcon := internal.FormatGitStatus(info.GitStatus)
 
 			branchDisplay := info.CurrentBranch
 			if info.ExpectedBranch != "" && info.ExpectedBranch != info.CurrentBranch {
 				branchDisplay = fmt.Sprintf("%s (expected: %s)", info.CurrentBranch, info.ExpectedBranch)
 			}
 
-			table.AddRow([]string{worktreeName, branchDisplay, internal.FormatStatusIcon(statusIcon, statusText), info.Path})
+			table.AddRow([]string{worktreeName, branchDisplay, gitStatusIcon, syncStatus, info.Path})
 		}
 
 		table.Print()
 
-		fmt.Println()
 		if !status.InSync {
-			PrintInfo("%s", internal.FormatInfo("Run 'gbm status' for detailed information or 'gbm sync' to fix issues"))
+			fmt.Println()
+			PrintInfo("%s", internal.FormatInfo("Run 'gbm sync' to synchronize changes"))
 		}
 
 		return nil

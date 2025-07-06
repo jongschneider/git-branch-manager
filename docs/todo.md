@@ -63,7 +63,7 @@ ERROR: Error: exit status 1
 - [x]  add `remove` verb
 - [x] support `gbm switch -` to go to previous worktree
 - [x] sort branches by .envrc first, then worktree createdAt DESC
-- [ ] add info verb (see info_prd.md and info_ascii_mockup.md)
+- [x] add info verb (see info_prd.md and info_ascii_mockup.md)
 - [ ] configuration for copying files into new worktrees (.env, anything not tracked by git)
 - [ ] track merge backs... not sure how yet and how to prompt the user.
     - [ ] helper to create a merge worktree
@@ -72,10 +72,11 @@ ERROR: Error: exit status 1
 - [ ] control branch name JIRA through config file (use current as defaults)
 - [ ] add jira me to config.toml
 - [ ] replace confirmation with bubbltea confirmation (lipgloss?)
-- [ ] combine list and status. they do the same thing.
-    - [ ] use `list` and remove `status`
-    - [ ] columns should be WORKTREE | BRANCH | GIT STATUS | SYNC STATUS | PATH (if not enough room in terminal, omit PATH)
+- [x] combine list and status. they do the same thing.
+    - [x] use `list` and remove `status`
+    - [x] columns should be WORKTREE | BRANCH | GIT STATUS | SYNC STATUS | PATH (if not enough room in terminal, omit PATH)
 - [ ] add `theme` verb with default themes
 - [ ] support `JIRA_CONFIG_FILE` env var ( see https://github.com/ankitpokhrel/jira-cli?tab=readme-ov-file#multiple-projects)
-- [ ] add https://github.com/swisscom/bitbucket-cli integration for PRs
-- [ ] make output adaptive layout.
+- [x] make output adaptive layout.
+    - [x] responsive table design for gbm list - hides PATH column when terminal is narrow (< 100 chars)
+- [x] remove the `clean` verb

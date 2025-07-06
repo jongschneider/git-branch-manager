@@ -247,32 +247,6 @@ func (m *Manager) ValidateEnvrc() error {
 	return nil
 }
 
-func (m *Manager) CleanOrphaned(force bool) error {
-	status, err := m.GetSyncStatus()
-	if err != nil {
-		return err
-	}
-
-	for _, envVar := range status.OrphanedWorktrees {
-		worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
-
-		if !force {
-			fmt.Printf("Remove orphaned worktree %s? [y/N]: ", envVar)
-			var response string
-			fmt.Scanln(&response)
-			if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
-				continue
-			}
-		}
-
-		err := m.gitManager.RemoveWorktree(worktreePath)
-		if err != nil {
-			return fmt.Errorf("failed to remove orphaned worktree %s: %w", envVar, err)
-		}
-	}
-
-	return nil
-}
 
 func (m *Manager) GetEnvMapping() (map[string]string, error) {
 	if m.envMapping == nil {

@@ -49,9 +49,6 @@ STAGING=feature/new-api
 - Shows environment variable mappings
 - Indicates sync status for each entry
 
-**`gbm clean`**
-- Removes orphaned worktrees (interactive by default)
-- Option for force removal with `--force`
 
 **`gbm validate`**
 - Validates `.envrc` syntax and branch references
