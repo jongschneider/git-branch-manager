@@ -202,6 +202,17 @@ func (gm *GitManager) BranchExists(branchName string) (bool, error) {
 				return storer.ErrStop
 			}
 		}
+		// Also check remote branches
+		if ref.Name().IsRemote() {
+			remoteBranch := ref.Name().Short()
+			if strings.HasPrefix(remoteBranch, "origin/") {
+				localBranch := strings.TrimPrefix(remoteBranch, "origin/")
+				if localBranch == branchName {
+					found = true
+					return storer.ErrStop
+				}
+			}
+		}
 		return nil
 	})
 
@@ -271,6 +282,7 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 	if !branchExists {
 		return fmt.Errorf("branch '%s' does not exist", branchName)
 	}
+
 
 	// Check if remote tracking branch exists
 	remoteBranch := fmt.Sprintf("origin/%s", branchName)

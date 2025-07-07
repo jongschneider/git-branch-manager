@@ -78,7 +78,6 @@ func (m *Manager) LoadEnvMapping(envrcPath string) error {
 	return nil
 }
 
-
 func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 	if m.envMapping == nil {
 		return nil, fmt.Errorf("no .envrc mapping loaded")
@@ -128,8 +127,13 @@ func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 }
 
 func (m *Manager) Sync(dryRun, force, fetch bool) error {
-	if m.envMapping == nil {
-		return fmt.Errorf("no .envrc mapping loaded")
+	// if m.envMapping == nil {
+	// 	return fmt.Errorf("no .envrc mapping loaded")
+	// }
+
+	// Validate all branches exist before performing any operations
+	if err := m.ValidateEnvrc(); err != nil {
+		return err
 	}
 
 	if fetch {
@@ -151,6 +155,17 @@ func (m *Manager) Sync(dryRun, force, fetch bool) error {
 		return nil
 	}
 
+	// Remove orphaned worktrees first (if --force is used) to free up branches
+	if force {
+		for _, envVar := range status.OrphanedWorktrees {
+			worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
+			err := m.gitManager.RemoveWorktree(worktreePath)
+			if err != nil {
+				return fmt.Errorf("failed to remove orphaned worktree %s: %w", envVar, err)
+			}
+		}
+	}
+
 	for _, envVar := range status.MissingWorktrees {
 		branchName := m.envMapping.Variables[envVar]
 		err := m.gitManager.CreateWorktree(envVar, branchName, m.config.Settings.WorktreePrefix)
@@ -164,16 +179,6 @@ func (m *Manager) Sync(dryRun, force, fetch bool) error {
 		err := m.gitManager.UpdateWorktree(worktreePath, change.NewBranch)
 		if err != nil {
 			return fmt.Errorf("failed to update worktree for %s: %w", envVar, err)
-		}
-	}
-
-	if force {
-		for _, envVar := range status.OrphanedWorktrees {
-			worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
-			err := m.gitManager.RemoveWorktree(worktreePath)
-			if err != nil {
-				return fmt.Errorf("failed to remove orphaned worktree %s: %w", envVar, err)
-			}
 		}
 	}
 
@@ -198,13 +203,12 @@ func (m *Manager) ValidateEnvrc() error {
 			return fmt.Errorf("failed to check branch %s for %s: %w", branchName, envVar, err)
 		}
 		if !exists {
-			return fmt.Errorf("branch '%s' for environment variable '%s' does not exist", branchName, envVar)
+			return fmt.Errorf("branch '%s' does not exist", branchName)
 		}
 	}
 
 	return nil
 }
-
 
 func (m *Manager) GetEnvMapping() (map[string]string, error) {
 	if m.envMapping == nil {

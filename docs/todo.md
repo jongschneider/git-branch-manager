@@ -80,3 +80,5 @@ ERROR: Error: exit status 1
 - [x] make output adaptive layout.
     - [x] responsive table design for gbm list - hides PATH column when terminal is narrow (< 100 chars)
 - [x] remove the `clean` verb
+- [ ] add hooks (for automating tasked before/after a command is run)
+    * example: after `gbm add` copy `.env` file from MAIN

@@ -196,9 +196,18 @@ func setupEnvrc(defaultBranch string) error {
 			return fmt.Errorf("failed to copy .envrc from worktree: %w", err)
 		}
 	} else if os.IsNotExist(err) {
-		PrintInfo("No .envrc found in MAIN worktree, creating new one...")
-		if err := createDefaultEnvrc(rootEnvrcPath, defaultBranch); err != nil {
-			return fmt.Errorf("failed to create default .envrc: %w", err)
+		// Check if .envrc already exists in root (from repository contents)
+		if _, err := os.Stat(rootEnvrcPath); err == nil {
+			PrintInfo("Found .envrc in root, keeping existing configuration...")
+			// Don't overwrite existing .envrc from repository
+			return nil
+		} else if os.IsNotExist(err) {
+			PrintInfo("No .envrc found in MAIN worktree, creating new one...")
+			if err := createDefaultEnvrc(rootEnvrcPath, defaultBranch); err != nil {
+				return fmt.Errorf("failed to create default .envrc: %w", err)
+			}
+		} else {
+			return fmt.Errorf("failed to check .envrc in root: %w", err)
 		}
 	} else {
 		return fmt.Errorf("failed to check .envrc in worktree: %w", err)
@@ -249,8 +258,12 @@ func initializeWorktreeManagement() error {
 	}
 
 	// Initialize worktree management - create worktrees for each .envrc mapping
+	// Use a more permissive sync that doesn't fail on invalid branches during clone
 	if err := manager.Sync(false, false, false); err != nil {
-		return fmt.Errorf("failed to sync worktrees: %w", err)
+		// For clone operations, we want to be more permissive and not fail
+		// if there are invalid branch references in the .envrc file
+		PrintInfo("Warning: some branch references in .envrc may be invalid: %v", err)
+		PrintInfo("You can run 'gbm sync' later to resolve any issues")
 	}
 
 	return nil
