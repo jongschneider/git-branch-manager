@@ -29,6 +29,7 @@ The tool synchronizes local worktrees with branch definitions and provides
 notifications when configurations drift out of sync.`,
 	PersistentPreRun: func(cmd *cobra.Command, args []string) {
 		InitializeLogging()
+		checkAndDisplayMergeBackAlerts()
 	},
 }
 
@@ -101,5 +102,22 @@ func PrintError(format string, args ...interface{}) {
 func CloseLogFile() {
 	if logFile != nil {
 		logFile.Close()
+	}
+}
+
+func checkAndDisplayMergeBackAlerts() {
+	status, err := internal.CheckMergeBackStatus(GetConfigPath())
+	if err != nil {
+		PrintVerbose("Failed to check merge-back status: %v", err)
+		return
+	}
+
+	if status == nil {
+		return
+	}
+
+	alert := internal.FormatMergeBackAlert(status)
+	if alert != "" {
+		fmt.Fprint(os.Stderr, alert)
 	}
 }

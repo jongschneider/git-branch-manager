@@ -137,6 +137,8 @@ func (r *GitTestRepo) runGitCommand(args ...string) error {
 	cmd.Dir = r.LocalDir
 	if output, err := cmd.CombinedOutput(); err != nil {
 		return fmt.Errorf("git command failed: %s (output: %s)", err, string(output))
+	} else {
+		fmt.Println("Git command output:", string(output))
 	}
 	return nil
 }
@@ -241,9 +243,46 @@ func (r *GitTestRepo) WriteFile(path, content string) error {
 }
 
 func (r *GitTestRepo) CreateEnvrc(mapping map[string]string) error {
+	// Create deterministic ordered content to avoid flaky tests
+	// Order: MAIN, PREVIEW, PROD, then any others alphabetically
 	var content string
-	for key, value := range mapping {
-		content += fmt.Sprintf("%s=%s\n", key, value)
+
+	// Standard order that tests expect
+	orderedKeys := []string{"MAIN", "PREVIEW", "PROD"}
+
+	// Add the standard keys in order if they exist
+	for _, key := range orderedKeys {
+		if value, exists := mapping[key]; exists {
+			content += fmt.Sprintf("%s=%s\n", key, value)
+		}
+	}
+
+	// Add any remaining keys alphabetically
+	var remainingKeys []string
+	for key := range mapping {
+		found := false
+		for _, standardKey := range orderedKeys {
+			if key == standardKey {
+				found = true
+				break
+			}
+		}
+		if !found {
+			remainingKeys = append(remainingKeys, key)
+		}
+	}
+
+	// Sort remaining keys for determinism
+	for i := 0; i < len(remainingKeys); i++ {
+		for j := i + 1; j < len(remainingKeys); j++ {
+			if remainingKeys[i] > remainingKeys[j] {
+				remainingKeys[i], remainingKeys[j] = remainingKeys[j], remainingKeys[i]
+			}
+		}
+	}
+
+	for _, key := range remainingKeys {
+		content += fmt.Sprintf("%s=%s\n", key, mapping[key])
 	}
 
 	return r.WriteFile(".envrc", content)
@@ -314,4 +353,16 @@ func (r *GitTestRepo) InLocalRepo(fn func() error) error {
 	restore := r.WithWorkingDir(r.LocalDir)
 	defer restore()
 	return fn()
+}
+
+func (r *GitTestRepo) CreateSynchronizedBranch(name string) error {
+	if err := r.runGitCommand("checkout", "-b", name); err != nil {
+		return fmt.Errorf("failed to create branch %s: %w", name, err)
+	}
+
+	if err := r.runGitCommand("push", r.Config.RemoteName, name); err != nil {
+		return fmt.Errorf("failed to push branch %s: %w", name, err)
+	}
+
+	return nil
 }
