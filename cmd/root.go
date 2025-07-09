@@ -108,7 +108,12 @@ func CloseLogFile() {
 // createInitializedManager creates a new manager with git root discovery and env mapping loaded.
 // It gracefully handles missing .envrc files by logging a verbose message.
 func createInitializedManager() (*internal.Manager, error) {
-	repoPath, err := internal.FindGitRoot(".")
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+	
+	repoPath, err := internal.FindGitRoot(wd)
 	if err != nil {
 		return nil, fmt.Errorf("not in a git repository: %w", err)
 	}
@@ -128,7 +133,12 @@ func createInitializedManager() (*internal.Manager, error) {
 // createInitializedManagerStrict creates a new manager and requires .envrc to exist.
 // It returns an error if .envrc cannot be loaded.
 func createInitializedManagerStrict() (*internal.Manager, error) {
-	repoPath, err := internal.FindGitRoot(".")
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+	
+	repoPath, err := internal.FindGitRoot(wd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find git repository root: %w", err)
 	}
@@ -149,7 +159,12 @@ func createInitializedManagerStrict() (*internal.Manager, error) {
 // createInitializedGitManager creates a new git manager with git root discovery.
 // Used by commands that need direct git operations without .envrc dependency.
 func createInitializedGitManager() (*internal.GitManager, error) {
-	gitRoot, err := internal.FindGitRoot(".")
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil, fmt.Errorf("failed to get working directory: %w", err)
+	}
+	
+	gitRoot, err := internal.FindGitRoot(wd)
 	if err != nil {
 		return nil, fmt.Errorf("not in a git repository: %w", err)
 	}
