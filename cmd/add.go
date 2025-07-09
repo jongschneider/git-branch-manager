@@ -27,21 +27,10 @@ var addCmd = &cobra.Command{
 	RunE: func(cmd *cobra.Command, args []string) error {
 		worktreeName := args[0]
 
-		// Find git repository root
-		repoPath, err := internal.FindGitRoot(".")
-		if err != nil {
-			return fmt.Errorf("not in a git repository: %w", err)
-		}
-
 		// Create manager
-		manager, err := internal.NewManager(repoPath)
+		manager, err := createInitializedManager()
 		if err != nil {
-			return fmt.Errorf("failed to create manager: %w", err)
-		}
-
-		// Load .envrc configuration to check if worktree is tracked
-		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
-			PrintVerbose("No .envrc found or failed to load, treating as ad hoc worktree: %v", err)
+			return err
 		}
 
 		var branchName string

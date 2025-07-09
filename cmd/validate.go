@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 
 	"gbm/internal"
 
@@ -17,24 +16,9 @@ var validateCmd = &cobra.Command{
 Checks if referenced branches exist locally or remotely. Useful for CI/CD integration
 and ensuring configuration correctness before syncing.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		wd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
-		}
-
-		repoRoot, err := internal.FindGitRoot(wd)
-		if err != nil {
-			return fmt.Errorf("failed to find git repository root: %w", err)
-		}
-
-		manager, err := internal.NewManager(repoRoot)
+		manager, err := createInitializedManagerStrict()
 		if err != nil {
 			return err
-		}
-
-		PrintVerbose("Loading .envrc configuration from: %s", GetConfigPath())
-		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
-			return fmt.Errorf("failed to load .envrc: %w", err)
 		}
 
 		PrintVerbose("Validating branch references...")

@@ -29,14 +29,9 @@ Usage:
 			return fmt.Errorf("failed to get working directory: %w", err)
 		}
 
-		repoPath, err := internal.FindGitRoot(wd)
+		manager, err := createInitializedManager()
 		if err != nil {
-			return fmt.Errorf("not in a git repository: %w", err)
-		}
-
-		manager, err := internal.NewManager(repoPath)
-		if err != nil {
-			return fmt.Errorf("failed to create manager: %w", err)
+			return err
 		}
 
 		if pullAll {

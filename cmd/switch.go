@@ -40,25 +40,9 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		PrintVerbose("Running switch command")
 
-		wd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
-		}
-
-		repoRoot, err := internal.FindGitRoot(wd)
-		if err != nil {
-			return fmt.Errorf("failed to find git repository root: %w", err)
-		}
-		PrintVerbose("Checking status from repository root: %s", repoRoot)
-
-		manager, err := internal.NewManager(repoRoot)
+		manager, err := createInitializedManager()
 		if err != nil {
 			return err
-		}
-
-		// Load .envrc configuration for proper sorting
-		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
-			PrintVerbose("No .envrc found or failed to load: %v", err)
 		}
 
 		if len(args) == 0 {
@@ -215,17 +199,7 @@ func init() {
 }
 
 func getWorktreeNames() []string {
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil
-	}
-
-	repoRoot, err := internal.FindGitRoot(wd)
-	if err != nil {
-		return nil
-	}
-
-	manager, err := internal.NewManager(repoRoot)
+	manager, err := createInitializedManager()
 	if err != nil {
 		return nil
 	}

@@ -113,8 +113,6 @@ func TestListCommand_WithEnvrcWorktrees(t *testing.T) {
 	assert.Equal(t, "", strings.TrimSpace(outputStr))
 }
 
-
-
 func TestListCommand_UntrackedWorktrees(t *testing.T) {
 	// Create a repository with branches
 	sourceRepo := testutils.NewMultiBranchRepo(t)
@@ -511,5 +509,3 @@ func TestListCommand_NoEnvrcFile(t *testing.T) {
 	assert.Error(t, err)
 	assert.Contains(t, err.Error(), "failed to load .envrc")
 }
-
-

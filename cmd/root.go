@@ -105,6 +105,63 @@ func CloseLogFile() {
 	}
 }
 
+// createInitializedManager creates a new manager with git root discovery and env mapping loaded.
+// It gracefully handles missing .envrc files by logging a verbose message.
+func createInitializedManager() (*internal.Manager, error) {
+	repoPath, err := internal.FindGitRoot(".")
+	if err != nil {
+		return nil, fmt.Errorf("not in a git repository: %w", err)
+	}
+
+	manager, err := internal.NewManager(repoPath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to create manager: %w", err)
+	}
+
+	if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
+		PrintVerbose("No .envrc found or failed to load: %v", err)
+	}
+
+	return manager, nil
+}
+
+// createInitializedManagerStrict creates a new manager and requires .envrc to exist.
+// It returns an error if .envrc cannot be loaded.
+func createInitializedManagerStrict() (*internal.Manager, error) {
+	repoPath, err := internal.FindGitRoot(".")
+	if err != nil {
+		return nil, fmt.Errorf("failed to find git repository root: %w", err)
+	}
+
+	manager, err := internal.NewManager(repoPath)
+	if err != nil {
+		return nil, err
+	}
+
+	PrintVerbose("Loading .envrc configuration from: %s", GetConfigPath())
+	if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
+		return nil, fmt.Errorf("failed to load .envrc: %w", err)
+	}
+
+	return manager, nil
+}
+
+// createInitializedGitManager creates a new git manager with git root discovery.
+// Used by commands that need direct git operations without .envrc dependency.
+func createInitializedGitManager() (*internal.GitManager, error) {
+	gitRoot, err := internal.FindGitRoot(".")
+	if err != nil {
+		return nil, fmt.Errorf("not in a git repository: %w", err)
+	}
+
+	gitManager, err := internal.NewGitManager(gitRoot)
+	if err != nil {
+		return nil, fmt.Errorf("failed to initialize git manager: %w", err)
+	}
+
+	return gitManager, nil
+}
+
 func checkAndDisplayMergeBackAlerts() {
 	// Check if merge-back alerts should be shown
 	if !shouldShowMergeBackAlerts() {

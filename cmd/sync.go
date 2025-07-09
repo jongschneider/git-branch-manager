@@ -1,9 +1,6 @@
 package cmd
 
 import (
-	"fmt"
-	"os"
-
 	"gbm/internal"
 
 	"github.com/spf13/cobra"
@@ -23,24 +20,9 @@ var syncCmd = &cobra.Command{
 Creates missing worktrees for new environment variables, updates existing worktrees
 if branch references have changed, and optionally removes orphaned worktrees.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
-		wd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
-		}
-
-		repoRoot, err := internal.FindGitRoot(wd)
-		if err != nil {
-			return fmt.Errorf("failed to find git repository root: %w", err)
-		}
-
-		manager, err := internal.NewManager(repoRoot)
+		manager, err := createInitializedManagerStrict()
 		if err != nil {
 			return err
-		}
-
-		PrintVerbose("Loading .envrc configuration from: %s", GetConfigPath())
-		if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
-			return fmt.Errorf("failed to load .envrc: %w", err)
 		}
 
 		if syncDryRun {

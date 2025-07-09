@@ -2,10 +2,7 @@ package cmd
 
 import (
 	"fmt"
-	"os"
 	"strings"
-
-	"gbm/internal"
 
 	"github.com/spf13/cobra"
 )
@@ -29,16 +26,10 @@ Examples:
 	RunE: func(cmd *cobra.Command, args []string) error {
 		worktreeName := args[0]
 
-		// Find git repository root
-		repoPath, err := internal.FindGitRoot(".")
-		if err != nil {
-			return fmt.Errorf("not in a git repository: %w", err)
-		}
-
 		// Create manager
-		manager, err := internal.NewManager(repoPath)
+		manager, err := createInitializedManager()
 		if err != nil {
-			return fmt.Errorf("failed to create manager: %w", err)
+			return err
 		}
 
 		// Check if worktree exists
@@ -88,20 +79,8 @@ func init() {
 	// Add completion for worktree names
 	removeCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			// Get current working directory
-			wd, err := os.Getwd()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-
-			// Find git repository root
-			repoPath, err := internal.FindGitRoot(wd)
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-
 			// Create manager
-			manager, err := internal.NewManager(repoPath)
+			manager, err := createInitializedManager()
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}

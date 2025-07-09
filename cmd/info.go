@@ -39,16 +39,10 @@ func runInfoCommand(cmd *cobra.Command, args []string) error {
 		worktreeName = filepath.Base(currentPath)
 	}
 
-	// Find git root
-	gitRoot, err := internal.FindGitRoot(".")
-	if err != nil {
-		return fmt.Errorf("not in a git repository: %w", err)
-	}
-
 	// Initialize git manager
-	gitManager, err := internal.NewGitManager(gitRoot)
+	gitManager, err := createInitializedGitManager()
 	if err != nil {
-		return fmt.Errorf("failed to initialize git manager: %w", err)
+		return err
 	}
 
 	// Get worktree information
