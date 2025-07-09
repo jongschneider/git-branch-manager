@@ -332,7 +332,7 @@ func TestSwitchCommand_ErrorConditions(t *testing.T) {
 				return tempDir
 			},
 			args:          []string{"switch", "DEV"},
-			errorContains: "failed to find git repository root",
+			errorContains: "not in a git repository",
 		},
 		{
 			name: "worktree does not exist",
