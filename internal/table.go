@@ -16,7 +16,7 @@ type Table struct {
 }
 
 func NewTable(headers []string) *Table {
-	termWidth := getTerminalWidth()
+	termWidth := GetTerminalWidth()
 
 	// Set minimum column widths for responsive design
 	minWidths := map[string]int{

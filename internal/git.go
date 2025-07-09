@@ -52,6 +52,34 @@ func execCommandRun(cmd *exec.Cmd) error {
 	return err
 }
 
+// ExecGitCommand executes a git command in the specified directory with optional output capture
+// This unified function replaces multiple duplicate git execution patterns across the codebase
+func ExecGitCommand(dir string, args ...string) ([]byte, error) {
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	return cmd.Output()
+}
+
+// ExecGitCommandRun executes a git command in the specified directory without capturing output
+func ExecGitCommandRun(dir string, args ...string) error {
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	return cmd.Run()
+}
+
+// ExecGitCommandCombined executes a git command and returns combined stdout/stderr output
+func ExecGitCommandCombined(dir string, args ...string) ([]byte, error) {
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	return cmd.CombinedOutput()
+}
+
 // FindGitRoot finds the root directory of the git repository
 func FindGitRoot(startPath string) (string, error) {
 	// First, try direct git commands from the current directory
@@ -224,9 +252,7 @@ func (gm *GitManager) BranchExists(branchName string) (bool, error) {
 }
 
 func (gm *GitManager) GetWorktrees() ([]*WorktreeInfo, error) {
-	cmd := exec.Command("git", "worktree", "list", "--porcelain")
-	cmd.Dir = gm.repoPath
-	output, err := execCommand(cmd)
+	output, err := ExecGitCommand(gm.repoPath, "worktree", "list", "--porcelain")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get worktrees: %w", err)
 	}
@@ -283,46 +309,34 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 		return fmt.Errorf("branch '%s' does not exist", branchName)
 	}
 
-
 	// Check if remote tracking branch exists
 	remoteBranch := fmt.Sprintf("origin/%s", branchName)
-	cmd := exec.Command("git", "rev-parse", "--verify", remoteBranch)
-	cmd.Dir = gm.repoPath
-	_, err = execCommand(cmd)
+	_, err = ExecGitCommand(gm.repoPath, "rev-parse", "--verify", remoteBranch)
 
 	if err == nil {
 		// Remote tracking branch exists, create worktree and set up tracking
-		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
-		cmd.Dir = gm.repoPath
-		if err := execCommandRun(cmd); err != nil {
+		if err := ExecGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
 			return fmt.Errorf("failed to create worktree: %w", err)
 		}
 
 		// Set up tracking for the remote branch
-		trackCmd := exec.Command("git", "branch", "--set-upstream-to", remoteBranch, branchName)
-		trackCmd.Dir = worktreePath
-		if err := execCommandRun(trackCmd); err != nil {
+		if err := ExecGitCommandRun(worktreePath, "branch", "--set-upstream-to", remoteBranch, branchName); err != nil {
 			return fmt.Errorf("failed to set up tracking: %w", err)
 		}
 
 		return nil
 	} else {
 		// No remote tracking branch, create worktree normally
-		cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
-	}
-
-	cmd.Dir = gm.repoPath
-	if err := execCommandRun(cmd); err != nil {
-		return fmt.Errorf("failed to create worktree: %w", err)
+		if err := ExecGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
+			return fmt.Errorf("failed to create worktree: %w", err)
+		}
 	}
 
 	return nil
 }
 
 func (gm *GitManager) RemoveWorktree(worktreePath string) error {
-	cmd := exec.Command("git", "worktree", "remove", worktreePath, "--force")
-	cmd.Dir = gm.repoPath
-	if err := execCommandRun(cmd); err != nil {
+	if err := ExecGitCommandRun(gm.repoPath, "worktree", "remove", worktreePath, "--force"); err != nil {
 		return fmt.Errorf("failed to remove worktree: %w", err)
 	}
 
@@ -363,9 +377,7 @@ func (gm *GitManager) GetWorktreeStatus(worktreePath string) (*GitStatus, error)
 	status := &GitStatus{}
 
 	// Get git status
-	cmd := exec.Command("git", "status", "--porcelain", "--ahead-behind")
-	cmd.Dir = worktreePath
-	output, err := execCommand(cmd)
+	output, err := ExecGitCommand(worktreePath, "status", "--porcelain", "--ahead-behind")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get git status: %w", err)
 	}
@@ -401,9 +413,7 @@ func (gm *GitManager) GetWorktreeStatus(worktreePath string) (*GitStatus, error)
 	}
 
 	// Get ahead/behind info
-	cmd = exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
-	cmd.Dir = worktreePath
-	output, err = execCommand(cmd)
+	output, err = ExecGitCommand(worktreePath, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
 	if err == nil {
 		parts := strings.Fields(string(output))
 		if len(parts) == 2 {
@@ -459,9 +469,7 @@ func (gm *GitManager) CreateBranch(branchName, baseBranch string) error {
 		baseBranch = "HEAD"
 	}
 
-	cmd := exec.Command("git", "branch", branchName, baseBranch)
-	cmd.Dir = gm.repoPath
-	if err := execCommandRun(cmd); err != nil {
+	if err := ExecGitCommandRun(gm.repoPath, "branch", branchName, baseBranch); err != nil {
 		return fmt.Errorf("failed to create branch: %w", err)
 	}
 
@@ -532,9 +540,7 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 }
 
 func (gm *GitManager) GetCurrentBranch() (string, error) {
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = gm.repoPath
-	output, err := execCommand(cmd)
+	output, err := ExecGitCommand(gm.repoPath, "rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return "", fmt.Errorf("failed to get current branch: %w", err)
 	}
@@ -543,9 +549,7 @@ func (gm *GitManager) GetCurrentBranch() (string, error) {
 }
 
 func (gm *GitManager) GetRemoteBranches() ([]string, error) {
-	cmd := exec.Command("git", "branch", "-r")
-	cmd.Dir = gm.repoPath
-	output, err := execCommand(cmd)
+	output, err := ExecGitCommand(gm.repoPath, "branch", "-r")
 	if err != nil {
 		return nil, fmt.Errorf("failed to get remote branches: %w", err)
 	}
@@ -574,9 +578,7 @@ func (gm *GitManager) PushWorktree(worktreePath string) error {
 	}
 
 	// Get the current branch
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = worktreePath
-	output, err := execCommand(cmd)
+	output, err := ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return fmt.Errorf("failed to get current branch: %w", err)
 	}
@@ -584,10 +586,9 @@ func (gm *GitManager) PushWorktree(worktreePath string) error {
 	currentBranch := strings.TrimSpace(string(output))
 
 	// Check if upstream is set
-	cmd = exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
-	cmd.Dir = worktreePath
-	_, err = execCommand(cmd)
+	_, err = ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "@{upstream}")
 
+	var cmd *exec.Cmd
 	if err != nil {
 		// No upstream set, push with -u flag
 		cmd = exec.Command("git", "push", "-u", "origin", currentBranch)

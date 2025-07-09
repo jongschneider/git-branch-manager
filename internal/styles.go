@@ -2,9 +2,14 @@ package internal
 
 import (
 	"fmt"
+	"os"
+	"os/exec"
+	"strconv"
+	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
+	"golang.org/x/term"
 )
 
 // Global icon manager instance
@@ -261,4 +266,33 @@ func FormatRelativeTime(t time.Time) string {
 		return formatted
 	}
 	return formatted + " ago"
+}
+
+// Terminal utilities
+// GetTerminalWidth returns the terminal width, with multiple fallbacks
+func GetTerminalWidth() int {
+	// Try getting terminal size directly
+	width, _, err := term.GetSize(int(os.Stdout.Fd()))
+	if err == nil && width > 0 {
+		return width
+	}
+
+	// Fallback to COLUMNS environment variable (works in tmux)
+	if columns := os.Getenv("COLUMNS"); columns != "" {
+		if w, err := strconv.Atoi(columns); err == nil && w > 0 {
+			return w
+		}
+	}
+
+	// Try tput cols command as another fallback
+	if cmd := exec.Command("tput", "cols"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			if w, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil && w > 0 {
+				return w
+			}
+		}
+	}
+
+	// Final fallback
+	return 80
 }

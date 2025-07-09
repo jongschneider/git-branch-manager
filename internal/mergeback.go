@@ -4,7 +4,6 @@ import (
 	"bufio"
 	"fmt"
 	"os"
-	"os/exec"
 	"regexp"
 	"sort"
 	"strconv"
@@ -171,17 +170,13 @@ func parseEnvrcFile(configPath string) ([]EnvVarMapping, error) {
 }
 
 func getUserInfo(repoPath string) (string, string, error) {
-	emailCmd := exec.Command("git", "config", "user.email")
-	emailCmd.Dir = repoPath
-	emailBytes, err := emailCmd.Output()
+	emailBytes, err := ExecGitCommand(repoPath, "config", "user.email")
 	email := strings.TrimSpace(string(emailBytes))
 	if err != nil {
 		email = ""
 	}
 
-	nameCmd := exec.Command("git", "config", "user.name")
-	nameCmd.Dir = repoPath
-	nameBytes, err := nameCmd.Output()
+	nameBytes, err := ExecGitCommand(repoPath, "config", "user.name")
 	name := strings.TrimSpace(string(nameBytes))
 	if err != nil {
 		name = ""
@@ -195,9 +190,7 @@ func getUserInfo(repoPath string) (string, string, error) {
 }
 
 func getCommitsNeedingMergeBack(repoPath, targetBranch, sourceBranch string) ([]MergeBackCommitInfo, error) {
-	cmd := exec.Command("git", "log", targetBranch+".."+sourceBranch, "--format=%H|%s|%an|%ae|%ct")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
+	output, err := ExecGitCommand(repoPath, "log", targetBranch+".."+sourceBranch, "--format=%H|%s|%an|%ae|%ct")
 	if err != nil {
 		return nil, err
 	}

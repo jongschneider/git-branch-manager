@@ -2,14 +2,10 @@ package internal
 
 import (
 	"fmt"
-	"os"
-	"os/exec"
-	"strconv"
 	"strings"
 	"time"
 
 	"github.com/charmbracelet/lipgloss"
-	"golang.org/x/term"
 )
 
 type InfoRenderer struct {
@@ -27,33 +23,6 @@ type InfoRenderer struct {
 	jiraStyle      lipgloss.Style
 }
 
-// getTerminalWidth returns the terminal width, with multiple fallbacks
-func getTerminalWidth() int {
-	// Try getting terminal size directly
-	width, _, err := term.GetSize(int(os.Stdout.Fd()))
-	if err == nil && width > 0 {
-		return width
-	}
-
-	// Fallback to COLUMNS environment variable (works in tmux)
-	if columns := os.Getenv("COLUMNS"); columns != "" {
-		if w, err := strconv.Atoi(columns); err == nil && w > 0 {
-			return w
-		}
-	}
-
-	// Try tput cols command as another fallback
-	if cmd := exec.Command("tput", "cols"); cmd != nil {
-		if output, err := cmd.Output(); err == nil {
-			if w, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil && w > 0 {
-				return w
-			}
-		}
-	}
-
-	// Final fallback
-	return 80
-}
 
 func NewInfoRenderer() *InfoRenderer {
 	// Define adaptive colors for better light/dark theme support
@@ -64,7 +33,7 @@ func NewInfoRenderer() *InfoRenderer {
 	successColor := lipgloss.AdaptiveColor{Light: "#059669", Dark: "#10B981"}
 	warningColor := lipgloss.AdaptiveColor{Light: "#D97706", Dark: "#FCD34D"}
 
-	termWidth := getTerminalWidth()
+	termWidth := GetTerminalWidth()
 	contentWidth := termWidth - 10 // Account for borders and padding
 
 	return &InfoRenderer{
@@ -179,7 +148,7 @@ func (r *InfoRenderer) renderJiraSection(jira *JiraTicketDetails) string {
 	content.WriteString(r.renderKeyValue("Key", jira.Key))
 
 	if jira.Summary != "" {
-		termWidth := getTerminalWidth()
+		termWidth := GetTerminalWidth()
 		summaryWidth := termWidth - 25 // Account for borders, padding, and key label
 		if summaryWidth < 30 {
 			summaryWidth = 30 // minimum width
@@ -227,7 +196,7 @@ func (r *InfoRenderer) renderJiraSection(jira *JiraTicketDetails) string {
 		content.WriteString(commentHeader + "\n")
 
 		// Wrap the comment text to fit within borders
-		termWidth := getTerminalWidth()
+		termWidth := GetTerminalWidth()
 		commentWidth := termWidth - 30 // Account for borders, padding, and indentation
 		if commentWidth < 40 {
 			commentWidth = 40 // minimum width
@@ -265,7 +234,7 @@ func (r *InfoRenderer) renderGitSection(data *WorktreeInfoData) string {
 	if len(data.Commits) > 0 {
 		latest := data.Commits[0]
 		timeAgo := time.Since(latest.Timestamp)
-		termWidth := getTerminalWidth()
+		termWidth := GetTerminalWidth()
 		commitWidth := termWidth - 25 // Account for borders, padding, and key label
 		if commitWidth < 30 {
 			commitWidth = 30
@@ -282,7 +251,7 @@ func (r *InfoRenderer) renderGitSection(data *WorktreeInfoData) string {
 	// Modified files
 	if len(data.ModifiedFiles) > 0 {
 		content.WriteString("Modified Files:\n")
-		termWidth := getTerminalWidth()
+		termWidth := GetTerminalWidth()
 		filePathWidth := termWidth - 40 // Account for borders, status, and changes
 		if filePathWidth < 20 {
 			filePathWidth = 20
