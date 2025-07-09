@@ -131,7 +131,7 @@ func (t *Table) getResponsiveHeaders() ([]string, []int) {
 	columnIndices := make([]int, 0)
 
 	// Always include these columns first (in priority order)
-	priorityOrder := []string{"WORKTREE", "BRANCH", "GIT STATUS", "SYNC STATUS"}
+	priorityOrder := []string{"ENV VARIABLE", "WORKTREE", "BRANCH", "GIT STATUS", "SYNC STATUS", "STATUS"}
 
 	for _, priorityHeader := range priorityOrder {
 		for i, header := range t.headers {

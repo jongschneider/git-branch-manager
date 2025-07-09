@@ -22,6 +22,7 @@ type ConfigSettings struct {
 	WorktreePrefix        string `toml:"worktree_prefix"`
 	AutoFetch             bool   `toml:"auto_fetch"`
 	CreateMissingBranches bool   `toml:"create_missing_branches"`
+	MergeBackAlerts       bool   `toml:"merge_back_alerts"`
 }
 
 type ConfigState struct {
@@ -62,6 +63,7 @@ func DefaultConfig() *Config {
 			WorktreePrefix:        "worktrees",
 			AutoFetch:             true,
 			CreateMissingBranches: false,
+			MergeBackAlerts:       false, // Disabled by default
 		},
 		State: ConfigState{
 			LastSync:         time.Time{},
@@ -105,6 +107,11 @@ func LoadConfig(gbmDir string) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+// GetGBMDir returns the path to the .gbm directory for the given repository root
+func GetGBMDir(repoRoot string) string {
+	return filepath.Join(repoRoot, ".gbm")
 }
 
 func (c *Config) Save(gbmDir string) error {

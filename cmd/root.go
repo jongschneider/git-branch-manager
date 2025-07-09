@@ -106,6 +106,11 @@ func CloseLogFile() {
 }
 
 func checkAndDisplayMergeBackAlerts() {
+	// Check if merge-back alerts should be shown
+	if !shouldShowMergeBackAlerts() {
+		return
+	}
+
 	status, err := internal.CheckMergeBackStatus(GetConfigPath())
 	if err != nil {
 		PrintVerbose("Failed to check merge-back status: %v", err)
@@ -120,4 +125,30 @@ func checkAndDisplayMergeBackAlerts() {
 	if alert != "" {
 		fmt.Fprint(os.Stderr, alert)
 	}
+}
+
+// shouldShowMergeBackAlerts checks configuration to determine
+// if merge-back alerts should be displayed
+func shouldShowMergeBackAlerts() bool {
+	// Check configuration file
+	wd, err := os.Getwd()
+	if err != nil {
+		PrintVerbose("Failed to get working directory: %v", err)
+		return false // Default to disabled
+	}
+
+	repoRoot, err := internal.FindGitRoot(wd)
+	if err != nil {
+		PrintVerbose("Not in a git repository: %v", err)
+		return false // Default to disabled
+	}
+
+	gbmDir := internal.GetGBMDir(repoRoot)
+	config, err := internal.LoadConfig(gbmDir)
+	if err != nil {
+		PrintVerbose("Failed to load config: %v", err)
+		return false // Default to disabled
+	}
+
+	return config.Settings.MergeBackAlerts
 }
