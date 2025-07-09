@@ -3,6 +3,8 @@ package internal
 import (
 	"fmt"
 	"os"
+	"os/exec"
+	"strconv"
 	"strings"
 	"time"
 
@@ -11,27 +13,46 @@ import (
 )
 
 type InfoRenderer struct {
-	headerStyle     lipgloss.Style
-	sectionStyle    lipgloss.Style
-	keyStyle        lipgloss.Style
-	valueStyle      lipgloss.Style
-	borderStyle     lipgloss.Style
-	separatorStyle  lipgloss.Style
-	titleStyle      lipgloss.Style
-	subtitleStyle   lipgloss.Style
-	statusStyle     lipgloss.Style
-	commitStyle     lipgloss.Style
-	fileStyle       lipgloss.Style
-	jiraStyle       lipgloss.Style
+	headerStyle    lipgloss.Style
+	sectionStyle   lipgloss.Style
+	keyStyle       lipgloss.Style
+	valueStyle     lipgloss.Style
+	borderStyle    lipgloss.Style
+	separatorStyle lipgloss.Style
+	titleStyle     lipgloss.Style
+	subtitleStyle  lipgloss.Style
+	statusStyle    lipgloss.Style
+	commitStyle    lipgloss.Style
+	fileStyle      lipgloss.Style
+	jiraStyle      lipgloss.Style
 }
 
-// getTerminalWidth returns the terminal width, with a fallback to 80
+// getTerminalWidth returns the terminal width, with multiple fallbacks
 func getTerminalWidth() int {
+	// Try getting terminal size directly
 	width, _, err := term.GetSize(int(os.Stdout.Fd()))
-	if err != nil {
-		return 80 // fallback width
+	if err == nil && width > 0 {
+		return width
 	}
-	return width
+
+	// Fallback to COLUMNS environment variable (works in tmux)
+	if columns := os.Getenv("COLUMNS"); columns != "" {
+		if w, err := strconv.Atoi(columns); err == nil && w > 0 {
+			return w
+		}
+	}
+
+	// Try tput cols command as another fallback
+	if cmd := exec.Command("tput", "cols"); cmd != nil {
+		if output, err := cmd.Output(); err == nil {
+			if w, err := strconv.Atoi(strings.TrimSpace(string(output))); err == nil && w > 0 {
+				return w
+			}
+		}
+	}
+
+	// Final fallback
+	return 80
 }
 
 func NewInfoRenderer() *InfoRenderer {
