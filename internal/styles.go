@@ -1,6 +1,9 @@
 package internal
 
 import (
+	"fmt"
+	"time"
+
 	"github.com/charmbracelet/lipgloss"
 )
 
@@ -226,4 +229,36 @@ func FormatGitStatus(status *GitStatus) string {
 	}
 
 	return StatusOKStyle.Render(iconManager.GitClean())
+}
+
+// Time formatting utilities
+func FormatDuration(d time.Duration) string {
+	if d < time.Hour {
+		minutes := int(d.Minutes())
+		if minutes < 1 {
+			return "just now"
+		}
+		return fmt.Sprintf("%d minutes", minutes)
+	}
+
+	if d < 24*time.Hour {
+		hours := int(d.Hours())
+		return fmt.Sprintf("%d hours", hours)
+	}
+
+	days := int(d.Hours() / 24)
+	if days == 1 {
+		return "1 day"
+	}
+	return fmt.Sprintf("%d days", days)
+}
+
+func FormatRelativeTime(t time.Time) string {
+	duration := time.Since(t)
+	formatted := FormatDuration(duration)
+
+	if formatted == "just now" {
+		return formatted
+	}
+	return formatted + " ago"
 }

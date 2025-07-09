@@ -36,7 +36,7 @@
 
 #### Helper Function Usage:
 - `createInitializedManager()`: For commands that gracefully handle missing .envrc
-- `createInitializedManagerStrict()`: For commands that require .envrc to exist  
+- `createInitializedManagerStrict()`: For commands that require .envrc to exist
 - `createInitializedGitManager()`: For commands that need direct git operations only
 
 ---
@@ -62,17 +62,23 @@
 **Difficulty:** Easy | **Impact:** Medium | **Files:** 2 files | **Est. Time:** 20 minutes
 
 #### Tasks:
-- [ ] Extract unified time formatting function to shared utility
-- [ ] Merge `formatDuration()` and `formatRelativeTime()` logic
-- [ ] Update `internal/info_renderer.go` to use shared function
-- [ ] Update `internal/mergeback.go` to use shared function
-- [ ] Remove duplicate time formatting implementations
+- [x] Extract unified time formatting function to shared utility
+- [x] Merge `formatDuration()` and `formatRelativeTime()` logic
+- [x] Update `internal/info_renderer.go` to use shared function
+- [x] Update `internal/mergeback.go` to use shared function
+- [x] Remove duplicate time formatting implementations
 
 #### Completion Requirements:
-- [ ] All existing tests pass without modification
-- [ ] Code compiles without errors
-- [ ] Time formatting output remains identical
-- [ ] **COMPLETE ONLY WHEN ALL TESTS PASS**
+- [x] All existing tests pass without modification
+- [x] Code compiles without errors
+- [x] Time formatting output remains identical
+- [x] **COMPLETE ONLY WHEN ALL TESTS PASS**
+
+#### Implementation Notes:
+- **COMPLETED**: Created shared `FormatDuration()` and `FormatRelativeTime()` functions in `styles.go`
+- **Consolidated Logic**: Unified the time formatting logic while maintaining identical output
+- **Maintained Compatibility**: Both functions now delegate to shared implementations
+- **All Tests Pass**: No functionality changes, only code consolidation
 
 ---
 

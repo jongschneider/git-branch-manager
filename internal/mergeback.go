@@ -268,7 +268,7 @@ func FormatMergeBackAlert(status *MergeBackStatus) string {
 		output.WriteString("\n")
 
 		for _, commit := range info.UserCommits {
-			relativeTime := formatRelativeTime(commit.Timestamp)
+			relativeTime := FormatRelativeTime(commit.Timestamp)
 			output.WriteString(fmt.Sprintf("• %s - %s (you - %s)\n",
 				commit.Hash[:7], commit.Message, relativeTime))
 		}
@@ -276,27 +276,4 @@ func FormatMergeBackAlert(status *MergeBackStatus) string {
 	}
 
 	return output.String()
-}
-
-func formatRelativeTime(t time.Time) string {
-	duration := time.Since(t)
-
-	if duration < time.Hour {
-		minutes := int(duration.Minutes())
-		if minutes < 1 {
-			return "just now"
-		}
-		return fmt.Sprintf("%d minutes ago", minutes)
-	}
-
-	if duration < 24*time.Hour {
-		hours := int(duration.Hours())
-		return fmt.Sprintf("%d hours ago", hours)
-	}
-
-	days := int(duration.Hours() / 24)
-	if days == 1 {
-		return "1 day ago"
-	}
-	return fmt.Sprintf("%d days ago", days)
 }

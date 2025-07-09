@@ -160,7 +160,7 @@ func (r *InfoRenderer) renderWorktreeSection(data *WorktreeInfoData) string {
 		timeAgo := time.Since(data.CreatedAt)
 		timeStr := fmt.Sprintf("%s (%s ago)",
 			data.CreatedAt.Format("2006-01-02 15:04:05"),
-			r.formatDuration(timeAgo))
+			FormatDuration(timeAgo))
 		content.WriteString(r.renderKeyValue("Created", timeStr))
 	}
 
@@ -223,7 +223,7 @@ func (r *InfoRenderer) renderJiraSection(jira *JiraTicketDetails) string {
 
 	if jira.LatestComment != nil {
 		timeAgo := time.Since(jira.LatestComment.Timestamp)
-		commentHeader := fmt.Sprintf("💬 Latest Comment (%s ago):", r.formatDuration(timeAgo))
+		commentHeader := fmt.Sprintf("💬 Latest Comment (%s ago):", FormatDuration(timeAgo))
 		content.WriteString(commentHeader + "\n")
 
 		// Wrap the comment text to fit within borders
@@ -274,7 +274,7 @@ func (r *InfoRenderer) renderGitSection(data *WorktreeInfoData) string {
 		lastCommit := fmt.Sprintf("%s (%s) - %s ago",
 			wrappedMessage,
 			latest.Hash[:7],
-			r.formatDuration(timeAgo))
+			FormatDuration(timeAgo))
 		content.WriteString(r.renderKeyValue("Last Commit", lastCommit))
 		content.WriteString(r.renderKeyValue("Author", latest.Author))
 	}
@@ -319,7 +319,7 @@ func (r *InfoRenderer) renderGitSection(data *WorktreeInfoData) string {
 			line := fmt.Sprintf("  %s %-40s (%s ago)\n",
 				commit.Hash[:7],
 				commit.Message,
-				r.formatDuration(timeAgo))
+				FormatDuration(timeAgo))
 			content.WriteString(line)
 		}
 	}
@@ -350,16 +350,6 @@ func (r *InfoRenderer) formatGitStatus(status *GitStatus) string {
 	}
 
 	return "🟢 CLEAN"
-}
-
-func (r *InfoRenderer) formatDuration(d time.Duration) string {
-	if d < time.Hour {
-		return fmt.Sprintf("%d minutes", int(d.Minutes()))
-	} else if d < 24*time.Hour {
-		return fmt.Sprintf("%d hours", int(d.Hours()))
-	} else {
-		return fmt.Sprintf("%d days", int(d.Hours()/24))
-	}
 }
 
 func (r *InfoRenderer) getStatusIcon(status string) string {
