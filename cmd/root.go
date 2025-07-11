@@ -47,7 +47,8 @@ func GetConfigPath() string {
 	if configPath != "" {
 		return configPath
 	}
-	return ".envrc"
+
+	return ".gbm.config.yaml"
 }
 
 func GetWorktreeDir() string {
@@ -105,14 +106,14 @@ func CloseLogFile() {
 	}
 }
 
-// createInitializedManager creates a new manager with git root discovery and env mapping loaded.
-// It gracefully handles missing .envrc files by logging a verbose message.
+// createInitializedManager creates a new manager with git root discovery and gbm config loaded.
+// It gracefully handles missing .gbm.config.yaml files by logging a verbose message.
 func createInitializedManager() (*internal.Manager, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
-	
+
 	repoPath, err := internal.FindGitRoot(wd)
 	if err != nil {
 		return nil, fmt.Errorf("not in a git repository: %w", err)
@@ -123,21 +124,21 @@ func createInitializedManager() (*internal.Manager, error) {
 		return nil, fmt.Errorf("failed to create manager: %w", err)
 	}
 
-	if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
-		PrintVerbose("No .envrc found or failed to load: %v", err)
+	if err := manager.LoadGBMConfig(GetConfigPath()); err != nil {
+		PrintVerbose("No .gbm.config.yaml found or failed to load: %v", err)
 	}
 
 	return manager, nil
 }
 
-// createInitializedManagerStrict creates a new manager and requires .envrc to exist.
-// It returns an error if .envrc cannot be loaded.
+// createInitializedManagerStrict creates a new manager and requires .gbm.config.yaml to exist.
+// It returns an error if .gbm.config.yaml cannot be loaded.
 func createInitializedManagerStrict() (*internal.Manager, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
-	
+
 	repoPath, err := internal.FindGitRoot(wd)
 	if err != nil {
 		return nil, fmt.Errorf("failed to find git repository root: %w", err)
@@ -148,22 +149,22 @@ func createInitializedManagerStrict() (*internal.Manager, error) {
 		return nil, err
 	}
 
-	PrintVerbose("Loading .envrc configuration from: %s", GetConfigPath())
-	if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
-		return nil, fmt.Errorf("failed to load .envrc: %w", err)
+	PrintVerbose("Loading .gbm.config.yaml configuration from: %s", GetConfigPath())
+	if err := manager.LoadGBMConfig(GetConfigPath()); err != nil {
+		return nil, fmt.Errorf("failed to load .gbm.config.yaml: %w", err)
 	}
 
 	return manager, nil
 }
 
 // createInitializedGitManager creates a new git manager with git root discovery.
-// Used by commands that need direct git operations without .envrc dependency.
+// Used by commands that need direct git operations without .gbm.config.yaml dependency.
 func createInitializedGitManager() (*internal.GitManager, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
 	}
-	
+
 	gitRoot, err := internal.FindGitRoot(wd)
 	if err != nil {
 		return nil, fmt.Errorf("not in a git repository: %w", err)

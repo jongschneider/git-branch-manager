@@ -15,33 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Helper function to setup a cloned repository with worktrees for testing
-func setupClonedRepoWithWorktreesForRemove(t *testing.T, sourceRepo *testutils.GitTestRepo) (string, string) {
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-
-	os.Chdir(targetDir)
-
-	// Clone the repository
-	cloneCmd := rootCmd
-	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-	err := cloneCmd.Execute()
-	require.NoError(t, err, "Failed to clone repository")
-
-	// Navigate to cloned repo
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
-
-	// Sync worktrees
-	syncCmd := rootCmd
-	syncCmd.SetArgs([]string{"sync"})
-	err = syncCmd.Execute()
-	require.NoError(t, err, "Failed to sync worktrees")
-
-	return repoPath, originalDir
-}
 
 // Helper function to verify worktree no longer exists
 func verifyWorktreeRemoved(t *testing.T, repoPath, worktreeName string) {
@@ -138,28 +111,27 @@ func TestRemoveCommand_SuccessfulRemoval(t *testing.T) {
 	force = false
 
 	// Create source repo with multiple branches and .envrc
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// Verify FEAT worktree exists before removal
-	verifyWorktreeExists(t, repoPath, "FEAT")
+	verifyWorktreeExists(t, repoPath, "feat")
 
 	// Remove FEAT worktree with user confirmation (simulate "y" input)
 	err := simulateUserInput("y", func() error {
 		cmd := rootCmd
-		cmd.SetArgs([]string{"remove", "FEAT"})
+		cmd.SetArgs([]string{"remove", "feat"})
 		return cmd.Execute()
 	})
 
 	require.NoError(t, err, "Remove command should succeed with user confirmation")
 
 	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "FEAT")
+	verifyWorktreeRemoved(t, repoPath, "feat")
 }
 
 func TestRemoveCommand_NonexistentWorktree(t *testing.T) {
@@ -167,10 +139,9 @@ func TestRemoveCommand_NonexistentWorktree(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
@@ -209,16 +180,15 @@ func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// Create uncommitted changes in MAIN worktree
-	mainWorktreePath := filepath.Join(repoPath, "worktrees", "MAIN")
+	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
 	createUncommittedChanges(t, mainWorktreePath)
 
 	// Verify worktree has uncommitted changes
@@ -226,7 +196,7 @@ func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
 
 	// Try to remove without force flag
 	cmd := rootCmd
-	cmd.SetArgs([]string{"remove", "MAIN"})
+	cmd.SetArgs([]string{"remove", "main"})
 
 	err := cmd.Execute()
 	require.Error(t, err, "Remove should fail with uncommitted changes when force not used")
@@ -242,16 +212,15 @@ func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// Create uncommitted changes in PROD worktree
-	prodWorktreePath := filepath.Join(repoPath, "worktrees", "PROD")
+	prodWorktreePath := filepath.Join(repoPath, "worktrees", "prod")
 	createUncommittedChanges(t, prodWorktreePath)
 
 	// Verify worktree has uncommitted changes
@@ -259,13 +228,13 @@ func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
 
 	// Remove with force flag should succeed despite uncommitted changes
 	cmd := rootCmd
-	cmd.SetArgs([]string{"remove", "PROD", "--force"})
+	cmd.SetArgs([]string{"remove", "prod", "--force"})
 
 	err := cmd.Execute()
 	require.NoError(t, err, "Remove with --force should succeed even with uncommitted changes")
 
 	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "PROD")
+	verifyWorktreeRemoved(t, repoPath, "prod")
 }
 
 func TestRemoveCommand_ForceBypassesConfirmation(t *testing.T) {
@@ -273,23 +242,22 @@ func TestRemoveCommand_ForceBypassesConfirmation(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// Remove with force flag should bypass confirmation prompt
 	cmd := rootCmd
-	cmd.SetArgs([]string{"remove", "DEV", "--force"})
+	cmd.SetArgs([]string{"remove", "dev", "--force"})
 
 	err := cmd.Execute()
 	require.NoError(t, err, "Remove with --force should succeed without confirmation")
 
 	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "DEV")
+	verifyWorktreeRemoved(t, repoPath, "dev")
 }
 
 func TestRemoveCommand_UserAcceptsConfirmation(t *testing.T) {
@@ -297,28 +265,27 @@ func TestRemoveCommand_UserAcceptsConfirmation(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// Verify worktree exists before removal
-	verifyWorktreeExists(t, repoPath, "FEAT")
+	verifyWorktreeExists(t, repoPath, "feat")
 
 	// Remove worktree with user accepting confirmation (simulate "y" input)
 	err := simulateUserInput("y", func() error {
 		cmd := rootCmd
-		cmd.SetArgs([]string{"remove", "FEAT"})
+		cmd.SetArgs([]string{"remove", "feat"})
 		return cmd.Execute()
 	})
 
 	require.NoError(t, err, "Remove should succeed when user accepts confirmation")
 
 	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "FEAT")
+	verifyWorktreeRemoved(t, repoPath, "feat")
 }
 
 func TestRemoveCommand_UserAcceptsConfirmationWithYes(t *testing.T) {
@@ -326,28 +293,27 @@ func TestRemoveCommand_UserAcceptsConfirmationWithYes(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// Verify worktree exists before removal
-	verifyWorktreeExists(t, repoPath, "DEV")
+	verifyWorktreeExists(t, repoPath, "dev")
 
 	// Remove worktree with user accepting confirmation (simulate "yes" input)
 	err := simulateUserInput("yes", func() error {
 		cmd := rootCmd
-		cmd.SetArgs([]string{"remove", "DEV"})
+		cmd.SetArgs([]string{"remove", "dev"})
 		return cmd.Execute()
 	})
 
 	require.NoError(t, err, "Remove should succeed when user types 'yes'")
 
 	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "DEV")
+	verifyWorktreeRemoved(t, repoPath, "dev")
 }
 
 func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
@@ -355,10 +321,9 @@ func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
@@ -369,7 +334,7 @@ func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
 	// Remove worktree with user declining confirmation (simulate "n" input)
 	err := simulateUserInput("n", func() error {
 		cmd := rootCmd
-		cmd.SetArgs([]string{"remove", "MAIN"})
+		cmd.SetArgs([]string{"remove", "main"})
 		return cmd.Execute()
 	})
 
@@ -384,28 +349,27 @@ func TestRemoveCommand_UserDeclinesWithEmptyInput(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// Verify worktree exists before attempted removal
-	verifyWorktreeExists(t, repoPath, "PROD")
+	verifyWorktreeExists(t, repoPath, "prod")
 
 	// Remove worktree with user providing empty input (just hitting enter)
 	err := simulateUserInput("", func() error {
 		cmd := rootCmd
-		cmd.SetArgs([]string{"remove", "PROD"})
+		cmd.SetArgs([]string{"remove", "prod"})
 		return cmd.Execute()
 	})
 
 	require.NoError(t, err, "Remove should complete without error when user provides empty input")
 
 	// Verify worktree still exists
-	verifyWorktreeExists(t, repoPath, "PROD")
+	verifyWorktreeExists(t, repoPath, "prod")
 }
 
 func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
@@ -413,13 +377,12 @@ func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Navigate into the FEAT worktree directory
-	featWorktreePath := filepath.Join(repoPath, "worktrees", "FEAT")
+	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
 	os.Chdir(featWorktreePath)
 
 	// Verify we're in the worktree directory (resolve any symlinks for comparison)
@@ -430,7 +393,7 @@ func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
 
 	// Remove the worktree we're currently in (with force to avoid confirmation)
 	cmd := rootCmd
-	cmd.SetArgs([]string{"remove", "FEAT", "--force"})
+	cmd.SetArgs([]string{"remove", "feat", "--force"})
 
 	err := cmd.Execute()
 	require.NoError(t, err, "Remove should succeed even when executed from within the worktree")
@@ -439,7 +402,7 @@ func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "FEAT")
+	verifyWorktreeRemoved(t, repoPath, "feat")
 }
 
 func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
@@ -447,19 +410,18 @@ func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// First, verify all expected worktrees exist
 	verifyWorktreeExists(t, repoPath, "MAIN")
-	verifyWorktreeExists(t, repoPath, "DEV")
-	verifyWorktreeExists(t, repoPath, "FEAT")
-	verifyWorktreeExists(t, repoPath, "PROD")
+	verifyWorktreeExists(t, repoPath, "dev")
+	verifyWorktreeExists(t, repoPath, "feat")
+	verifyWorktreeExists(t, repoPath, "prod")
 
 	// Get initial worktree count
 	cmd := exec.Command("git", "worktree", "list")
@@ -470,7 +432,7 @@ func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
 
 	// Remove one worktree
 	removeCmd := rootCmd
-	removeCmd.SetArgs([]string{"remove", "DEV", "--force"})
+	removeCmd.SetArgs([]string{"remove", "dev", "--force"})
 
 	err = removeCmd.Execute()
 	require.NoError(t, err, "Remove command should succeed")
@@ -487,13 +449,13 @@ func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
 
 	// Verify DEV worktree no longer appears in the list
 	for _, line := range updatedWorktrees {
-		assert.NotContains(t, line, "worktrees/DEV", "DEV worktree should not appear in git worktree list")
+		assert.NotContains(t, line, "worktrees/dev", "dev worktree should not appear in git worktree list")
 	}
 
 	// Verify other worktrees still exist
 	verifyWorktreeExists(t, repoPath, "MAIN")
-	verifyWorktreeExists(t, repoPath, "FEAT")
-	verifyWorktreeExists(t, repoPath, "PROD")
+	verifyWorktreeExists(t, repoPath, "feat")
+	verifyWorktreeExists(t, repoPath, "prod")
 }
 
 func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
@@ -501,16 +463,15 @@ func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
 	force = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktreesForRemove(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// Add some files to the MAIN worktree
-	mainWorktreePath := filepath.Join(repoPath, "worktrees", "MAIN")
+	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
 	testFile := filepath.Join(mainWorktreePath, "test_file.txt")
 	err := os.WriteFile(testFile, []byte("test content"), 0644)
 	require.NoError(t, err, "Failed to create test file in worktree")
@@ -521,7 +482,7 @@ func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
 
 	// Remove worktree
 	cmd := rootCmd
-	cmd.SetArgs([]string{"remove", "MAIN", "--force"})
+	cmd.SetArgs([]string{"remove", "main", "--force"})
 
 	err = cmd.Execute()
 	require.NoError(t, err, "Remove command should succeed")
@@ -534,4 +495,3 @@ func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
 	_, err = os.Stat(testFile)
 	assert.True(t, os.IsNotExist(err), "Files within worktree should be removed")
 }
-

@@ -82,3 +82,13 @@ ERROR: Error: exit status 1
 - [x] remove the `clean` verb
 - [ ] add hooks (for automating tasked before/after a command is run)
     * example: after `gbm add` copy `.env` file from MAIN
+- [ ] review and improve fuzzy matching logic in switch command
+    * current behavior: input is normalized to uppercase, then fuzzy matched against actual config keys
+    * this creates inconsistent behavior between direct matches (uppercase) and fuzzy matches (config case)
+    * consider making the matching logic more intuitive and consistent
+- [ ] fix .gbm.config.yaml creation (clone.go) and make default branch not be MAIN, but what the default branch is called
+    * don't enforce CAPS for worktree name
+- [x] make .gbm.config.yaml tests actually use yaml for validation instead of string contains.
+- [x] what's the point of TestCloneCommand_EmptyRepository?
+- [ ] add confirmation to the `gbm sync --force` because it is destructive.
+    * give list of what will be destroyed

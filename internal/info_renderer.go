@@ -23,7 +23,6 @@ type InfoRenderer struct {
 	jiraStyle      lipgloss.Style
 }
 
-
 func NewInfoRenderer() *InfoRenderer {
 	// Define adaptive colors for better light/dark theme support
 	primaryColor := lipgloss.AdaptiveColor{Light: "#7D56F4", Dark: "#A78BFA"}

@@ -1,14 +1,13 @@
 package internal
 
 import (
-	"bufio"
 	"fmt"
 	"os"
-	"regexp"
-	"sort"
 	"strconv"
 	"strings"
 	"time"
+
+	"gopkg.in/yaml.v3"
 )
 
 type MergeBackStatus struct {
@@ -34,11 +33,6 @@ type MergeBackCommitInfo struct {
 	IsUser    bool
 }
 
-type EnvVarMapping struct {
-	Name   string
-	Branch string
-	Order  int
-}
 
 func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 	// Try to find git root and create GitManager
@@ -61,12 +55,12 @@ func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 		return nil, nil
 	}
 
-	envMappings, err := parseEnvrcFile(configPath)
+	config, err := parseConfigFile(configPath)
 	if err != nil {
 		return nil, nil
 	}
 
-	if len(envMappings) <= 1 {
+	if len(config.Worktrees) <= 1 {
 		return &MergeBackStatus{}, nil
 	}
 
@@ -80,17 +74,27 @@ func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 		HasUserCommits:   false,
 	}
 
-	for i := len(envMappings) - 1; i > 0; i-- {
-		fromMapping := envMappings[i]
-		toMapping := envMappings[i-1]
+	// Check each worktree that has a merge_into target
+	for worktreeName, worktreeConfig := range config.Worktrees {
+		if worktreeConfig.MergeInto == "" {
+			continue // Skip root worktrees (no merge target)
+		}
 
-		fromExists, _ := gitManager.BranchExists(fromMapping.Branch)
-		toExists, _ := gitManager.BranchExists(toMapping.Branch)
+		// Find the target worktree config
+		targetConfig, exists := config.Worktrees[worktreeConfig.MergeInto]
+		if !exists {
+			continue // Skip if target worktree doesn't exist in config
+		}
+
+		// Check if both branches exist
+		fromExists, _ := gitManager.BranchExists(worktreeConfig.Branch)
+		toExists, _ := gitManager.BranchExists(targetConfig.Branch)
 		if !fromExists || !toExists {
 			continue
 		}
 
-		commits, err := getCommitsNeedingMergeBack(gitRoot, toMapping.Branch, fromMapping.Branch)
+		// Get commits that need to be merged back
+		commits, err := getCommitsNeedingMergeBack(gitRoot, targetConfig.Branch, worktreeConfig.Branch)
 		if err != nil {
 			continue
 		}
@@ -99,6 +103,7 @@ func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 			continue
 		}
 
+		// Identify user commits
 		userCommits := []MergeBackCommitInfo{}
 		for _, commit := range commits {
 			if isUserCommit(commit, userEmail, userName) {
@@ -109,8 +114,8 @@ func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 		}
 
 		mergeBackInfo := MergeBackInfo{
-			FromBranch:  fromMapping.Name,
-			ToBranch:    toMapping.Name,
+			FromBranch:  worktreeName,
+			ToBranch:    worktreeConfig.MergeInto,
 			Commits:     commits,
 			UserCommits: userCommits,
 			TotalCount:  len(commits),
@@ -123,50 +128,19 @@ func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 	return status, nil
 }
 
-func parseEnvrcFile(configPath string) ([]EnvVarMapping, error) {
-	file, err := os.Open(configPath)
+
+func parseConfigFile(configPath string) (*GBMConfig, error) {
+	data, err := os.ReadFile(configPath)
 	if err != nil {
 		return nil, err
 	}
-	defer file.Close()
 
-	var mappings []EnvVarMapping
-	scanner := bufio.NewScanner(file)
-	order := 0
-
-	envVarRegex := regexp.MustCompile(`^([A-Z_][A-Z0-9_]*)=(.+)$`)
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		matches := envVarRegex.FindStringSubmatch(line)
-		if len(matches) == 3 {
-			mappings = append(mappings, EnvVarMapping{
-				Name:   matches[1],
-				Branch: matches[2],
-				Order:  order,
-			})
-			order++
-		}
+	var config GBMConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, err
-	}
-
-	if mappings == nil {
-		mappings = []EnvVarMapping{}
-	}
-
-	sort.Slice(mappings, func(i, j int) bool {
-		return mappings[i].Order < mappings[j].Order
-	})
-
-	return mappings, nil
+	return &config, nil
 }
 
 func getUserInfo(repoPath string) (string, string, error) {

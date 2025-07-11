@@ -22,15 +22,15 @@ func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
 		testutils.WithUser("Test User", "test@example.com"),
 	)
 
-	// Create .envrc on main branch first
-	err := repo.CreateEnvrc(map[string]string{
-		"MAIN":    mainBranch,
-		"PREVIEW": previewBranch,
-		"PROD":    prodBranch,
+	// Create .gbm.config.yaml on main branch first
+	err := repo.CreateGBMConfig(map[string]string{
+		"main":    mainBranch,
+		"preview": previewBranch,
+		"prod":    prodBranch,
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .envrc configuration")
+	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized branches from main
@@ -43,7 +43,7 @@ func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
 	err = repo.CreateSynchronizedBranch(prodBranch)
 	require.NoError(t, err)
 
-	// Now create a hotfix commit on PROD that doesn't exist in PREVIEW
+	// Now create a hotfix commit on prod that doesn't exist in preview
 	err = repo.WriteFile("hotfix.txt", "Critical security fix")
 	require.NoError(t, err)
 
@@ -60,25 +60,25 @@ func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".envrc")
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
 
-		// Should detect that PROD has commits that need to be merged to PREVIEW
+		// Should detect that prod has commits that need to be merged to preview
 		assert.Len(t, status.MergeBacksNeeded, 1)
 		assert.True(t, status.HasUserCommits)
 
 		mergeBack := status.MergeBacksNeeded[0]
-		assert.Equal(t, "PROD", mergeBack.FromBranch)
-		assert.Equal(t, "PREVIEW", mergeBack.ToBranch)
+		assert.Equal(t, "prod", mergeBack.FromBranch)
+		assert.Equal(t, "preview", mergeBack.ToBranch)
 		assert.Equal(t, 1, mergeBack.TotalCount)
 		assert.Equal(t, 1, mergeBack.UserCount)
 		assert.Len(t, mergeBack.UserCommits, 1)
 		assert.Contains(t, mergeBack.UserCommits[0].Message, "Fix critical security vulnerability")
 
 		alertMsg := FormatMergeBackAlert(status)
-		assert.Contains(t, alertMsg, "⚠️  Merge-back required in tracked branches:\n\nPROD → PREVIEW: 1 commits need merge-back (1 by you)")
+		assert.Contains(t, alertMsg, "⚠️  Merge-back required in tracked branches:\n\nprod → preview: 1 commits need merge-back (1 by you)")
 		return nil
 	})
 	require.NoError(t, err)
@@ -94,15 +94,15 @@ func TestMergeBackDetection_MultipleCommits(t *testing.T) {
 		testutils.WithUser("Alice", "alice@example.com"),
 	)
 
-	// Create .envrc on main first
-	err := repo.CreateEnvrc(map[string]string{
-		"MAIN":    mainBranch,
-		"PREVIEW": previewBranch,
-		"PROD":    prodBranch,
+	// Create .gbm.config.yaml on main first
+	err := repo.CreateGBMConfig(map[string]string{
+		"main":    mainBranch,
+		"preview": previewBranch,
+		"prod":    prodBranch,
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .envrc configuration")
+	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized branches
@@ -146,18 +146,18 @@ func TestMergeBackDetection_MultipleCommits(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".envrc")
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
 
-		// Should detect PROD -> PREVIEW merge-back needed
+		// Should detect prod -> preview merge-back needed
 		assert.Len(t, status.MergeBacksNeeded, 1)
 		assert.True(t, status.HasUserCommits)
 
 		mergeBack := status.MergeBacksNeeded[0]
-		assert.Equal(t, "PROD", mergeBack.FromBranch)
-		assert.Equal(t, "PREVIEW", mergeBack.ToBranch)
+		assert.Equal(t, "prod", mergeBack.FromBranch)
+		assert.Equal(t, "preview", mergeBack.ToBranch)
 		assert.Equal(t, 3, mergeBack.TotalCount) // All three commits
 		assert.Equal(t, 3, mergeBack.UserCount)  // All commits by Alice
 		assert.Len(t, mergeBack.UserCommits, 3)
@@ -177,24 +177,24 @@ func TestMergeBackDetection_MultipleCommits(t *testing.T) {
 }
 
 func TestMergeBackDetection_CascadingMergebacks(t *testing.T) {
-	// Test scenario where PROD has commits, and PREVIEW also has different commits
+	// Test scenario where prod has commits, and preview also has different commits
 	repo := testutils.NewGitTestRepo(t,
 		testutils.WithDefaultBranch("main"),
 		testutils.WithUser("Developer", "dev@example.com"),
 	)
 
-	// Create .envrc on main first
-	err := repo.CreateEnvrc(map[string]string{
-		"MAIN":    "main",
-		"PREVIEW": "preview",
-		"PROD":    "prod",
+	// Create .gbm.config.yaml on main first
+	err := repo.CreateGBMConfig(map[string]string{
+		"main":    "main",
+		"preview": "preview",
+		"prod":    "prod",
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .envrc configuration")
+	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
 	require.NoError(t, err)
 
-	// Create synchronized branches after .envrc is committed
+	// Create synchronized branches after .gbm.config.yaml is committed
 	err = repo.CreateSynchronizedBranch("preview")
 	require.NoError(t, err)
 
@@ -204,7 +204,7 @@ func TestMergeBackDetection_CascadingMergebacks(t *testing.T) {
 	err = repo.CreateSynchronizedBranch("prod")
 	require.NoError(t, err)
 
-	// Add commits to PROD
+	// Add commits to prod
 	err = repo.SwitchToBranch("prod")
 	require.NoError(t, err)
 
@@ -217,7 +217,7 @@ func TestMergeBackDetection_CascadingMergebacks(t *testing.T) {
 	err = repo.PushBranch("prod")
 	require.NoError(t, err)
 
-	// Add commits to PREVIEW
+	// Add commits to preview
 	err = repo.SwitchToBranch("preview")
 	require.NoError(t, err)
 
@@ -236,32 +236,33 @@ func TestMergeBackDetection_CascadingMergebacks(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".envrc")
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
 
-		// Should detect both PROD -> PREVIEW and PREVIEW -> MAIN
+		// Should detect both prod -> preview and preview -> MAIN
 		assert.Len(t, status.MergeBacksNeeded, 2)
 		assert.True(t, status.HasUserCommits)
 
 		// Find the merge-backs by source branch
 		var prodToPreview, previewToMain *MergeBackInfo
 		for i := range status.MergeBacksNeeded {
-			if status.MergeBacksNeeded[i].FromBranch == "PROD" {
+			switch status.MergeBacksNeeded[i].FromBranch {
+			case "prod":
 				prodToPreview = &status.MergeBacksNeeded[i]
-			} else if status.MergeBacksNeeded[i].FromBranch == "PREVIEW" {
+			case "preview":
 				previewToMain = &status.MergeBacksNeeded[i]
 			}
 		}
 
 		require.NotNil(t, prodToPreview)
-		assert.Equal(t, "PREVIEW", prodToPreview.ToBranch)
+		assert.Equal(t, "preview", prodToPreview.ToBranch)
 		assert.Equal(t, 1, prodToPreview.TotalCount)
 		assert.Equal(t, 1, prodToPreview.UserCount)
 
 		require.NotNil(t, previewToMain)
-		assert.Equal(t, "MAIN", previewToMain.ToBranch)
+		assert.Equal(t, "main", previewToMain.ToBranch)
 		assert.Equal(t, 1, previewToMain.TotalCount)
 		assert.Equal(t, 1, previewToMain.UserCount)
 
@@ -277,15 +278,15 @@ func TestMergeBackDetection_NoMergeBacksNeeded(t *testing.T) {
 		testutils.WithUser("Developer", "dev@example.com"),
 	)
 
-	// Create .envrc on main first
-	err := repo.CreateEnvrc(map[string]string{
-		"MAIN":    "main",
-		"PREVIEW": "preview",
-		"PROD":    "prod",
+	// Create .gbm.config.yaml on main first
+	err := repo.CreateGBMConfig(map[string]string{
+		"main":    "main",
+		"preview": "preview",
+		"prod":    "prod",
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .envrc configuration")
+	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized branches with no additional commits
@@ -304,7 +305,7 @@ func TestMergeBackDetection_NoMergeBacksNeeded(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".envrc")
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -319,27 +320,27 @@ func TestMergeBackDetection_NoMergeBacksNeeded(t *testing.T) {
 }
 
 func TestMergeBackDetection_NonExistentBranches(t *testing.T) {
-	// Test scenario with .envrc referencing branches that don't exist
+	// Test scenario with .gbm.config.yaml referencing branches that don't exist
 	repo := testutils.NewGitTestRepo(t,
 		testutils.WithDefaultBranch("main"),
 		testutils.WithUser("Developer", "dev@example.com"),
 	)
 
-	// Create .envrc with non-existent branches
-	err := repo.CreateEnvrc(map[string]string{
-		"MAIN":    "main",
-		"PREVIEW": "nonexistent-preview",
-		"PROD":    "nonexistent-prod",
-		"STAGING": "also-nonexistent",
+	// Create .gbm.config.yaml with non-existent branches
+	err := repo.CreateGBMConfig(map[string]string{
+		"main":    "main",
+		"preview": "nonexistent-preview",
+		"prod":    "nonexistent-prod",
+		"staging": "also-nonexistent",
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .envrc configuration")
+	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
 	require.NoError(t, err)
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".envrc")
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -360,17 +361,17 @@ func TestMergeBackDetection_DynamicHierarchy(t *testing.T) {
 		testutils.WithUser("DevOps", "devops@example.com"),
 	)
 
-	// Create .envrc first on main
-	err := repo.CreateEnvrc(map[string]string{
-		"MAIN":    "main",
-		"STAGING": "staging",
-		"PREVIEW": "preview",
-		"PROD":    "prod",
-		"HOTFIX":  "hotfix",
+	// Create .gbm.config.yaml first on main
+	err := repo.CreateGBMConfig(map[string]string{
+		"main":    "main",
+		"staging": "staging",
+		"preview": "preview",
+		"prod":    "prod",
+		"hotfix":  "hotfix",
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .envrc configuration")
+	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
 	require.NoError(t, err)
 
 	// Create a five-tier hierarchy with synchronized branches
@@ -395,7 +396,7 @@ func TestMergeBackDetection_DynamicHierarchy(t *testing.T) {
 	err = repo.CreateSynchronizedBranch("hotfix")
 	require.NoError(t, err)
 
-	// Add a commit to HOTFIX (bottom of hierarchy)
+	// Add a commit to hotfix (bottom of hierarchy)
 	err = repo.SwitchToBranch("hotfix")
 	require.NoError(t, err)
 
@@ -414,18 +415,18 @@ func TestMergeBackDetection_DynamicHierarchy(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".envrc")
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
 
-		// Should detect only HOTFIX -> PROD merge-back (immediate parent)
+		// Should detect only hotfix -> prod merge-back (immediate parent)
 		assert.Len(t, status.MergeBacksNeeded, 1)
 		assert.True(t, status.HasUserCommits)
 
 		mergeBack := status.MergeBacksNeeded[0]
-		assert.Equal(t, "HOTFIX", mergeBack.FromBranch)
-		assert.Equal(t, "PROD", mergeBack.ToBranch)
+		assert.Equal(t, "hotfix", mergeBack.FromBranch)
+		assert.Equal(t, "prod", mergeBack.ToBranch)
 		assert.Equal(t, 1, mergeBack.TotalCount)
 		assert.Equal(t, 1, mergeBack.UserCount)
 
@@ -441,15 +442,15 @@ func TestMergeBackAlertFormatting_RealScenario(t *testing.T) {
 		testutils.WithUser("Engineer", "engineer@company.com"),
 	)
 
-	// Create .envrc on main first
-	err := repo.CreateEnvrc(map[string]string{
-		"MAIN":    "main",
-		"PREVIEW": "preview",
-		"PROD":    "prod",
+	// Create .gbm.config.yaml on main first
+	err := repo.CreateGBMConfig(map[string]string{
+		"main":    "main",
+		"preview": "preview",
+		"prod":    "prod",
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .envrc configuration")
+	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized branches
@@ -478,7 +479,7 @@ func TestMergeBackAlertFormatting_RealScenario(t *testing.T) {
 
 	// Test merge-back detection and alert formatting
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".envrc")
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -486,7 +487,7 @@ func TestMergeBackAlertFormatting_RealScenario(t *testing.T) {
 		alert := FormatMergeBackAlert(status)
 		assert.NotEmpty(t, alert)
 		assert.Contains(t, alert, "⚠️  Merge-back required in tracked branches:")
-		assert.Contains(t, alert, "PROD → PREVIEW: 1 commits need merge-back (1 by you)")
+		assert.Contains(t, alert, "prod → preview: 1 commits need merge-back (1 by you)")
 		assert.Contains(t, alert, "CVE-2024-1234: Fix SQL injection in user auth")
 		assert.Contains(t, alert, "(you -")
 

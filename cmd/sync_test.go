@@ -2,7 +2,6 @@ package cmd
 
 import (
 	"bytes"
-	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -22,27 +21,6 @@ func resetSyncFlags() {
 	syncFetch = false
 }
 
-// Helper function to setup a cloned repository for sync testing
-func setupSyncTestRepo(t *testing.T, sourceRepo *testutils.GitTestRepo) (string, string) {
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-
-	os.Chdir(targetDir)
-
-	// Clone the repository
-	cloneCmd := rootCmd
-	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-	err := cloneCmd.Execute()
-	require.NoError(t, err, "Failed to clone repository")
-
-	// Navigate to cloned repo
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
-
-	// Return the path and original directory, but stay in the cloned repo
-	return repoPath, originalDir
-}
 
 func TestSyncCommand_BasicOperations(t *testing.T) {
 	tests := []struct {
@@ -51,26 +29,34 @@ func TestSyncCommand_BasicOperations(t *testing.T) {
 		expectedDirs []string
 	}{
 		{
-			name: "sync with existing envrc creates all worktrees",
+			name: "sync with existing gbm config creates all worktrees",
 			setupRepo: func(t *testing.T) *testutils.GitTestRepo {
-				return testutils.NewStandardEnvrcRepo(t) // Has MAIN, DEV, FEAT, PROD
+				return testutils.NewStandardGBMConfigRepo(t) // Has main, dev, feat, prod
 			},
-			expectedDirs: []string{"worktrees/MAIN", "worktrees/DEV", "worktrees/FEAT", "worktrees/PROD"},
+			expectedDirs: []string{"worktrees/main", "worktrees/dev", "worktrees/feat", "worktrees/prod"},
 		},
 		{
-			name: "sync with minimal envrc",
+			name: "sync with minimal gbm config",
 			setupRepo: func(t *testing.T) *testutils.GitTestRepo {
-				mapping := map[string]string{"MAIN": "main"}
-				return testutils.NewEnvrcRepo(t, mapping)
+				repo := testutils.NewBasicRepo(t)
+				gbmContent := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+`
+				require.NoError(t, repo.WriteFile(".gbm.config.yaml", gbmContent))
+				require.NoError(t, repo.CommitChangesWithForceAdd("Add gbm config"))
+				require.NoError(t, repo.PushBranch("main"))
+				return repo
 			},
-			expectedDirs: []string{"worktrees/MAIN"},
+			expectedDirs: []string{"worktrees/main"},
 		},
 		{
 			name: "sync with already synced repo is idempotent",
 			setupRepo: func(t *testing.T) *testutils.GitTestRepo {
-				return testutils.NewStandardEnvrcRepo(t)
+				return testutils.NewStandardGBMConfigRepo(t)
 			},
-			expectedDirs: []string{"worktrees/MAIN", "worktrees/DEV", "worktrees/FEAT", "worktrees/PROD"},
+			expectedDirs: []string{"worktrees/main", "worktrees/dev", "worktrees/feat", "worktrees/prod"},
 		},
 	}
 
@@ -78,8 +64,7 @@ func TestSyncCommand_BasicOperations(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			resetSyncFlags() // Reset flags before each test
 			sourceRepo := tt.setupRepo(t)
-			_, originalDir := setupSyncTestRepo(t, sourceRepo)
-			defer os.Chdir(originalDir)
+			setupClonedRepo(t, sourceRepo)
 
 			// For the idempotent test, run sync twice
 			if strings.Contains(tt.name, "idempotent") {
@@ -113,17 +98,28 @@ func TestSyncCommand_Flags(t *testing.T) {
 			name: "dry-run flag shows changes without applying",
 			args: []string{"sync", "--dry-run"},
 			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
-				// Add more worktrees to .envrc to create missing worktrees scenario
-				require.NoError(t, os.WriteFile(".envrc", []byte("MAIN=main\nNEW1=develop\nNEW2=feature/auth\n"), 0644))
+				// Add more worktrees to .gbm.config.yaml to create missing worktrees scenario
+				gbmContent := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  new1:
+    branch: develop
+    description: "Development branch"
+  new2:
+    branch: feature/auth
+    description: "Feature branch"
+`
+				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
 			},
 			validate: func(t *testing.T, repoPath string, output string, err error) {
 				require.NoError(t, err)
 				// Check that the command succeeded and directories are as expected
-				// NEW1 and NEW2 should still be missing after dry-run
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "NEW1"))
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "NEW2"))
-				// MAIN should still exist (was created by clone)
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
+				// new1 and new2 should still be missing after dry-run
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "new1"))
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "new2"))
+				// main should still exist (was created by clone)
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
 			},
 		},
 		{
@@ -132,20 +128,25 @@ func TestSyncCommand_Flags(t *testing.T) {
 			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
 				// Create untracked worktree
 				wd, _ := os.Getwd()
-				createUntrackedWorktree(t, wd, "ORPHAN", "main")
+				createUntrackedWorktree(t, wd, "orphan", "main")
 
-				// Modify .envrc to remove some existing worktrees (making them orphaned)
-				require.NoError(t, os.WriteFile(".envrc", []byte("MAIN=main\n"), 0644))
+				// Modify .gbm.config.yaml to remove some existing worktrees (making them orphaned)
+				gbmContent := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+`
+				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
 			},
 			validate: func(t *testing.T, repoPath string, output string, err error) {
 				require.NoError(t, err)
-				// MAIN should still exist (still in .envrc)
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
+				// main should still exist (still in .gbm.config.yaml)
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
 				// Orphaned worktrees should be removed by --force
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "DEV"))
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "FEAT"))
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "PROD"))
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "ORPHAN"))
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "feat"))
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "prod"))
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "orphan"))
 			},
 		},
 		{
@@ -157,10 +158,10 @@ func TestSyncCommand_Flags(t *testing.T) {
 			validate: func(t *testing.T, repoPath string, output string, err error) {
 				require.NoError(t, err)
 				// Verify worktrees exist (fetch doesn't prevent sync)
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "DEV"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "FEAT"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "PROD"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "feat"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "prod"))
 			},
 		},
 	}
@@ -168,9 +169,8 @@ func TestSyncCommand_Flags(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resetSyncFlags() // Reset flags before each test
-			sourceRepo := testutils.NewStandardEnvrcRepo(t)
-			repoPath, originalDir := setupSyncTestRepo(t, sourceRepo)
-			defer os.Chdir(originalDir)
+			sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+			repoPath := setupClonedRepo(t, sourceRepo)
 
 			tt.setup(t, &testutils.GitTestRepo{LocalDir: repoPath})
 
@@ -190,55 +190,105 @@ func TestSyncCommand_Flags(t *testing.T) {
 
 func TestSyncCommand_SyncScenarios(t *testing.T) {
 	tests := []struct {
-		name           string
-		initialEnvrc   map[string]string
-		updatedEnvrc   map[string]string
-		expectChanges  bool
-		validateResult func(t *testing.T, repoPath string)
+		name            string
+		initialGBMConfig string
+		updatedGBMConfig string
+		expectChanges   bool
+		validateResult  func(t *testing.T, repoPath string)
 	}{
 		{
-			name:          "branch reference changed",
-			initialEnvrc:  map[string]string{"MAIN": "main", "FEAT": "feature/auth"},
-			updatedEnvrc:  map[string]string{"MAIN": "main", "FEAT": "develop"},
+			name: "branch reference changed",
+			initialGBMConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  feat:
+    branch: feature/auth
+    description: "Feature branch"
+`,
+			updatedGBMConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  feat:
+    branch: develop
+    description: "Feature branch"
+`,
 			expectChanges: true,
 			validateResult: func(t *testing.T, repoPath string) {
-				// Verify FEAT worktree was updated to develop branch
+				// Verify feat worktree was updated to develop branch
 				cmd := exec.Command("git", "branch", "--show-current")
-				cmd.Dir = filepath.Join(repoPath, "worktrees", "FEAT")
+				cmd.Dir = filepath.Join(repoPath, "worktrees", "feat")
 				branchOutput, err := cmd.Output()
 				require.NoError(t, err)
 				assert.Equal(t, "develop", strings.TrimSpace(string(branchOutput)))
 			},
 		},
 		{
-			name:          "new environment variable added",
-			initialEnvrc:  map[string]string{"MAIN": "main"},
-			updatedEnvrc:  map[string]string{"MAIN": "main", "DEV": "develop"},
+			name: "new worktree added",
+			initialGBMConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+`,
+			updatedGBMConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  dev:
+    branch: develop
+    description: "Development branch"
+`,
 			expectChanges: true,
 			validateResult: func(t *testing.T, repoPath string) {
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "DEV"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
 			},
 		},
 		{
-			name:          "environment variable removed",
-			initialEnvrc:  map[string]string{"MAIN": "main", "TEMP": "develop"},
-			updatedEnvrc:  map[string]string{"MAIN": "main"},
+			name: "worktree removed",
+			initialGBMConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  temp:
+    branch: develop
+    description: "Temporary branch"
+`,
+			updatedGBMConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+`,
 			expectChanges: true,
 			validateResult: func(t *testing.T, repoPath string) {
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-				// TEMP should still exist without --force
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "TEMP"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+				// temp should still exist without --force
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "temp"))
 			},
 		},
 		{
-			name:          "no changes needed",
-			initialEnvrc:  map[string]string{"MAIN": "main", "DEV": "develop"},
-			updatedEnvrc:  map[string]string{"MAIN": "main", "DEV": "develop"},
+			name: "no changes needed",
+			initialGBMConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  dev:
+    branch: develop
+    description: "Development branch"
+`,
+			updatedGBMConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  dev:
+    branch: develop
+    description: "Development branch"
+`,
 			expectChanges: false,
 			validateResult: func(t *testing.T, repoPath string) {
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "DEV"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
 			},
 		},
 	}
@@ -246,23 +296,18 @@ func TestSyncCommand_SyncScenarios(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resetSyncFlags() // Reset flags before each test
-			// Create source repo with initial .envrc
+			// Create source repo with initial .gbm.config.yaml
 			sourceRepo := testutils.NewMultiBranchRepo(t)
-			require.NoError(t, sourceRepo.CreateEnvrc(tt.initialEnvrc))
-			commitEnvrcChanges(t, sourceRepo, "Add initial .envrc")
+			require.NoError(t, sourceRepo.WriteFile(".gbm.config.yaml", tt.initialGBMConfig))
+			require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add initial .gbm.config.yaml"))
 			require.NoError(t, sourceRepo.PushBranch("main"))
 
-			repoPath, originalDir := setupSyncTestRepo(t, sourceRepo)
-			defer os.Chdir(originalDir)
+			repoPath := setupClonedRepo(t, sourceRepo)
 
-			// Update .envrc to new configuration
-			envrcContent := ""
-			for key, value := range tt.updatedEnvrc {
-				envrcContent += fmt.Sprintf("%s=%s\n", key, value)
-			}
-			require.NoError(t, os.WriteFile(".envrc", []byte(envrcContent), 0644))
+			// Update .gbm.config.yaml to new configuration
+			require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(tt.updatedGBMConfig), 0644))
 
-			// Run sync with updated .envrc
+			// Run sync with updated .gbm.config.yaml
 			cmd := rootCmd
 			cmd.SetArgs([]string{"sync"})
 			err := cmd.Execute()
@@ -276,7 +321,7 @@ func TestSyncCommand_SyncScenarios(t *testing.T) {
 func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 	tests := []struct {
 		name                   string
-		envrcMapping           map[string]string
+		gbmConfig              string
 		untrackedWorktrees     []string
 		syncArgs               []string
 		validateResult         func(t *testing.T, repoPath string, output string)
@@ -284,51 +329,61 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 	}{
 		{
 			name: "untracked worktree preserved by default",
-			envrcMapping: map[string]string{
-				"MAIN": "main",
-				"DEV":  "develop",
-			},
-			untrackedWorktrees:     []string{"MANUAL"},
+			gbmConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  dev:
+    branch: develop
+    description: "Development branch"
+`,
+			untrackedWorktrees:     []string{"manual"},
 			syncArgs:               []string{"sync"},
 			createTrackedWorktrees: false,
 			validateResult: func(t *testing.T, repoPath string, output string) {
 				// Tracked worktrees should exist
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "DEV"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
 				// Untracked worktree should still exist (not removed)
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MANUAL"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "manual"))
 			},
 		},
 		{
 			name: "untracked worktree removed with --force",
-			envrcMapping: map[string]string{
-				"MAIN": "main",
-				"DEV":  "develop",
-			},
-			untrackedWorktrees:     []string{"MANUAL"},
+			gbmConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  dev:
+    branch: develop
+    description: "Development branch"
+`,
+			untrackedWorktrees:     []string{"manual"},
 			syncArgs:               []string{"sync", "--force"},
 			createTrackedWorktrees: false,
 			validateResult: func(t *testing.T, repoPath string, output string) {
 				// Tracked worktrees should exist
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "DEV"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
 				// Untracked worktree should be removed
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "MANUAL"))
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "manual"))
 			},
 		},
 		{
 			name: "dry-run shows untracked worktree would be removed",
-			envrcMapping: map[string]string{
-				"MAIN": "main",
-			},
-			untrackedWorktrees:     []string{"TEMP", "EXPERIMENTAL"},
+			gbmConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+`,
+			untrackedWorktrees:     []string{"temp", "experimental"},
 			syncArgs:               []string{"sync", "--dry-run", "--force"},
 			createTrackedWorktrees: false,
 			validateResult: func(t *testing.T, repoPath string, output string) {
 				// All worktrees should still exist (dry-run)
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "TEMP"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "EXPERIMENTAL"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "temp"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "experimental"))
 				// In dry-run mode, orphaned worktrees should NOT be removed
 				// (We can't easily capture the output due to test isolation issues,
 				// but we can verify the intended behavior: no actual changes made)
@@ -336,31 +391,35 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 		},
 		{
 			name: "tracked worktrees updated, untracked preserved without force",
-			envrcMapping: map[string]string{
-				"MAIN": "main",
-				"FEAT": "develop", // Will be changed from feature/auth
-			},
-			untrackedWorktrees:     []string{"MANUAL"},
+			gbmConfig: `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  feat:
+    branch: develop
+    description: "Feature branch"
+`,
+			untrackedWorktrees:     []string{"manual"},
 			syncArgs:               []string{"sync"},
 			createTrackedWorktrees: true,
 			validateResult: func(t *testing.T, repoPath string, output string) {
 				// TRACKED worktrees should exist and be updated
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "FEAT"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "feat"))
 
 				// UNTRACKED worktree should still exist (not removed without --force)
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MANUAL"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "manual"))
 
-				// Verify FEAT worktree was updated to develop branch
+				// Verify feat worktree was updated to develop branch
 				cmd := exec.Command("git", "branch", "--show-current")
-				cmd.Dir = filepath.Join(repoPath, "worktrees", "FEAT")
+				cmd.Dir = filepath.Join(repoPath, "worktrees", "feat")
 				featOutput, err := cmd.Output()
 				require.NoError(t, err)
 				assert.Equal(t, "develop", strings.TrimSpace(string(featOutput)))
 
-				// MANUAL worktree should still be on main branch (unchanged)
+				// manual worktree should still be on main branch (unchanged)
 				manualCmd := exec.Command("git", "branch", "--show-current")
-				manualCmd.Dir = filepath.Join(repoPath, "worktrees", "MANUAL")
+				manualCmd.Dir = filepath.Join(repoPath, "worktrees", "manual")
 				manualOutput, err := manualCmd.Output()
 				require.NoError(t, err)
 				assert.Equal(t, "main", strings.TrimSpace(string(manualOutput)))
@@ -374,25 +433,28 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 			var sourceRepo *testutils.GitTestRepo
 
 			if tt.createTrackedWorktrees {
-				// Setup initial .envrc with different branch for FEAT
+				// Setup initial .gbm.config.yaml with different branch for feat
 				sourceRepo = testutils.NewMultiBranchRepo(t)
-				initialEnvrc := map[string]string{
-					"MAIN": "main",
-					"FEAT": "feature/auth",
-				}
-				require.NoError(t, sourceRepo.CreateEnvrc(initialEnvrc))
-				commitEnvrcChanges(t, sourceRepo, "Add initial .envrc")
+				initialGBMConfig := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  feat:
+    branch: feature/auth
+    description: "Feature branch"
+`
+				require.NoError(t, sourceRepo.WriteFile(".gbm.config.yaml", initialGBMConfig))
+				require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add initial .gbm.config.yaml"))
 				require.NoError(t, sourceRepo.PushBranch("main"))
 			} else {
 				// Standard setup for other tests
 				sourceRepo = testutils.NewMultiBranchRepo(t)
-				require.NoError(t, sourceRepo.CreateEnvrc(tt.envrcMapping))
-				commitEnvrcChanges(t, sourceRepo, "Add .envrc")
+				require.NoError(t, sourceRepo.WriteFile(".gbm.config.yaml", tt.gbmConfig))
+				require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add .gbm.config.yaml"))
 				require.NoError(t, sourceRepo.PushBranch("main"))
 			}
 
-			repoPath, originalDir := setupSyncTestRepo(t, sourceRepo)
-			defer os.Chdir(originalDir)
+			repoPath := setupClonedRepo(t, sourceRepo)
 
 			if tt.createTrackedWorktrees {
 				// Create untracked worktree first
@@ -400,12 +462,8 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 					createUntrackedWorktree(t, repoPath, untrackedName, "main")
 				}
 
-				// Update .envrc to change FEAT branch
-				envrcContent := ""
-				for key, value := range tt.envrcMapping {
-					envrcContent += fmt.Sprintf("%s=%s\n", key, value)
-				}
-				require.NoError(t, os.WriteFile(".envrc", []byte(envrcContent), 0644))
+				// Update .gbm.config.yaml to change feat branch
+				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(tt.gbmConfig), 0644))
 			} else {
 				// Create untracked worktrees for standard tests
 				for _, untrackedName := range tt.untrackedWorktrees {
@@ -445,25 +503,30 @@ func TestSyncCommand_ErrorHandling(t *testing.T) {
 			expectedError: "failed to find git repository root",
 		},
 		{
-			name: "missing envrc file",
+			name: "missing gbm config file",
 			setup: func(t *testing.T) string {
 				repo := testutils.NewBasicRepo(t)
 				return repo.GetLocalPath()
 			},
 			args:          []string{"sync"},
-			expectedError: "failed to load .envrc",
+			expectedError: "failed to load .gbm.config.yaml",
 		},
 		{
 			name: "invalid branch reference",
 			setup: func(t *testing.T) string {
 				// Create a source repo with invalid branch reference
 				sourceRepo := testutils.NewBasicRepo(t)
-				require.NoError(t, sourceRepo.CreateEnvrc(map[string]string{"INVALID": "nonexistent-branch"}))
-				commitEnvrcChanges(t, sourceRepo, "Add invalid envrc")
+				gbmContent := `worktrees:
+  invalid:
+    branch: nonexistent-branch
+    description: "Invalid branch reference"
+`
+				require.NoError(t, sourceRepo.WriteFile(".gbm.config.yaml", gbmContent))
+				require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add invalid gbm config"))
 				require.NoError(t, sourceRepo.PushBranch("main"))
 
 				// Clone it to set up proper structure, but don't defer the chdir - let the test handle it
-				repoPath, _ := setupSyncTestRepo(t, sourceRepo)
+				repoPath := setupClonedRepo(t, sourceRepo)
 				// Immediately return to original dir so test can handle directory changes
 				os.Chdir(repoPath)
 				return repoPath
@@ -501,11 +564,24 @@ func TestSyncCommand_Integration(t *testing.T) {
 		{
 			name: "complete sync workflow",
 			scenario: func(t *testing.T, repoPath string) {
-				// 1. Initial state created by clone (MAIN, DEV, FEAT, PROD from StandardEnvrcRepo)
+				// 1. Initial state created by clone (main, dev, feat, prod from StandardGBMConfigRepo)
 
-				// 2. Modify .envrc to remove some worktrees and add different ones
-				envrcContent := "MAIN=main\nDEV=develop\nNEW_FEAT=feature/auth\nNEW_PROD=production/v1.0\n"
-				require.NoError(t, os.WriteFile(".envrc", []byte(envrcContent), 0644))
+				// 2. Modify .gbm.config.yaml to remove some worktrees and add different ones
+				gbmContent := `worktrees:
+  main:
+    branch: main
+    description: "Main production branch"
+  dev:
+    branch: develop
+    description: "Development branch"
+  new_feat:
+    branch: feature/auth
+    description: "New feature branch"
+  new_prod:
+    branch: production/v1.0
+    description: "New production branch"
+`
+				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
 
 				// 3. Run sync with --force to remove orphaned worktrees and create new ones
 				cmd := rootCmd
@@ -514,21 +590,21 @@ func TestSyncCommand_Integration(t *testing.T) {
 			},
 			validate: func(t *testing.T, repoPath string) {
 				// Verify new worktrees exist
-				expectedDirs := []string{"MAIN", "DEV", "NEW_FEAT", "NEW_PROD"}
+				expectedDirs := []string{"main", "dev", "new_feat", "new_prod"}
 				for _, dir := range expectedDirs {
 					assert.DirExists(t, filepath.Join(repoPath, "worktrees", dir))
 				}
 
 				// Old worktrees should be removed with --force
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "FEAT"))
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "PROD"))
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "feat"))
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "prod"))
 			},
 		},
 		{
 			name: "sync after manual worktree changes",
 			scenario: func(t *testing.T, repoPath string) {
 				// Manually remove a tracked worktree (simulate corruption where worktree is lost)
-				devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+				devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 
 				// Remove the worktree directory first
 				require.NoError(t, os.RemoveAll(devWorktreePath))
@@ -544,12 +620,12 @@ func TestSyncCommand_Integration(t *testing.T) {
 				require.NoError(t, cmd.Execute())
 			},
 			validate: func(t *testing.T, repoPath string) {
-				// DEV should be recreated
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "DEV"))
+				// dev should be recreated
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
 				// All original worktrees should still exist
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "FEAT"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "PROD"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "feat"))
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "prod"))
 			},
 		},
 	}
@@ -557,9 +633,8 @@ func TestSyncCommand_Integration(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			resetSyncFlags() // Reset flags before each test
-			sourceRepo := testutils.NewStandardEnvrcRepo(t)
-			repoPath, originalDir := setupSyncTestRepo(t, sourceRepo)
-			defer os.Chdir(originalDir)
+			sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+			repoPath := setupClonedRepo(t, sourceRepo)
 
 			tt.scenario(t, repoPath)
 			tt.validate(t, repoPath)
@@ -583,13 +658,3 @@ func createUntrackedWorktree(t *testing.T, repoPath, name, branch string) {
 	require.NoError(t, err, "Failed to create untracked worktree %s", name)
 }
 
-// Helper function to safely commit .envrc changes (handles already-clean repos)
-func commitEnvrcChanges(t *testing.T, repo *testutils.GitTestRepo, message string) {
-	if err := repo.CommitChangesWithForceAdd(message); err != nil {
-		if strings.Contains(err.Error(), "nothing to commit") {
-			// Ignore "nothing to commit" errors - repo is already in desired state
-			return
-		}
-		require.NoError(t, err)
-	}
-}

@@ -1,15 +1,13 @@
 package internal
 
 import (
-	"bufio"
 	"fmt"
 	"os"
 	"path/filepath"
-	"regexp"
-	"strings"
 	"time"
 
 	"github.com/BurntSushi/toml"
+	"gopkg.in/yaml.v3"
 )
 
 type Config struct {
@@ -53,8 +51,15 @@ type ConfigIcons struct {
 	GitUnknown  string `toml:"git_unknown"`
 }
 
-type EnvMapping struct {
-	Variables map[string]string
+// YAML-based configuration structures
+type GBMConfig struct {
+	Worktrees map[string]WorktreeConfig `yaml:"worktrees"`
+}
+
+type WorktreeConfig struct {
+	Branch      string `yaml:"branch"`
+	MergeInto   string `yaml:"merge_into,omitempty"`
+	Description string `yaml:"description,omitempty"`
 }
 
 func DefaultConfig() *Config {
@@ -115,7 +120,7 @@ func GetGBMDir(repoRoot string) string {
 }
 
 func (c *Config) Save(gbmDir string) error {
-	if err := os.MkdirAll(gbmDir, 0755); err != nil {
+	if err := os.MkdirAll(gbmDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create .gbm directory: %w", err)
 	}
 
@@ -134,38 +139,17 @@ func (c *Config) Save(gbmDir string) error {
 	return nil
 }
 
-func ParseEnvrc(path string) (*EnvMapping, error) {
-	file, err := os.Open(path)
+// ParseGBMConfig parses the YAML-based .gbm.config.yaml file
+func ParseGBMConfig(path string) (*GBMConfig, error) {
+	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to open .envrc file: %w", err)
-	}
-	defer file.Close()
-
-	mapping := &EnvMapping{
-		Variables: make(map[string]string),
+		return nil, fmt.Errorf("failed to read .gbm.config.yaml file: %w", err)
 	}
 
-	scanner := bufio.NewScanner(file)
-	envVarRegex := regexp.MustCompile(`^([A-Z_][A-Z0-9_]*)=(.+)$`)
-
-	for scanner.Scan() {
-		line := strings.TrimSpace(scanner.Text())
-
-		if line == "" || strings.HasPrefix(line, "#") {
-			continue
-		}
-
-		matches := envVarRegex.FindStringSubmatch(line)
-		if len(matches) == 3 {
-			varName := matches[1]
-			branchName := strings.Trim(matches[2], "\"'")
-			mapping.Variables[varName] = branchName
-		}
+	var config GBMConfig
+	if err := yaml.Unmarshal(data, &config); err != nil {
+		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
 
-	if err := scanner.Err(); err != nil {
-		return nil, fmt.Errorf("error reading .envrc file: %w", err)
-	}
-
-	return mapping, nil
+	return &config, nil
 }

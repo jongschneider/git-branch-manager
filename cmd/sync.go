@@ -14,10 +14,10 @@ var (
 
 var syncCmd = &cobra.Command{
 	Use:   "sync",
-	Short: "Synchronize all worktrees with current .envrc definitions",
-	Long: `Synchronize all worktrees with current .envrc definitions.
+	Short: "Synchronize all worktrees with current .gbm.config.yaml definitions",
+	Long: `Synchronize all worktrees with current .gbm.config.yaml definitions.
 
-Creates missing worktrees for new environment variables, updates existing worktrees
+Creates missing worktrees for new worktree configurations, updates existing worktrees
 if branch references have changed, and optionally removes orphaned worktrees.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager, err := createInitializedManagerStrict()

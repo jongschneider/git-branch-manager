@@ -10,113 +10,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParseEnvrcFile(t *testing.T) {
-	tests := []struct {
-		name        string
-		content     string
-		expected    []EnvVarMapping
-		expectError bool
-	}{
-		{
-			name: "standard three-tier configuration",
-			content: `MAIN=main
-PREVIEW=preview-v2.1
-PROD=production-v2.0`,
-			expected: []EnvVarMapping{
-				{Name: "MAIN", Branch: "main", Order: 0},
-				{Name: "PREVIEW", Branch: "preview-v2.1", Order: 1},
-				{Name: "PROD", Branch: "production-v2.0", Order: 2},
-			},
-			expectError: false,
-		},
-		{
-			name: "configuration with comments and empty lines",
-			content: `# Environment configuration
-MAIN=main
-
-# Preview environment
-PREVIEW=preview-v2.1
-
-# Production environment
-PROD=production-v2.0`,
-			expected: []EnvVarMapping{
-				{Name: "MAIN", Branch: "main", Order: 0},
-				{Name: "PREVIEW", Branch: "preview-v2.1", Order: 1},
-				{Name: "PROD", Branch: "production-v2.0", Order: 2},
-			},
-			expectError: false,
-		},
-		{
-			name:    "single environment",
-			content: `MAIN=main`,
-			expected: []EnvVarMapping{
-				{Name: "MAIN", Branch: "main", Order: 0},
-			},
-			expectError: false,
-		},
-		{
-			name:        "empty file",
-			content:     "",
-			expected:    []EnvVarMapping{},
-			expectError: false,
-		},
-		{
-			name: "complex environment names",
-			content: `MAIN=main
-STAGING_2=staging-branch-v2
-PREVIEW_PROD=preview-production-v3.0
-PROD_FINAL=production-final-v1.0`,
-			expected: []EnvVarMapping{
-				{Name: "MAIN", Branch: "main", Order: 0},
-				{Name: "STAGING_2", Branch: "staging-branch-v2", Order: 1},
-				{Name: "PREVIEW_PROD", Branch: "preview-production-v3.0", Order: 2},
-				{Name: "PROD_FINAL", Branch: "production-final-v1.0", Order: 3},
-			},
-			expectError: false,
-		},
-		{
-			name: "mixed valid and invalid lines",
-			content: `MAIN=main
-invalid-line-without-equals
-PREVIEW=preview-v2.1
-# comment
-PROD=production-v2.0
-123INVALID=branch`,
-			expected: []EnvVarMapping{
-				{Name: "MAIN", Branch: "main", Order: 0},
-				{Name: "PREVIEW", Branch: "preview-v2.1", Order: 1},
-				{Name: "PROD", Branch: "production-v2.0", Order: 2},
-			},
-			expectError: false,
-		},
-	}
-
-	for _, tt := range tests {
-		t.Run(tt.name, func(t *testing.T) {
-			tmpDir := t.TempDir()
-			configPath := filepath.Join(tmpDir, ".envrc")
-
-			err := os.WriteFile(configPath, []byte(tt.content), 0644)
-			require.NoError(t, err)
-
-			result, err := parseEnvrcFile(configPath)
-
-			if tt.expectError {
-				assert.Error(t, err)
-			} else {
-				assert.NoError(t, err)
-				assert.Equal(t, tt.expected, result)
-			}
-		})
-	}
-}
-
-func TestParseEnvrcFileErrors(t *testing.T) {
-	t.Run("non-existent file", func(t *testing.T) {
-		_, err := parseEnvrcFile("/non/existent/file")
-		assert.Error(t, err)
-	})
-}
+// Tests for legacy .envrc parsing removed since we no longer support .envrc files
 
 func TestCommitInfo(t *testing.T) {
 	t.Run("isUserCommit with email match", func(t *testing.T) {
@@ -288,15 +182,15 @@ func TestCheckMergeBackStatusIntegration(t *testing.T) {
 		t.Skip("Not in a git repository, skipping integration test")
 	}
 
-	t.Run("missing .envrc file", func(t *testing.T) {
-		result, err := CheckMergeBackStatus("/non/existent/.envrc")
+	t.Run("missing .gbm.config.yaml file", func(t *testing.T) {
+		result, err := CheckMergeBackStatus("/non/existent/.gbm.config.yaml")
 		assert.NoError(t, err)
 		assert.Nil(t, result)
 	})
 
-	t.Run("empty .envrc file", func(t *testing.T) {
+	t.Run("empty .gbm.config.yaml file", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		configPath := filepath.Join(tmpDir, ".envrc")
+		configPath := filepath.Join(tmpDir, ".gbm.config.yaml")
 
 		err := os.WriteFile(configPath, []byte(""), 0644)
 		require.NoError(t, err)
@@ -309,9 +203,14 @@ func TestCheckMergeBackStatusIntegration(t *testing.T) {
 
 	t.Run("single environment", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		configPath := filepath.Join(tmpDir, ".envrc")
+		configPath := filepath.Join(tmpDir, ".gbm.config.yaml")
 
-		err := os.WriteFile(configPath, []byte("MAIN=main"), 0644)
+		config := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+`
+		err := os.WriteFile(configPath, []byte(config), 0644)
 		require.NoError(t, err)
 
 		result, err := CheckMergeBackStatus(configPath)
@@ -321,19 +220,6 @@ func TestCheckMergeBackStatusIntegration(t *testing.T) {
 	})
 }
 
-func TestEnvVarMapping(t *testing.T) {
-	t.Run("env var mapping structure", func(t *testing.T) {
-		mapping := EnvVarMapping{
-			Name:   "PROD",
-			Branch: "production-v1.0",
-			Order:  0,
-		}
-
-		assert.Equal(t, "PROD", mapping.Name)
-		assert.Equal(t, "production-v1.0", mapping.Branch)
-		assert.Equal(t, 0, mapping.Order)
-	})
-}
 
 func TestMergeBackStructures(t *testing.T) {
 	t.Run("merge back status structure", func(t *testing.T) {

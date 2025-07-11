@@ -189,7 +189,7 @@ func getModifiedFiles(worktreePath string) ([]internal.FileChange, error) {
 	}
 
 	var files []internal.FileChange
-	
+
 	// Parse unstaged changes
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	for _, line := range lines {
@@ -336,10 +336,10 @@ type JiraRawResponse struct {
 	Key    string `json:"key"`
 	Self   string `json:"self"`
 	Fields struct {
-		Summary     string `json:"summary"`
-		Created     string `json:"created"`
-		DueDate     *string   `json:"duedate"`
-		Status      struct {
+		Summary string  `json:"summary"`
+		Created string  `json:"created"`
+		DueDate *string `json:"duedate"`
+		Status  struct {
 			Name string `json:"name"`
 		} `json:"status"`
 		Priority struct {
@@ -453,7 +453,7 @@ func getJiraTicketDetails(jiraKey string) (*internal.JiraTicketDetails, error) {
 	// Add latest comment
 	if len(jiraResponse.Fields.Comment.Comments) > 0 {
 		latest := jiraResponse.Fields.Comment.Comments[0]
-		
+
 		// Extract comment text from nested structure
 		var commentText strings.Builder
 		for _, content := range latest.Body.Content {
@@ -469,14 +469,14 @@ func getJiraTicketDetails(jiraKey string) (*internal.JiraTicketDetails, error) {
 				Author:  latest.Author.DisplayName,
 				Content: commentText.String(),
 			}
-			
+
 			// Parse comment timestamp
 			if latest.Created != "" {
 				if timestamp, err := time.Parse(time.RFC3339, latest.Created); err == nil {
 					comment.Timestamp = timestamp
 				}
 			}
-			
+
 			ticket.LatestComment = comment
 		}
 	}
@@ -501,7 +501,7 @@ func formatJiraURL(selfURL, key string) string {
 
 	// Extract the base URL (everything before "/rest")
 	baseURL := selfURL[:restIndex]
-	
+
 	// Construct the browse URL
 	return baseURL + "/browse/" + key
 }

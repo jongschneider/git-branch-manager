@@ -14,13 +14,13 @@ import (
 
 // Test helper functions
 
-func setupValidateTest(t *testing.T, repo *testutils.GitTestRepo, envrcMapping map[string]string) {
-	if envrcMapping != nil {
-		err := repo.CreateEnvrc(envrcMapping)
-		require.NoError(t, err, "Failed to create .envrc")
+func setupValidateTest(t *testing.T, repo *testutils.GitTestRepo, gbmMapping map[string]string) {
+	if gbmMapping != nil {
+		err := repo.CreateGBMConfig(gbmMapping)
+		require.NoError(t, err, "Failed to create .gbm.config.yaml")
 
-		err = repo.CommitChangesWithForceAdd("Add .envrc configuration")
-		require.NoError(t, err, "Failed to commit .envrc")
+		err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
+		require.NoError(t, err, "Failed to commit .gbm.config.yaml")
 	}
 }
 
@@ -67,7 +67,7 @@ func parseValidationTable(output string) map[string]string {
 
 	for line := range strings.SplitSeq(output, "\n") {
 		// Skip header lines, separators, and empty lines
-		if strings.Contains(line, "ENV VARIABLE") ||
+		if strings.Contains(line, "WORKTREE") ||
 			strings.Contains(line, "┌") ||
 			strings.Contains(line, "├") ||
 			strings.Contains(line, "└") ||
@@ -75,14 +75,14 @@ func parseValidationTable(output string) map[string]string {
 			continue
 		}
 
-		// Parse table rows (format: "│ ENV_VAR │ BRANCH │ STATUS │")
+		// Parse table rows (format: "│ WORKTREE │ BRANCH │ STATUS │")
 		if strings.Contains(line, "│") {
 			parts := strings.Split(line, "│")
 			if len(parts) >= 4 {
-				envVar := strings.TrimSpace(parts[1])
+				worktree := strings.TrimSpace(parts[1])
 				status := strings.TrimSpace(parts[3])
-				if envVar != "" && status != "" {
-					results[envVar] = status
+				if worktree != "" && status != "" {
+					results[worktree] = status
 				}
 			}
 		}
@@ -94,28 +94,28 @@ func parseValidationTable(output string) map[string]string {
 func assertValidationResults(t *testing.T, output string, expectedResults map[string]string) {
 	results := parseValidationTable(output)
 
-	for envVar, expectedStatus := range expectedResults {
-		actualStatus, exists := results[envVar]
-		assert.True(t, exists, "Environment variable %s should appear in validation results", envVar)
-		assert.Contains(t, actualStatus, expectedStatus, "Environment variable %s should have status %s", envVar, expectedStatus)
+	for worktree, expectedStatus := range expectedResults {
+		actualStatus, exists := results[worktree]
+		assert.True(t, exists, "Worktree %s should appear in validation results", worktree)
+		assert.Contains(t, actualStatus, expectedStatus, "Worktree %s should have status %s", worktree, expectedStatus)
 	}
 }
 
 // Test functions
 
 func TestValidateCommand_AllBranchesValid(t *testing.T) {
-	repo := testutils.NewStandardEnvrcRepo(t)
+	repo := testutils.NewStandardGBMConfigRepo(t)
 
-	setupValidateTest(t, repo, nil) // .envrc already exists in StandardEnvrcRepo
+	setupValidateTest(t, repo, nil) // .gbm.config.yaml already exists in StandardGBMConfigRepo
 
 	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
 	require.NoError(t, err, "Validate command should succeed when all branches are valid")
 
 	expectedResults := map[string]string{
-		"MAIN": "VALID",
-		"DEV":  "VALID",
-		"FEAT": "VALID",
-		"PROD": "VALID",
+		"main": "VALID",
+		"dev":  "VALID",
+		"feat": "VALID",
+		"prod": "VALID",
 	}
 
 	assertValidationResults(t, output, expectedResults)
@@ -124,26 +124,26 @@ func TestValidateCommand_AllBranchesValid(t *testing.T) {
 func TestValidateCommand_SomeBranchesInvalid(t *testing.T) {
 	repo := testutils.NewMultiBranchRepo(t)
 
-	// Create .envrc with some valid and some invalid branch references
-	envrcMapping := map[string]string{
-		"MAIN":    "main",               // valid - exists
-		"DEV":     "develop",            // valid - exists
-		"FEAT":    "feature/auth",       // valid - exists
-		"INVALID": "nonexistent-branch", // invalid - doesn't exist
-		"MISSING": "another-missing",    // invalid - doesn't exist
+	// Create .gbm.config.yaml with some valid and some invalid branch references
+	gbmMapping := map[string]string{
+		"main":    "main",               // valid - exists
+		"dev":     "develop",            // valid - exists
+		"feat":    "feature/auth",       // valid - exists
+		"invalid": "nonexistent-branch", // invalid - doesn't exist
+		"missing": "another-missing",    // invalid - doesn't exist
 	}
 
-	setupValidateTest(t, repo, envrcMapping)
+	setupValidateTest(t, repo, gbmMapping)
 
 	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
 	require.Error(t, err, "Validate command should fail when some branches are invalid")
 
 	expectedResults := map[string]string{
-		"MAIN":    "VALID",
-		"DEV":     "VALID",
-		"FEAT":    "VALID",
-		"INVALID": "NOT FOUND",
-		"MISSING": "NOT FOUND",
+		"main":    "VALID",
+		"dev":     "VALID",
+		"feat":    "VALID",
+		"invalid": "NOT FOUND",
+		"missing": "NOT FOUND",
 	}
 
 	assertValidationResults(t, output, expectedResults)
@@ -153,85 +153,85 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 	tests := []struct {
 		name            string
 		setupRepo       func(t *testing.T) *testutils.GitTestRepo
-		envMapping      map[string]string
+		gbmMapping      map[string]string
 		shouldPass      bool
 		expectedResults map[string]string
 	}{
 		{
 			name:      "local branches only",
 			setupRepo: testutils.NewMultiBranchRepo,
-			envMapping: map[string]string{
-				"MAIN": "main",
-				"DEV":  "develop",
-				"FEAT": "feature/auth",
-				"PROD": "production/v1.0",
+			gbmMapping: map[string]string{
+				"main": "main",
+				"dev":  "develop",
+				"feat": "feature/auth",
+				"prod": "production/v1.0",
 			},
 			shouldPass: true,
 			expectedResults: map[string]string{
-				"MAIN": "VALID",
-				"DEV":  "VALID",
-				"FEAT": "VALID",
-				"PROD": "VALID",
+				"main": "VALID",
+				"dev":  "VALID",
+				"feat": "VALID",
+				"prod": "VALID",
 			},
 		},
 		{
 			name:      "remote branches only",
 			setupRepo: testutils.NewMultiBranchRepo,
-			envMapping: map[string]string{
-				"MAIN": "main",
-				"DEV":  "develop",
+			gbmMapping: map[string]string{
+				"main": "main",
+				"dev":  "develop",
 			},
 			shouldPass: true,
 			expectedResults: map[string]string{
-				"MAIN": "VALID",
-				"DEV":  "VALID",
+				"main": "VALID",
+				"dev":  "VALID",
 			},
 		},
 		{
 			name:      "both local and remote branches",
 			setupRepo: testutils.NewMultiBranchRepo,
-			envMapping: map[string]string{
-				"MAIN": "main",
-				"DEV":  "develop",
-				"FEAT": "feature/auth",
-				"PROD": "production/v1.0",
+			gbmMapping: map[string]string{
+				"main": "main",
+				"dev":  "develop",
+				"feat": "feature/auth",
+				"prod": "production/v1.0",
 			},
 			shouldPass: true,
 			expectedResults: map[string]string{
-				"MAIN": "VALID",
-				"DEV":  "VALID",
-				"FEAT": "VALID",
-				"PROD": "VALID",
+				"main": "VALID",
+				"dev":  "VALID",
+				"feat": "VALID",
+				"prod": "VALID",
 			},
 		},
 		{
 			name:      "non-existent branches",
 			setupRepo: testutils.NewBasicRepo,
-			envMapping: map[string]string{
+			gbmMapping: map[string]string{
 				"MAIN":    "main",
-				"MISSING": "does-not-exist",
-				"INVALID": "also-missing",
+				"missing": "does-not-exist",
+				"invalid": "also-missing",
 			},
 			shouldPass: false,
 			expectedResults: map[string]string{
 				"MAIN":    "VALID",
-				"MISSING": "NOT FOUND",
-				"INVALID": "NOT FOUND",
+				"missing": "NOT FOUND",
+				"invalid": "NOT FOUND",
 			},
 		},
 		{
 			name:      "branches with special characters/slashes",
 			setupRepo: testutils.NewMultiBranchRepo,
-			envMapping: map[string]string{
+			gbmMapping: map[string]string{
 				"MAIN":    "main",
-				"FEATURE": "feature/auth",
-				"RELEASE": "production/v1.0",
+				"feature": "feature/auth",
+				"release": "production/v1.0",
 			},
 			shouldPass: true,
 			expectedResults: map[string]string{
 				"MAIN":    "VALID",
-				"FEATURE": "VALID",
-				"RELEASE": "VALID",
+				"feature": "VALID",
+				"release": "VALID",
 			},
 		},
 	}
@@ -239,7 +239,7 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := tt.setupRepo(t)
-			setupValidateTest(t, repo, tt.envMapping)
+			setupValidateTest(t, repo, tt.gbmMapping)
 
 			output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
 
@@ -254,62 +254,66 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 	}
 }
 
-func TestValidateCommand_MissingEnvrc(t *testing.T) {
+func TestValidateCommand_MissingGBMConfig(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Don't create .envrc file - setupValidateTest with nil mapping skips creation
+	// Don't create .gbm.config.yaml file - setupValidateTest with nil mapping skips creation
 	setupValidateTest(t, repo, nil)
 
 	_, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
-	require.Error(t, err, "Validate command should fail when .envrc file is missing")
+	require.Error(t, err, "Validate command should fail when .gbm.config.yaml file is missing")
 
-	// Check that error message mentions missing .envrc
-	assert.ErrorContains(t, err, ".envrc", "Error message should mention .envrc file")
+	// Check that error message mentions missing .gbm.config.yaml
+	assert.ErrorContains(t, err, ".gbm.config.yaml", "Error message should mention .gbm.config.yaml file")
 }
 
-func TestValidateCommand_InvalidEnvrcSyntax(t *testing.T) {
+func TestValidateCommand_InvalidGBMConfigSyntax(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Create .envrc with invalid syntax (malformed content)
-	err := repo.WriteFile(".envrc", "INVALID SYNTAX WITHOUT EQUALS\nALSO=MISSING=QUOTES\nVALID=branch")
-	require.NoError(t, err, "Failed to create malformed .envrc")
+	// Create .gbm.config.yaml with invalid syntax (malformed YAML content)
+	err := repo.WriteFile(".gbm.config.yaml", "invalid yaml syntax:\n  - missing quotes\n  bad indentation\nworktrees:\n  main branch: main")
+	require.NoError(t, err, "Failed to create malformed .gbm.config.yaml")
 
-	err = repo.CommitChangesWithForceAdd("Add malformed .envrc")
-	require.NoError(t, err, "Failed to commit malformed .envrc")
+	err = repo.CommitChangesWithForceAdd("Add malformed .gbm.config.yaml")
+	require.NoError(t, err, "Failed to commit malformed .gbm.config.yaml")
 
 	_, err = runValidateCommand(t, repo.GetLocalPath(), []string{})
-	require.Error(t, err, "Validate command should fail when .envrc has invalid syntax")
+	require.Error(t, err, "Validate command should fail when .gbm.config.yaml has invalid syntax")
 
 	// The error could be either a parsing error or validation failure
 	// Since the current implementation may still parse some entries, we just verify it fails
 }
 
-func TestValidateCommand_EmptyEnvrc(t *testing.T) {
+func TestValidateCommand_EmptyGBMConfig(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Create empty .envrc file
-	err := repo.WriteFile(".envrc", "")
-	require.NoError(t, err, "Failed to create empty .envrc")
+	// Create empty .gbm.config.yaml file
+	err := repo.WriteFile(".gbm.config.yaml", "")
+	require.NoError(t, err, "Failed to create empty .gbm.config.yaml")
 
-	err = repo.CommitChangesWithForceAdd("Add empty .envrc")
-	require.NoError(t, err, "Failed to commit empty .envrc")
+	err = repo.CommitChangesWithForceAdd("Add empty .gbm.config.yaml")
+	require.NoError(t, err, "Failed to commit empty .gbm.config.yaml")
 
 	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
-	require.NoError(t, err, "Validate command should succeed with empty .envrc")
+	require.NoError(t, err, "Validate command should succeed with empty .gbm.config.yaml")
 
-	// With empty .envrc, there should be no validation results to display
+	// With empty .gbm.config.yaml, there should be no validation results to display
 	results := parseValidationTable(output)
-	assert.Empty(t, results, "Empty .envrc should result in no validation entries")
+	assert.Empty(t, results, "Empty .gbm.config.yaml should result in no validation entries")
 }
 
 func TestValidateCommand_NotInGitRepository(t *testing.T) {
 	// Create a temporary directory that is not a git repository
 	tempDir := t.TempDir()
 
-	// Create .envrc file in non-git directory
-	envrcPath := tempDir + "/.envrc"
-	err := os.WriteFile(envrcPath, []byte("MAIN=main\n"), 0644)
-	require.NoError(t, err, "Failed to create .envrc in non-git directory")
+	// Create .gbm.config.yaml file in non-git directory
+	configPath := tempDir + "/.gbm.config.yaml"
+	configContent := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"`
+	err := os.WriteFile(configPath, []byte(configContent), 0644)
+	require.NoError(t, err, "Failed to create .gbm.config.yaml in non-git directory")
 
 	_, err = runValidateCommand(t, tempDir, []string{})
 	require.Error(t, err, "Validate command should fail when not in a git repository")
@@ -321,11 +325,11 @@ func TestValidateCommand_NotInGitRepository(t *testing.T) {
 func TestValidateCommand_CorruptGitRepository(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Create .envrc file first
-	envrcMapping := map[string]string{
-		"MAIN": "main",
+	// Create .gbm.config.yaml file first
+	gbmMapping := map[string]string{
+		"main": "main",
 	}
-	setupValidateTest(t, repo, envrcMapping)
+	setupValidateTest(t, repo, gbmMapping)
 
 	// Corrupt the .git directory by removing essential files
 	gitDir := repo.GetLocalPath() + "/.git"
@@ -339,23 +343,31 @@ func TestValidateCommand_CorruptGitRepository(t *testing.T) {
 	assert.Contains(t, err.Error(), "git", "Error message should mention git-related issue")
 }
 
-func TestValidateCommand_DuplicateEnvVars(t *testing.T) {
+func TestValidateCommand_DuplicateWorktrees(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Create .envrc with duplicate environment variables (last one wins)
-	err := repo.WriteFile(".envrc", "MAIN=main\nMAIN=develop\nTEST=feature/auth")
-	require.NoError(t, err, "Failed to create .envrc with duplicates")
+	// Create .gbm.config.yaml with duplicate worktree names (invalid YAML)
+	configContent := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  main:
+    branch: develop
+    description: "Duplicate main"
+  test:
+    branch: feature/auth
+    description: "Test branch"`
+	err := repo.WriteFile(".gbm.config.yaml", configContent)
+	require.NoError(t, err, "Failed to create .gbm.config.yaml with duplicates")
 
-	err = repo.CommitChangesWithForceAdd("Add .envrc with duplicates")
-	require.NoError(t, err, "Failed to commit .envrc")
+	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml with duplicates")
+	require.NoError(t, err, "Failed to commit .gbm.config.yaml")
 
-	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
-	require.Error(t, err, "Should fail because 'develop' branch doesn't exist")
+	_, err = runValidateCommand(t, repo.GetLocalPath(), []string{})
+	require.Error(t, err, "Should fail due to duplicate YAML keys")
 
-	// Verify that the last occurrence wins (MAIN=develop, not MAIN=main)
-	results := parseValidationTable(output)
-	assert.Contains(t, results["MAIN"], "NOT FOUND", "Should use the last value 'develop' which doesn't exist")
-	assert.Contains(t, results["TEST"], "NOT FOUND", "TEST branch should also not be found")
+	// Verify that the error mentions duplicate mapping keys
+	assert.Contains(t, err.Error(), "mapping key \"main\" already defined", "Should fail with YAML duplicate key error")
 }
 
 func TestValidateCommand_VeryLongBranchNames(t *testing.T) {
@@ -366,32 +378,39 @@ func TestValidateCommand_VeryLongBranchNames(t *testing.T) {
 	err := repo.CreateBranch(longBranchName, "Long branch content")
 	require.NoError(t, err, "Failed to create long branch")
 
-	// Create .envrc with very long branch name and environment variable
-	envrcMapping := map[string]string{
-		"MAIN":                                "main",
-		"VERY_LONG_ENVIRONMENT_VARIABLE_NAME": longBranchName,
+	// Create .gbm.config.yaml with very long branch name and worktree name
+	gbmMapping := map[string]string{
+		"main":                             "main",
+		"very_long_worktree_variable_name": longBranchName,
 	}
-	setupValidateTest(t, repo, envrcMapping)
+	setupValidateTest(t, repo, gbmMapping)
 
 	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
 	require.NoError(t, err, "Should succeed with long branch names")
 
 	// Verify table formatting remains readable with long names
 	results := parseValidationTable(output)
-	assert.Contains(t, results["MAIN"], "VALID")
-	assert.Contains(t, results["VERY_LONG_ENVIRONMENT_VARIABLE_NAME"], "VALID")
+	assert.Contains(t, results["main"], "VALID")
+	assert.Contains(t, results["very_long_worktree_variable_name"], "VALID")
 
 	// Verify table structure is maintained
 	assert.Contains(t, output, "┌", "Table should have proper borders")
 	assert.Contains(t, output, "│", "Table should have column separators")
 }
 
-func TestValidateCommand_CustomEnvrcPath(t *testing.T) {
+func TestValidateCommand_CustomGBMConfigPath(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Create custom .envrc file in different location
-	customPath := "custom-env-config"
-	err := repo.WriteFile(customPath, "MAIN=main\nCUSTOM=main")
+	// Create custom .gbm.config.yaml file in different location
+	customPath := "custom-gbm-config.yaml"
+	customContent := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+  custom:
+    branch: main
+    description: "Custom branch"`
+	err := repo.WriteFile(customPath, customContent)
 	require.NoError(t, err, "Failed to create custom config file")
 
 	err = repo.CommitChangesWithForceAdd("Add custom config file")
@@ -402,7 +421,7 @@ func TestValidateCommand_CustomEnvrcPath(t *testing.T) {
 
 	// Verify validation used the custom config file
 	results := parseValidationTable(output)
-	assert.Contains(t, results["MAIN"], "VALID")
-	assert.Contains(t, results["CUSTOM"], "VALID")
+	assert.Contains(t, results["main"], "VALID")
+	assert.Contains(t, results["custom"], "VALID")
 	assert.Len(t, results, 2, "Should only have entries from custom config file")
 }

@@ -40,9 +40,9 @@ worktree-based development.`,
 			return fmt.Errorf("failed to create main worktree: %w", err)
 		}
 
-		PrintInfo("Setting up .envrc configuration...")
-		if err := setupEnvrc(defaultBranch); err != nil {
-			return fmt.Errorf("failed to setup .envrc: %w", err)
+		PrintInfo("Setting up .gbm.config.yaml configuration...")
+		if err := setupGBMConfig(defaultBranch); err != nil {
+			return fmt.Errorf("failed to setup .gbm.config.yaml: %w", err)
 		}
 
 		PrintInfo("Initializing worktree management...")
@@ -60,7 +60,7 @@ func runGitBareClone(repoUrl string) error {
 	repo := extractRepoName(repoUrl)
 
 	// Create directory for the repository
-	if err := os.MkdirAll(repo, 0755); err != nil {
+	if err := os.MkdirAll(repo, 0o755); err != nil {
 		return fmt.Errorf("failed to create directory %s: %w", repo, err)
 	}
 
@@ -170,7 +170,7 @@ func getDefaultBranch() (string, error) {
 
 func createMainWorktree(defaultBranch string) error {
 	// Create worktrees directory
-	if err := os.MkdirAll("worktrees", 0755); err != nil {
+	if err := os.MkdirAll("worktrees", 0o755); err != nil {
 		return fmt.Errorf("failed to create worktrees directory: %w", err)
 	}
 
@@ -185,32 +185,32 @@ func createMainWorktree(defaultBranch string) error {
 	return nil
 }
 
-func setupEnvrc(defaultBranch string) error {
-	worktreeEnvrcPath := filepath.Join("worktrees", "MAIN", ".envrc")
-	rootEnvrcPath := ".envrc"
+func setupGBMConfig(defaultBranch string) error {
+	worktreeConfigPath := filepath.Join("worktrees", "MAIN", ".gbm.config.yaml")
+	rootConfigPath := ".gbm.config.yaml"
 
-	// Check if .envrc exists in the MAIN worktree
-	if _, err := os.Stat(worktreeEnvrcPath); err == nil {
-		PrintInfo("Found .envrc in MAIN worktree, copying to root...")
-		if err := copyFile(worktreeEnvrcPath, rootEnvrcPath); err != nil {
-			return fmt.Errorf("failed to copy .envrc from worktree: %w", err)
+	// Check if .gbm.config.yaml exists in the MAIN worktree
+	if _, err := os.Stat(worktreeConfigPath); err == nil {
+		PrintInfo("Found .gbm.config.yaml in MAIN worktree, copying to root...")
+		if err := copyFile(worktreeConfigPath, rootConfigPath); err != nil {
+			return fmt.Errorf("failed to copy .gbm.config.yaml from worktree: %w", err)
 		}
 	} else if os.IsNotExist(err) {
-		// Check if .envrc already exists in root (from repository contents)
-		if _, err := os.Stat(rootEnvrcPath); err == nil {
-			PrintInfo("Found .envrc in root, keeping existing configuration...")
-			// Don't overwrite existing .envrc from repository
+		// Check if .gbm.config.yaml already exists in root (from repository contents)
+		if _, err := os.Stat(rootConfigPath); err == nil {
+			PrintInfo("Found .gbm.config.yaml in root, keeping existing configuration...")
+			// Don't overwrite existing .gbm.config.yaml from repository
 			return nil
 		} else if os.IsNotExist(err) {
-			PrintInfo("No .envrc found in MAIN worktree, creating new one...")
-			if err := createDefaultEnvrc(rootEnvrcPath, defaultBranch); err != nil {
-				return fmt.Errorf("failed to create default .envrc: %w", err)
+			PrintInfo("No .gbm.config.yaml found in MAIN worktree, creating new one...")
+			if err := createDefaultGBMConfig(rootConfigPath, defaultBranch); err != nil {
+				return fmt.Errorf("failed to create default .gbm.config.yaml: %w", err)
 			}
 		} else {
-			return fmt.Errorf("failed to check .envrc in root: %w", err)
+			return fmt.Errorf("failed to check .gbm.config.yaml in root: %w", err)
 		}
 	} else {
-		return fmt.Errorf("failed to check .envrc in worktree: %w", err)
+		return fmt.Errorf("failed to check .gbm.config.yaml in worktree: %w", err)
 	}
 
 	return nil
@@ -233,10 +233,18 @@ func copyFile(src, dst string) error {
 	return err
 }
 
-func createDefaultEnvrc(path, defaultBranch string) error {
-	content := fmt.Sprintf("# Git Branch Manager configuration\n# This file defines the mapping between environment variables and branches\n\nMAIN=%s\n", defaultBranch)
+func createDefaultGBMConfig(path, defaultBranch string) error {
+	content := fmt.Sprintf(`# Git Branch Manager Configuration
 
-	return os.WriteFile(path, []byte(content), 0644)
+# Worktree definitions - key is the worktree name, value defines the branch and merge strategy
+worktrees:
+  # Primary worktree - no merge_into (root of merge chain)
+  main:
+    branch: %s
+    description: "Main production branch"
+`, defaultBranch)
+
+	return os.WriteFile(path, []byte(content), 0o644)
 }
 
 func initializeWorktreeManagement() error {
@@ -252,17 +260,17 @@ func initializeWorktreeManagement() error {
 		return fmt.Errorf("failed to create manager: %w", err)
 	}
 
-	// Load .envrc configuration
-	if err := manager.LoadEnvMapping(GetConfigPath()); err != nil {
-		return fmt.Errorf("failed to load .envrc: %w", err)
+	// Load .gbm.config.yaml configuration
+	if err := manager.LoadGBMConfig(GetConfigPath()); err != nil {
+		return fmt.Errorf("failed to load .gbm.config.yaml: %w", err)
 	}
 
-	// Initialize worktree management - create worktrees for each .envrc mapping
+	// Initialize worktree management - create worktrees for each .gbm.config.yaml mapping
 	// Use a more permissive sync that doesn't fail on invalid branches during clone
 	if err := manager.Sync(false, false, false); err != nil {
 		// For clone operations, we want to be more permissive and not fail
-		// if there are invalid branch references in the .envrc file
-		PrintInfo("Warning: some branch references in .envrc may be invalid: %v", err)
+		// if there are invalid branch references in the .gbm.config.yaml file
+		PrintInfo("Warning: some branch references in .gbm.config.yaml may be invalid: %v", err)
 		PrintInfo("You can run 'gbm sync' later to resolve any issues")
 	}
 

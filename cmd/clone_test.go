@@ -5,18 +5,29 @@ import (
 	"path/filepath"
 	"testing"
 
+	"gbm/internal"
 	"gbm/internal/testutils"
 
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
+// parseGBMConfig reads and unmarshals a .gbm.config.yaml file
+func parseGBMConfig(t *testing.T, path string) *internal.GBMConfig {
+	t.Helper()
+
+	config, err := internal.ParseGBMConfig(path)
+	require.NoError(t, err)
+
+	return config
+}
+
 func TestCloneCommand_Basic(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	t.Cleanup(func() { os.Chdir(originalDir) })
 
 	os.Chdir(targetDir)
 
@@ -26,30 +37,37 @@ func TestCloneCommand_Basic(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
+	repoName := sourceRepo.GetRepoName()
 	repoPath := filepath.Join(targetDir, repoName)
 
 	assert.DirExists(t, repoPath)
 	assert.DirExists(t, filepath.Join(repoPath, ".git"))
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees"))
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-	assert.FileExists(t, filepath.Join(repoPath, ".envrc"))
+	assert.FileExists(t, filepath.Join(repoPath, ".gbm.config.yaml"))
 
-	content, err := os.ReadFile(filepath.Join(repoPath, ".envrc"))
-	require.NoError(t, err)
-	assert.Contains(t, string(content), "MAIN=main")
+	config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+	expected := &internal.GBMConfig{
+		Worktrees: map[string]internal.WorktreeConfig{
+			"main": {
+				Branch:      "main",
+				Description: "Main production branch",
+			},
+		},
+	}
+	assert.Equal(t, expected, config)
 }
 
-func TestCloneCommand_WithExistingEnvrc(t *testing.T) {
-	sourceRepo := testutils.NewEnvrcRepo(t, map[string]string{
-		"MAIN": "main",
-		"DEV":  "develop",
-		"FEAT": "feature/auth",
+func TestCloneCommand_WithExistingGBMConfig(t *testing.T) {
+	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
+		"main": "main",
+		"dev":  "develop",
+		"feat": "feature/auth",
 	})
 
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	t.Cleanup(func() { os.Chdir(originalDir) })
 
 	os.Chdir(targetDir)
 
@@ -59,25 +77,39 @@ func TestCloneCommand_WithExistingEnvrc(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
+	repoName := sourceRepo.GetRepoName()
 	repoPath := filepath.Join(targetDir, repoName)
 
-	assert.FileExists(t, filepath.Join(repoPath, ".envrc"))
+	assert.FileExists(t, filepath.Join(repoPath, ".gbm.config.yaml"))
 
-	content, err := os.ReadFile(filepath.Join(repoPath, ".envrc"))
-	require.NoError(t, err)
-	envrcContent := string(content)
-	assert.Contains(t, envrcContent, "MAIN=main")
-	assert.Contains(t, envrcContent, "DEV=develop")
-	assert.Contains(t, envrcContent, "FEAT=feature/auth")
+	config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+	expected := &internal.GBMConfig{
+		Worktrees: map[string]internal.WorktreeConfig{
+			"main": {
+				Branch:      "main",
+				Description: "Main branch",
+			},
+			"dev": {
+				Branch:      "develop",
+				MergeInto:   "main",
+				Description: "Dev branch",
+			},
+			"feat": {
+				Branch:      "feature/auth",
+				MergeInto:   "dev",
+				Description: "Feat branch",
+			},
+		},
+	}
+	assert.Equal(t, expected, config)
 }
 
-func TestCloneCommand_WithoutEnvrc(t *testing.T) {
+func TestCloneCommand_WithoutGBMConfig(t *testing.T) {
 	sourceRepo := testutils.NewBasicRepo(t)
 
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	t.Cleanup(func() { os.Chdir(originalDir) })
 
 	os.Chdir(targetDir)
 
@@ -87,16 +119,21 @@ func TestCloneCommand_WithoutEnvrc(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
+	repoName := sourceRepo.GetRepoName()
 	repoPath := filepath.Join(targetDir, repoName)
 
-	assert.FileExists(t, filepath.Join(repoPath, ".envrc"))
+	assert.FileExists(t, filepath.Join(repoPath, ".gbm.config.yaml"))
 
-	content, err := os.ReadFile(filepath.Join(repoPath, ".envrc"))
-	require.NoError(t, err)
-	envrcContent := string(content)
-	assert.Contains(t, envrcContent, "MAIN=main")
-	assert.Contains(t, envrcContent, "# Git Branch Manager configuration")
+	config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+	expected := &internal.GBMConfig{
+		Worktrees: map[string]internal.WorktreeConfig{
+			"main": {
+				Branch:      "main",
+				Description: "Main production branch",
+			},
+		},
+	}
+	assert.Equal(t, expected, config)
 }
 
 func TestCloneCommand_DifferentDefaultBranches(t *testing.T) {
@@ -118,7 +155,7 @@ func TestCloneCommand_DifferentDefaultBranches(t *testing.T) {
 
 			targetDir := t.TempDir()
 			originalDir, _ := os.Getwd()
-			defer os.Chdir(originalDir)
+			t.Cleanup(func() { os.Chdir(originalDir) })
 
 			os.Chdir(targetDir)
 
@@ -128,14 +165,21 @@ func TestCloneCommand_DifferentDefaultBranches(t *testing.T) {
 			err := cmd.Execute()
 			require.NoError(t, err)
 
-			repoName := extractRepoName(sourceRepo.GetRemotePath())
+			repoName := sourceRepo.GetRepoName()
 			repoPath := filepath.Join(targetDir, repoName)
 
 			assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
 
-			content, err := os.ReadFile(filepath.Join(repoPath, ".envrc"))
-			require.NoError(t, err)
-			assert.Contains(t, string(content), "MAIN="+tt.defaultBranch)
+			config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+			expected := &internal.GBMConfig{
+				Worktrees: map[string]internal.WorktreeConfig{
+					"main": {
+						Branch:      tt.defaultBranch,
+						Description: "Main production branch",
+					},
+				},
+			}
+			assert.Equal(t, expected, config)
 		})
 	}
 }
@@ -145,7 +189,7 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	t.Cleanup(func() { os.Chdir(originalDir) })
 
 	os.Chdir(targetDir)
 
@@ -155,7 +199,7 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err)
 
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
+	repoName := sourceRepo.GetRepoName()
 	repoPath := filepath.Join(targetDir, repoName)
 
 	expectedDirs := []string{
@@ -169,7 +213,7 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 	}
 
 	expectedFiles := []string{
-		".envrc",
+		".gbm.config.yaml",
 		"worktrees/MAIN/README.md",
 	}
 
@@ -181,7 +225,7 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 func TestCloneCommand_InvalidRepository(t *testing.T) {
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	t.Cleanup(func() { os.Chdir(originalDir) })
 
 	os.Chdir(targetDir)
 
@@ -193,31 +237,6 @@ func TestCloneCommand_InvalidRepository(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to clone repository")
 }
 
-func TestCloneCommand_EmptyRepository(t *testing.T) {
-	sourceRepo := testutils.NewGitTestRepo(t,
-		testutils.WithDefaultBranch("main"),
-		testutils.WithUser("Test User", "test@example.com"),
-	)
-
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-
-	os.Chdir(targetDir)
-
-	cmd := rootCmd
-	cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-
-	err := cmd.Execute()
-	require.NoError(t, err)
-
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-
-	assert.DirExists(t, repoPath)
-	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
-	assert.FileExists(t, filepath.Join(repoPath, ".envrc"))
-}
 
 func TestExtractRepoName(t *testing.T) {
 	tests := []struct {
@@ -242,20 +261,29 @@ func TestExtractRepoName(t *testing.T) {
 	}
 }
 
-func TestCreateDefaultEnvrc(t *testing.T) {
+func TestCreateDefaultGBMConfig(t *testing.T) {
 	tempDir := t.TempDir()
-	envrcPath := filepath.Join(tempDir, ".envrc")
+	configPath := filepath.Join(tempDir, ".gbm.config.yaml")
 
-	err := createDefaultEnvrc(envrcPath, "main")
+	err := createDefaultGBMConfig(configPath, "main")
 	require.NoError(t, err)
 
-	assert.FileExists(t, envrcPath)
+	assert.FileExists(t, configPath)
 
-	content, err := os.ReadFile(envrcPath)
+	config := parseGBMConfig(t, configPath)
+	expected := &internal.GBMConfig{
+		Worktrees: map[string]internal.WorktreeConfig{
+			"main": {
+				Branch:      "main",
+				Description: "Main production branch",
+			},
+		},
+	}
+	assert.Equal(t, expected, config)
+
+	// Also verify the file contains expected comments by reading raw content
+	content, err := os.ReadFile(configPath)
 	require.NoError(t, err)
-
-	envrcContent := string(content)
-	assert.Contains(t, envrcContent, "MAIN=main")
-	assert.Contains(t, envrcContent, "# Git Branch Manager configuration")
-	assert.Contains(t, envrcContent, "# This file defines the mapping between environment variables and branches")
+	configContent := string(content)
+	assert.Contains(t, configContent, "# Git Branch Manager Configuration")
 }

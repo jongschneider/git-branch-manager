@@ -12,41 +12,13 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Helper function to setup a cloned repository with worktrees for switch testing
-func setupSwitchTestRepo(t *testing.T, sourceRepo *testutils.GitTestRepo) (string, string) {
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-
-	os.Chdir(targetDir)
-
-	// Clone the repository
-	cloneCmd := rootCmd
-	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-	err := cloneCmd.Execute()
-	require.NoError(t, err, "Failed to clone repository")
-
-	// Navigate to cloned repo
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
-
-	// Sync worktrees
-	syncCmd := rootCmd
-	syncCmd.SetArgs([]string{"sync"})
-	err = syncCmd.Execute()
-	require.NoError(t, err, "Failed to sync worktrees")
-
-	return repoPath, originalDir
-}
 
 func TestSwitchCommand_BasicWorktreeSwitching(t *testing.T) {
 	// Reset global flag state
 	printPath = false
 
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
-	repoPath, originalDir := setupSwitchTestRepo(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
@@ -56,20 +28,20 @@ func TestSwitchCommand_BasicWorktreeSwitching(t *testing.T) {
 		worktreeName string
 	}{
 		{
-			name:         "switch to MAIN worktree",
+			name:         "switch to main worktree",
 			worktreeName: "MAIN",
 		},
 		{
-			name:         "switch to DEV worktree",
-			worktreeName: "DEV",
+			name:         "switch to dev worktree",
+			worktreeName: "dev",
 		},
 		{
-			name:         "switch to FEAT worktree",
-			worktreeName: "FEAT",
+			name:         "switch to feat worktree",
+			worktreeName: "feat",
 		},
 		{
-			name:         "switch to PROD worktree",
-			worktreeName: "PROD",
+			name:         "switch to prod worktree",
+			worktreeName: "prod",
 		},
 	}
 
@@ -83,15 +55,14 @@ func TestSwitchCommand_BasicWorktreeSwitching(t *testing.T) {
 			})
 
 			require.NoError(t, err, "Switch command should succeed for %s", tt.worktreeName)
-			assert.Contains(t, output, "worktrees/"+tt.worktreeName, "Output should contain correct worktree path")
+			assert.Contains(t, output, "worktrees/"+strings.ToUpper(tt.worktreeName), "Output should contain correct worktree path")
 		})
 	}
 }
 
 func TestSwitchCommand_PrintPathFlag(t *testing.T) {
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
-	repoPath, originalDir := setupSwitchTestRepo(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	os.Chdir(repoPath)
 
@@ -101,13 +72,13 @@ func TestSwitchCommand_PrintPathFlag(t *testing.T) {
 		expectedPath string
 	}{
 		{
-			name:         "print path for MAIN",
+			name:         "print path for main",
 			worktreeName: "MAIN",
 			expectedPath: filepath.Join(repoPath, "worktrees", "MAIN"),
 		},
 		{
-			name:         "print path for DEV",
-			worktreeName: "DEV",
+			name:         "print path for dev",
+			worktreeName: "dev",
 			expectedPath: filepath.Join(repoPath, "worktrees", "DEV"),
 		},
 	}
@@ -123,15 +94,14 @@ func TestSwitchCommand_PrintPathFlag(t *testing.T) {
 
 			require.NoError(t, err, "Switch with --print-path should succeed")
 			// Use Contains instead of Equal to handle symlink path differences
-			assert.Contains(t, output, "worktrees/"+tt.worktreeName, "Should contain the correct worktree path")
+			assert.Contains(t, output, tt.expectedPath, "Should contain the correct worktree path")
 		})
 	}
 }
 
 func TestSwitchCommand_FuzzyMatching(t *testing.T) {
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
-	repoPath, originalDir := setupSwitchTestRepo(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	os.Chdir(repoPath)
 
@@ -158,8 +128,8 @@ func TestSwitchCommand_FuzzyMatching(t *testing.T) {
 		{
 			name:          "substring match - fea",
 			input:         "fea",
-			expectedMatch: "FEAT",
-			expectedPath:  filepath.Join(repoPath, "worktrees", "FEAT"),
+			expectedMatch: "feat",
+			expectedPath:  filepath.Join(repoPath, "worktrees", "feat"),
 		},
 		{
 			name:          "prefix match preference - ma",
@@ -201,9 +171,8 @@ func TestSwitchCommand_FuzzyMatching(t *testing.T) {
 }
 
 func TestSwitchCommand_ListWorktrees(t *testing.T) {
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
-	repoPath, originalDir := setupSwitchTestRepo(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	os.Chdir(repoPath)
 
@@ -217,7 +186,7 @@ func TestSwitchCommand_ListWorktrees(t *testing.T) {
 	require.NoError(t, err, "List worktrees should succeed")
 
 	// Check that all expected worktrees are listed
-	expectedWorktrees := []string{"MAIN", "DEV", "FEAT", "PROD"}
+	expectedWorktrees := []string{"MAIN", "dev", "feat", "prod"}
 	for _, worktree := range expectedWorktrees {
 		assert.Contains(t, output, worktree, "Should list worktree %s", worktree)
 	}
@@ -227,17 +196,16 @@ func TestSwitchCommand_ListWorktrees(t *testing.T) {
 }
 
 func TestSwitchCommand_PreviousWorktree(t *testing.T) {
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
-	repoPath, originalDir := setupSwitchTestRepo(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	os.Chdir(repoPath)
 
-	// First, switch to DEV to establish a previous worktree
+	// First, switch to dev to establish a previous worktree
 	cmd := rootCmd
-	cmd.SetArgs([]string{"switch", "DEV"})
+	cmd.SetArgs([]string{"switch", "dev"})
 	err := cmd.Execute()
-	require.NoError(t, err, "Initial switch to DEV should succeed")
+	require.NoError(t, err, "Initial switch to dev should succeed")
 
 	// Then switch to MAIN
 	cmd = rootCmd
@@ -254,13 +222,12 @@ func TestSwitchCommand_PreviousWorktree(t *testing.T) {
 	})
 
 	require.NoError(t, err, "Switch to previous worktree should succeed")
-	assert.Contains(t, output, "worktrees/DEV", "Should return path to DEV worktree")
+	assert.Contains(t, output, "worktrees/DEV", "Should return path to dev worktree")
 }
 
 func TestSwitchCommand_NoPreviousWorktree(t *testing.T) {
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
-	repoPath, originalDir := setupSwitchTestRepo(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	os.Chdir(repoPath)
 
@@ -277,16 +244,13 @@ func TestSwitchCommand_ShellIntegration(t *testing.T) {
 	// Reset global flag state
 	printPath = false
 
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
-	repoPath, originalDir := setupSwitchTestRepo(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	os.Chdir(repoPath)
 
 	// Set shell integration environment variable
-	oldEnv := os.Getenv("GBM_SHELL_INTEGRATION")
-	os.Setenv("GBM_SHELL_INTEGRATION", "1")
-	defer os.Setenv("GBM_SHELL_INTEGRATION", oldEnv)
+	t.Setenv("GBM_SHELL_INTEGRATION", "1")
 
 	cmd := rootCmd
 	cmd.SetArgs([]string{"switch", "FEAT"})
@@ -303,19 +267,19 @@ func TestSwitchCommand_ShellIntegration(t *testing.T) {
 
 	// Parse the cd command to get the target directory and verify it exists
 	lines := strings.TrimSpace(output)
-	if strings.HasPrefix(lines, "cd ") {
-		targetPath := strings.TrimPrefix(lines, "cd ")
+	require.True(t, strings.HasPrefix(lines, "cd "), "Output should start with 'cd ' command")
 
-		// Verify the target path exists and is a directory
-		info, err := os.Stat(targetPath)
-		require.NoError(t, err, "Target directory should exist")
-		assert.True(t, info.IsDir(), "Target should be a directory")
+	targetPath := strings.TrimPrefix(lines, "cd ")
 
-		// Verify it contains a .git file (worktree marker)
-		gitFile := filepath.Join(targetPath, ".git")
-		_, err = os.Stat(gitFile)
-		assert.NoError(t, err, "Worktree should have .git file")
-	}
+	// Verify the target path exists and is a directory
+	info, err := os.Stat(targetPath)
+	require.NoError(t, err, "Target directory should exist")
+	assert.True(t, info.IsDir(), "Target should be a directory")
+
+	// Verify it contains a .git file (worktree marker)
+	gitFile := filepath.Join(targetPath, ".git")
+	_, err = os.Stat(gitFile)
+	assert.NoError(t, err, "Worktree should have .git file")
 }
 
 func TestSwitchCommand_ErrorConditions(t *testing.T) {
@@ -331,15 +295,15 @@ func TestSwitchCommand_ErrorConditions(t *testing.T) {
 				tempDir := t.TempDir()
 				return tempDir
 			},
-			args:          []string{"switch", "DEV"},
+			args:          []string{"switch", "dev"},
 			errorContains: "not in a git repository",
 		},
 		{
 			name: "worktree does not exist",
 			setupFunc: func(t *testing.T) string {
 				// Create a basic repo with worktrees
-				sourceRepo := testutils.NewStandardEnvrcRepo(t)
-				repoPath, _ := setupSwitchTestRepo(t, sourceRepo)
+				sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+				repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 				return repoPath
 			},
 			args:          []string{"switch", "NONEXISTENT"},
@@ -372,4 +336,3 @@ func TestSwitchCommand_ErrorConditions(t *testing.T) {
 		})
 	}
 }
-

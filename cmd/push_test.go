@@ -102,14 +102,13 @@ func TestPushCommand_CurrentWorktree(t *testing.T) {
 	// Reset global flag state
 	pushAll = false
 
-	// Create source repo with multiple branches and .envrc
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	// Create source repo with multiple branches and .gbm.config.yaml
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	// Navigate into the DEV worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+	// Navigate into the dev worktree
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	os.Chdir(devWorktreePath)
 
 	// Get initial remote commit hash
@@ -137,11 +136,10 @@ func TestPushCommand_NamedWorktree(t *testing.T) {
 	// Reset global flag state
 	pushAll = false
 
-	// Create source repo with multiple branches and .envrc
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	// Create source repo with multiple branches and .gbm.config.yaml
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root (not in a worktree)
 	os.Chdir(repoPath)
@@ -149,13 +147,13 @@ func TestPushCommand_NamedWorktree(t *testing.T) {
 	// Get initial remote commit hash for feature/auth branch
 	initialHash := getRemoteCommitHash(t, sourceRepo, "feature/auth")
 
-	// Make local changes in FEAT worktree
-	featWorktreePath := filepath.Join(repoPath, "worktrees", "FEAT")
+	// Make local changes in feat worktree
+	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
 	makeLocalChanges(t, featWorktreePath, "named_push.txt", "Changes pushed by name")
 
 	// Push specific worktree by name
 	cmd := rootCmd
-	cmd.SetArgs([]string{"push", "FEAT"})
+	cmd.SetArgs([]string{"push", "feat"})
 
 	err := cmd.Execute()
 	require.NoError(t, err, "Push command should succeed")
@@ -172,11 +170,10 @@ func TestPushCommand_AllWorktrees(t *testing.T) {
 	// Reset global flag state
 	pushAll = false
 
-	// Create source repo with multiple branches and .envrc
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	// Create source repo with multiple branches and .gbm.config.yaml
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
@@ -188,8 +185,8 @@ func TestPushCommand_AllWorktrees(t *testing.T) {
 
 	// Make local changes in multiple worktrees
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "MAIN")
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
-	featWorktreePath := filepath.Join(repoPath, "worktrees", "FEAT")
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
+	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
 
 	makeLocalChanges(t, mainWorktreePath, "main_push.txt", "Main branch changes")
 	makeLocalChanges(t, devWorktreePath, "dev_push.txt", "Development changes")
@@ -224,13 +221,12 @@ func TestPushCommand_WithExistingUpstream(t *testing.T) {
 	pushAll = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	// Navigate into DEV worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+	// Navigate into dev worktree
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	os.Chdir(devWorktreePath)
 
 	// Verify upstream exists (should be set during sync)
@@ -255,13 +251,12 @@ func TestPushCommand_WithoutUpstream(t *testing.T) {
 	pushAll = false
 
 	// Create source repo and manually create a new branch without upstream
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Create a new branch in one of the worktrees without upstream
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	os.Chdir(devWorktreePath)
 
 	// Create and switch to new branch
@@ -289,10 +284,9 @@ func TestPushCommand_WithoutUpstream(t *testing.T) {
 
 func TestPushCommand_NotInWorktree(t *testing.T) {
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root (not in a worktree)
 	os.Chdir(repoPath)
@@ -311,10 +305,9 @@ func TestPushCommand_NotInWorktree(t *testing.T) {
 
 func TestPushCommand_NonexistentWorktree(t *testing.T) {
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
@@ -356,13 +349,12 @@ func TestPushCommand_WithLocalCommits(t *testing.T) {
 	pushAll = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	// Navigate into DEV worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+	// Navigate into dev worktree
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	os.Chdir(devWorktreePath)
 
 	// Get initial remote commit hash
@@ -395,13 +387,12 @@ func TestPushCommand_UpToDate(t *testing.T) {
 	pushAll = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	// Navigate into DEV worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+	// Navigate into dev worktree
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	os.Chdir(devWorktreePath)
 
 	// Get initial remote commit hash
@@ -439,7 +430,7 @@ func TestPushCommand_EmptyWorktreeList(t *testing.T) {
 	require.NoError(t, err, "Failed to clone repository")
 
 	// Navigate to cloned repo
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
+	repoName := sourceRepo.GetRepoName()
 	repoPath := filepath.Join(targetDir, repoName)
 	os.Chdir(repoPath)
 

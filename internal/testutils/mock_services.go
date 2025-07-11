@@ -11,10 +11,10 @@ import (
 )
 
 type MockJiraCLI struct {
-	responses  map[string]JiraResponse
-	mockDir    string
+	responses    map[string]JiraResponse
+	mockDir      string
 	originalPATH string
-	t          *testing.T
+	t            *testing.T
 }
 
 type JiraResponse struct {

@@ -44,7 +44,7 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 		PrintVerbose("Building worktree list table")
 		table := internal.NewTable([]string{"WORKTREE", "BRANCH", "GIT STATUS", "SYNC STATUS", "PATH"})
 
-		// Get sorted worktree names (.envrc first, then ad hoc by creation time desc)
+		// Get sorted worktree names (tracked first, then ad hoc by creation time desc)
 		sortedNames := manager.GetSortedWorktreeNames(worktrees)
 
 		for _, worktreeName := range sortedNames {
@@ -61,11 +61,11 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 				syncStatus = "UNTRACKED"
 			}
 
-			// Check if this is an untracked worktree (not in .envrc)
+			// Check if this is an untracked worktree (not in .gbm.config.yaml)
 			if syncStatus == "" {
-				envMapping, err := manager.GetEnvMapping()
+				worktreeMapping, err := manager.GetWorktreeMapping()
 				if err == nil {
-					if _, exists := envMapping[worktreeName]; !exists {
+					if _, exists := worktreeMapping[worktreeName]; !exists {
 						syncStatus = internal.FormatInfo("UNTRACKED")
 					} else {
 						syncStatus = internal.FormatSuccess("IN_SYNC")

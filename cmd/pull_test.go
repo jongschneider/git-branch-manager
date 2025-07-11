@@ -50,46 +50,18 @@ func getCurrentCommitHash(t *testing.T, dir string) string {
 	return strings.TrimSpace(string(output))
 }
 
-// Helper function to setup a cloned repository with worktrees
-func setupClonedRepoWithWorktrees(t *testing.T, sourceRepo *testutils.GitTestRepo) (string, string) {
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-
-	os.Chdir(targetDir)
-
-	// Clone the repository
-	cloneCmd := rootCmd
-	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-	err := cloneCmd.Execute()
-	require.NoError(t, err, "Failed to clone repository")
-
-	// Navigate to cloned repo
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
-
-	// Sync worktrees
-	syncCmd := rootCmd
-	syncCmd.SetArgs([]string{"sync"})
-	err = syncCmd.Execute()
-	require.NoError(t, err, "Failed to sync worktrees")
-
-	return repoPath, originalDir
-}
 
 func TestPullCommand_CurrentWorktree(t *testing.T) {
 	// Reset global flag state
 	pullAll = false
 
-	// Create source repo with multiple branches and .envrc
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	// Create source repo with multiple branches and .gbm.config.yaml
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	// Navigate into the DEV worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+	// Navigate into the dev worktree
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	os.Chdir(devWorktreePath)
 
 	// Get initial commit hash
@@ -98,7 +70,7 @@ func TestPullCommand_CurrentWorktree(t *testing.T) {
 	// Make remote changes to the develop branch
 	makeRemoteChanges(t, sourceRepo, "develop", "new_feature.txt", "New feature content")
 
-	// Pull current worktree (should pull DEV since we're in it)
+	// Pull current worktree (should pull dev since we're in it)
 	cmd := rootCmd
 	cmd.SetArgs([]string{"pull"})
 
@@ -117,17 +89,16 @@ func TestPullCommand_NamedWorktree(t *testing.T) {
 	// Reset global flag state
 	pullAll = false
 
-	// Create source repo with multiple branches and .envrc
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	// Create source repo with multiple branches and .gbm.config.yaml
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root (not in a worktree)
 	os.Chdir(repoPath)
 
-	// Get initial commit hash of FEAT worktree
-	featWorktreePath := filepath.Join(repoPath, "worktrees", "FEAT")
+	// Get initial commit hash of feat worktree
+	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
 	initialHash := getCurrentCommitHash(t, featWorktreePath)
 
 	// Make remote changes to the feature/auth branch
@@ -135,12 +106,12 @@ func TestPullCommand_NamedWorktree(t *testing.T) {
 
 	// Pull specific worktree by name
 	cmd := rootCmd
-	cmd.SetArgs([]string{"pull", "FEAT"})
+	cmd.SetArgs([]string{"pull", "feat"})
 
 	err := cmd.Execute()
 	require.NoError(t, err, "Pull command should succeed")
 
-	// Verify the changes were pulled to FEAT worktree
+	// Verify the changes were pulled to feat worktree
 	verifyWorktreeContent(t, featWorktreePath, "auth_changes.txt", "Authentication improvements")
 
 	// Verify commit hash changed
@@ -152,19 +123,18 @@ func TestPullCommand_AllWorktrees(t *testing.T) {
 	// Reset global flag state
 	pullAll = false
 
-	// Create source repo with multiple branches and .envrc
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	// Create source repo with multiple branches and .gbm.config.yaml
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
 
 	// Get initial commit hashes for all worktrees
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "MAIN")
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
-	featWorktreePath := filepath.Join(repoPath, "worktrees", "FEAT")
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
+	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
 
 	initialMainHash := getCurrentCommitHash(t, mainWorktreePath)
 	initialDevHash := getCurrentCommitHash(t, devWorktreePath)
@@ -195,16 +165,15 @@ func TestPullCommand_AllWorktrees(t *testing.T) {
 	newFeatHash := getCurrentCommitHash(t, featWorktreePath)
 
 	assert.NotEqual(t, initialMainHash, newMainHash, "MAIN commit hash should change")
-	assert.NotEqual(t, initialDevHash, newDevHash, "DEV commit hash should change")
-	assert.NotEqual(t, initialFeatHash, newFeatHash, "FEAT commit hash should change")
+	assert.NotEqual(t, initialDevHash, newDevHash, "dev commit hash should change")
+	assert.NotEqual(t, initialFeatHash, newFeatHash, "feat commit hash should change")
 }
 
 func TestPullCommand_NotInWorktree(t *testing.T) {
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root (not in a worktree)
 	os.Chdir(repoPath)
@@ -223,10 +192,9 @@ func TestPullCommand_NotInWorktree(t *testing.T) {
 
 func TestPullCommand_NonexistentWorktree(t *testing.T) {
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
 	os.Chdir(repoPath)
@@ -268,13 +236,12 @@ func TestPullCommand_FastForward(t *testing.T) {
 	pullAll = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	// Navigate into DEV worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+	// Navigate into dev worktree
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	os.Chdir(devWorktreePath)
 
 	// Get initial commit hash
@@ -303,13 +270,12 @@ func TestPullCommand_UpToDate(t *testing.T) {
 	pullAll = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	// Navigate into DEV worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+	// Navigate into dev worktree
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	os.Chdir(devWorktreePath)
 
 	// Get initial commit hash
@@ -332,13 +298,12 @@ func TestPullCommand_WithLocalChanges(t *testing.T) {
 	pullAll = false
 
 	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardEnvrcRepo(t)
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
-	repoPath, originalDir := setupClonedRepoWithWorktrees(t, sourceRepo)
-	defer os.Chdir(originalDir)
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	// Navigate into DEV worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
+	// Navigate into dev worktree
+	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	os.Chdir(devWorktreePath)
 
 	// Make local uncommitted changes
@@ -364,4 +329,3 @@ func TestPullCommand_WithLocalChanges(t *testing.T) {
 	require.NoError(t, err, "Local file should still exist")
 	assert.Equal(t, "Local uncommitted changes", string(localContent), "Local changes should be preserved")
 }
-

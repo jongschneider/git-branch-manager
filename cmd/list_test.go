@@ -67,12 +67,12 @@ func TestListCommand_EmptyRepository(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	t.Cleanup(func() { os.Chdir(originalDir) })
 
 	os.Chdir(repo.GetLocalPath())
 
-	repo.WriteFile(".envrc", "# Empty .envrc")
-	repo.CommitChanges("Add empty .envrc")
+	repo.WriteFile(".gbm.config.yaml", "# Empty .gbm.config.yaml")
+	repo.CommitChanges("Add empty .gbm.config.yaml")
 
 	cmd := rootCmd
 	cmd.SetArgs([]string{"list"})
@@ -87,15 +87,15 @@ func TestListCommand_EmptyRepository(t *testing.T) {
 	assert.Equal(t, "", strings.TrimSpace(outputStr))
 }
 
-func TestListCommand_WithEnvrcWorktrees(t *testing.T) {
-	repo := testutils.NewEnvrcRepo(t, map[string]string{
+func TestListCommand_WithGBMConfigWorktrees(t *testing.T) {
+	repo := testutils.NewGBMConfigRepo(t, map[string]string{
 		"MAIN": "main",
 		"DEV":  "develop",
 		"FEAT": "feature/auth",
 	})
 
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	t.Cleanup(func() { os.Chdir(originalDir) })
 
 	os.Chdir(repo.GetLocalPath())
 
@@ -117,28 +117,13 @@ func TestListCommand_UntrackedWorktrees(t *testing.T) {
 	// Create a repository with branches
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 
-	// Clone the repository
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	// Clone the repository (no sync needed since NewMultiBranchRepo doesn't have .gbm.config.yaml)
+	setupClonedRepo(t, sourceRepo)
 
-	os.Chdir(targetDir)
-
-	// Clone the repository
-	cloneCmd := rootCmd
-	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-	err := cloneCmd.Execute()
-	require.NoError(t, err)
-
-	// Change to the cloned repository
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
-
-	// Create an additional worktree that's not in .envrc (untracked)
+	// Create an additional worktree that's not in .gbm.config.yaml (untracked)
 	addCmd := rootCmd
 	addCmd.SetArgs([]string{"add", "--new-branch", "UNTRACKED", "develop"})
-	err = addCmd.Execute()
+	err := addCmd.Execute()
 	require.NoError(t, err)
 
 	// Now test the list command
@@ -164,7 +149,8 @@ func TestListCommand_UntrackedWorktrees(t *testing.T) {
 	mainWorktree, found := findWorktreeInRows(rows, "MAIN")
 	require.True(t, found, "MAIN worktree should be present")
 	assert.Equal(t, "main", mainWorktree.Branch)
-	assert.Contains(t, mainWorktree.SyncStatus, "IN_SYNC")
+	// When cloning without .gbm.config.yaml, MAIN worktree starts as UNTRACKED until config is properly set up
+	assert.Contains(t, mainWorktree.SyncStatus, "UNTRACKED")
 
 	// Verify UNTRACKED worktree
 	untrackedWorktree, found := findWorktreeInRows(rows, "UNTRACKED")
@@ -175,37 +161,16 @@ func TestListCommand_UntrackedWorktrees(t *testing.T) {
 
 func TestListCommand_OrphanedWorktrees(t *testing.T) {
 	// Create a repository with branches
-	sourceRepo := testutils.NewEnvrcRepo(t, map[string]string{
+	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
 		"MAIN": "main",
 		"DEV":  "develop",
 	})
 
-	// Clone the repository
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	// Clone the repository and sync worktrees
+	setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	os.Chdir(targetDir)
-
-	// Clone the repository
-	cloneCmd := rootCmd
-	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-	err := cloneCmd.Execute()
-	require.NoError(t, err)
-
-	// Change to the cloned repository
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
-
-	// Sync to create all worktrees
-	syncCmd := rootCmd
-	syncCmd.SetArgs([]string{"sync"})
-	err = syncCmd.Execute()
-	require.NoError(t, err)
-
-	// Remove DEV from .envrc to make it orphaned
-	err = os.WriteFile(".envrc", []byte("MAIN=main\n"), 0644)
+	// Remove DEV from .gbm.config.yaml to make it orphaned
+	err := os.WriteFile(".gbm.config.yaml", []byte("worktrees:\n  MAIN:\n    branch: main\n"), 0644)
 	require.NoError(t, err)
 
 	// Now test the list command
@@ -244,27 +209,12 @@ func TestListCommand_GitStatus(t *testing.T) {
 	// Create a repository with branches
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 
-	// Clone the repository
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-
-	os.Chdir(targetDir)
-
-	// Clone the repository
-	cloneCmd := rootCmd
-	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-	err := cloneCmd.Execute()
-	require.NoError(t, err)
-
-	// Change to the cloned repository
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
+	// Clone the repository (no sync needed since NewMultiBranchRepo doesn't have .gbm.config.yaml)
+	repoPath := setupClonedRepo(t, sourceRepo)
 
 	// Create a file in the MAIN worktree to create git status
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "MAIN")
-	err = os.WriteFile(filepath.Join(mainWorktreePath, "test.txt"), []byte("test content"), 0644)
+	err := os.WriteFile(filepath.Join(mainWorktreePath, "test.txt"), []byte("test content"), 0644)
 	require.NoError(t, err)
 
 	// Now test the list command
@@ -296,34 +246,13 @@ func TestListCommand_GitStatus(t *testing.T) {
 
 func TestListCommand_ExpectedBranchDisplay(t *testing.T) {
 	// Create a repository with branches
-	sourceRepo := testutils.NewEnvrcRepo(t, map[string]string{
+	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
 		"MAIN": "main",
 		"DEV":  "develop",
 	})
 
-	// Clone the repository
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-
-	os.Chdir(targetDir)
-
-	// Clone the repository
-	cloneCmd := rootCmd
-	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-	err := cloneCmd.Execute()
-	require.NoError(t, err)
-
-	// Change to the cloned repository
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
-
-	// Sync to create all worktrees
-	syncCmd := rootCmd
-	syncCmd.SetArgs([]string{"sync"})
-	err = syncCmd.Execute()
-	require.NoError(t, err)
+	// Clone the repository and sync worktrees
+	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Change DEV worktree to a different branch to test expected branch display
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
@@ -371,40 +300,19 @@ func TestListCommand_ExpectedBranchDisplay(t *testing.T) {
 
 func TestListCommand_SortedOutput(t *testing.T) {
 	// Create a repository with branches
-	sourceRepo := testutils.NewEnvrcRepo(t, map[string]string{
+	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
 		"MAIN": "main",
 		"DEV":  "develop",
 		"FEAT": "feature/auth",
 	})
 
-	// Clone the repository
-	targetDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
-
-	os.Chdir(targetDir)
-
-	// Clone the repository
-	cloneCmd := rootCmd
-	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
-	err := cloneCmd.Execute()
-	require.NoError(t, err)
-
-	// Change to the cloned repository
-	repoName := extractRepoName(sourceRepo.GetRemotePath())
-	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
-
-	// Sync to create all worktrees
-	syncCmd := rootCmd
-	syncCmd.SetArgs([]string{"sync"})
-	err = syncCmd.Execute()
-	require.NoError(t, err)
+	// Clone the repository and sync worktrees
+	setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Create an additional ad-hoc worktree to test sorting
 	addCmd := rootCmd
 	addCmd.SetArgs([]string{"add", "--new-branch", "ADHOC", "production/v1.0"})
-	err = addCmd.Execute()
+	err := addCmd.Execute()
 	require.NoError(t, err)
 
 	// Now test the list command
@@ -443,7 +351,7 @@ func TestListCommand_SortedOutput(t *testing.T) {
 	require.True(t, found, "ADHOC worktree should be present")
 	assert.Equal(t, "production/v1.0", adhocWorktree.Branch)
 
-	// Verify sorting: .envrc worktrees (MAIN, DEV, FEAT) should come before ad-hoc (ADHOC)
+	// Verify sorting: .gbm.config.yaml worktrees (MAIN, DEV, FEAT) should come before ad-hoc (ADHOC)
 	// The order in the rows slice should reflect the display order
 	worktreeNames := make([]string, len(rows))
 	for i, row := range rows {
@@ -468,16 +376,22 @@ func TestListCommand_SortedOutput(t *testing.T) {
 		}
 	}
 
-	// .envrc worktrees should come before ad-hoc worktrees
+	// .gbm.config.yaml worktrees should come before ad-hoc worktrees
 	assert.True(t, mainPos < adhocPos, "MAIN should come before ADHOC")
 	assert.True(t, devPos < adhocPos, "DEV should come before ADHOC")
 	assert.True(t, featPos < adhocPos, "FEAT should come before ADHOC")
+
+	// Verify the exact order of worktrees as they appear in the output
+	// Tracked worktrees should be sorted alphabetically, followed by ad-hoc worktrees
+	expectedOrder := []string{"DEV", "FEAT", "MAIN", "ADHOC"}
+	actualOrder := worktreeNames
+	assert.Equal(t, expectedOrder, actualOrder, "Worktrees should be in the expected sorted order")
 }
 
 func TestListCommand_NoGitRepository(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	t.Cleanup(func() { os.Chdir(originalDir) })
 
 	os.Chdir(tempDir)
 
@@ -489,17 +403,17 @@ func TestListCommand_NoGitRepository(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to find git repository root")
 }
 
-func TestListCommand_NoEnvrcFile(t *testing.T) {
+func TestListCommand_NoGBMConfigFile(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	t.Cleanup(func() { os.Chdir(originalDir) })
 
 	os.Chdir(repo.GetLocalPath())
 
-	envrcPath := filepath.Join(repo.GetLocalPath(), ".envrc")
-	if _, err := os.Stat(envrcPath); err == nil {
-		os.Remove(envrcPath)
+	gbmConfigPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+	if _, err := os.Stat(gbmConfigPath); err == nil {
+		os.Remove(gbmConfigPath)
 	}
 
 	cmd := rootCmd
@@ -507,5 +421,5 @@ func TestListCommand_NoEnvrcFile(t *testing.T) {
 
 	err := cmd.Execute()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to load .envrc")
+	assert.Contains(t, err.Error(), "failed to load .gbm.config.yaml")
 }

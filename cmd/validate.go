@@ -10,8 +10,8 @@ import (
 
 var validateCmd = &cobra.Command{
 	Use:   "validate",
-	Short: "Validate .envrc syntax and branch references",
-	Long: `Validate .envrc syntax and branch references.
+	Short: "Validate .gbm.config.yaml syntax and branch references",
+	Long: `Validate .gbm.config.yaml syntax and branch references.
 
 Checks if referenced branches exist locally or remotely. Useful for CI/CD integration
 and ensuring configuration correctness before syncing.`,
@@ -24,36 +24,36 @@ and ensuring configuration correctness before syncing.`,
 		PrintVerbose("Validating branch references...")
 
 		// Get the mapping to validate
-		mapping, err := manager.GetEnvMapping()
+		mapping, err := manager.GetWorktreeMapping()
 		if err != nil {
 			return err
 		}
 
 		// Create table for validation results
-		table := internal.NewTable([]string{"ENV VARIABLE", "BRANCH", "STATUS"})
+		table := internal.NewTable([]string{"WORKTREE", "BRANCH", "STATUS"})
 
 		allValid := true
-		for envVar, branchName := range mapping {
+		for worktreeName, branchName := range mapping {
 			exists, err := manager.BranchExists(branchName)
 			if err != nil {
-				table.AddRow([]string{envVar, branchName, internal.FormatError("ERROR")})
+				table.AddRow([]string{worktreeName, branchName, internal.FormatError("ERROR")})
 				allValid = false
 				continue
 			}
 
 			if exists {
-				table.AddRow([]string{envVar, branchName, internal.FormatSuccess("VALID")})
+				table.AddRow([]string{worktreeName, branchName, internal.FormatSuccess("VALID")})
 			} else {
-				table.AddRow([]string{envVar, branchName, internal.FormatError("NOT FOUND")})
+				table.AddRow([]string{worktreeName, branchName, internal.FormatError("NOT FOUND")})
 				allValid = false
 			}
 		}
 
 		// Display validation header
 		if allValid {
-			PrintInfo("%s", internal.FormatSuccess(".envrc validation passed"))
+			PrintInfo("%s", internal.FormatSuccess(".gbm.config.yaml validation passed"))
 		} else {
-			PrintError("%s", internal.FormatError(".envrc validation failed"))
+			PrintError("%s", internal.FormatError(".gbm.config.yaml validation failed"))
 		}
 
 		fmt.Println()

@@ -20,14 +20,14 @@ func TestMergeBackDetection_RealWorldDemo(t *testing.T) {
 	)
 
 	// Set up a typical production environment hierarchy
-	err := repo.CreateEnvrc(map[string]string{
-		"MAIN":    "main",
-		"STAGING": "staging",
-		"PROD":    "production",
+	err := repo.CreateGBMConfig(map[string]string{
+		"main":    "main",
+		"staging": "staging",
+		"prod":    "production",
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add environment configuration")
+	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized production branches
@@ -59,7 +59,7 @@ def validate_user_input(input_data):
 
 	// Demonstrate the merge-back detection in action
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".envrc")
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -83,4 +83,3 @@ def validate_user_input(input_data):
 	})
 	require.NoError(t, err)
 }
-
