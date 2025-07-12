@@ -3,6 +3,7 @@ package internal
 import (
 	"errors"
 	"fmt"
+	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -199,6 +200,7 @@ func (m *Manager) SyncWithConfirmation(dryRun, force, fetch bool, confirmFunc Co
 			}
 			return fmt.Errorf("failed to create worktree for %s: %w", worktreeName, err)
 		}
+
 	}
 
 	for worktreeName, change := range status.BranchChanges {
@@ -356,6 +358,21 @@ func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool
 		return err
 	}
 
+	// Check if this is an ad-hoc worktree (not tracked in .gbm.config.yaml)
+	isAdHoc := true
+	if m.gbmConfig != nil {
+		if _, exists := m.gbmConfig.Worktrees[worktreeName]; exists {
+			isAdHoc = false
+		}
+	}
+
+	// Only copy files for ad-hoc worktrees
+	if isAdHoc {
+		if err := m.copyFilesToWorktree(worktreeName); err != nil {
+			fmt.Printf("Warning: failed to copy files to worktree: %v\n", err)
+		}
+	}
+
 	// Track this worktree as ad hoc if it's not in .gbm.config.yaml
 	if m.gbmConfig != nil {
 		if _, exists := m.gbmConfig.Worktrees[worktreeName]; !exists {
@@ -367,6 +384,128 @@ func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool
 					// Log warning but don't fail the operation
 					fmt.Printf("Warning: failed to save config: %v\n", saveErr)
 				}
+			}
+		}
+	}
+
+	return nil
+}
+
+// copyFilesToWorktree copies files from source worktrees to the newly created worktree
+func (m *Manager) copyFilesToWorktree(targetWorktreeName string) error {
+	if len(m.config.FileCopy.Rules) == 0 {
+		return nil
+	}
+
+	targetWorktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, targetWorktreeName)
+
+	for _, rule := range m.config.FileCopy.Rules {
+		sourceWorktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, rule.SourceWorktree)
+
+		// Check if source worktree exists
+		if _, err := os.Stat(sourceWorktreePath); os.IsNotExist(err) {
+			fmt.Printf("Warning: source worktree '%s' does not exist, skipping file copy rule\n", rule.SourceWorktree)
+			continue
+		}
+
+		for _, filePattern := range rule.Files {
+			if err := m.copyFileOrDirectory(sourceWorktreePath, targetWorktreePath, filePattern); err != nil {
+				fmt.Printf("Warning: failed to copy '%s' from '%s': %v\n", filePattern, rule.SourceWorktree, err)
+			}
+		}
+	}
+
+	return nil
+}
+
+// copyFileOrDirectory copies a file or directory from source to target
+func (m *Manager) copyFileOrDirectory(sourceWorktreePath, targetWorktreePath, filePattern string) error {
+	sourcePath := filepath.Join(sourceWorktreePath, filePattern)
+	targetPath := filepath.Join(targetWorktreePath, filePattern)
+
+	sourceInfo, err := os.Stat(sourcePath)
+	if os.IsNotExist(err) {
+		return fmt.Errorf("source file/directory '%s' does not exist", sourcePath)
+	}
+	if err != nil {
+		return fmt.Errorf("failed to stat source path: %w", err)
+	}
+
+	if sourceInfo.IsDir() {
+		return m.copyDirectory(sourcePath, targetPath)
+	}
+	return m.copyFile(sourcePath, targetPath)
+}
+
+// copyFile copies a single file from source to target
+func (m *Manager) copyFile(sourcePath, targetPath string) error {
+	// Create target directory if it doesn't exist
+	targetDir := filepath.Dir(targetPath)
+	if err := os.MkdirAll(targetDir, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+
+	// Check if target file already exists
+	if _, err := os.Stat(targetPath); err == nil {
+		fmt.Printf("File '%s' already exists in target worktree, skipping\n", filepath.Base(targetPath))
+		return nil
+	}
+
+	// Open source file
+	sourceFile, err := os.Open(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to open source file: %w", err)
+	}
+	defer sourceFile.Close()
+
+	// Create target file
+	targetFile, err := os.Create(targetPath)
+	if err != nil {
+		return fmt.Errorf("failed to create target file: %w", err)
+	}
+	defer targetFile.Close()
+
+	// Copy file contents
+	if _, err := io.Copy(targetFile, sourceFile); err != nil {
+		return fmt.Errorf("failed to copy file contents: %w", err)
+	}
+
+	// Copy file permissions
+	sourceInfo, err := os.Stat(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to get source file info: %w", err)
+	}
+	if err := os.Chmod(targetPath, sourceInfo.Mode()); err != nil {
+		return fmt.Errorf("failed to set file permissions: %w", err)
+	}
+
+	return nil
+}
+
+// copyDirectory recursively copies a directory from source to target
+func (m *Manager) copyDirectory(sourcePath, targetPath string) error {
+	// Create target directory
+	if err := os.MkdirAll(targetPath, 0755); err != nil {
+		return fmt.Errorf("failed to create target directory: %w", err)
+	}
+
+	// Read source directory
+	entries, err := os.ReadDir(sourcePath)
+	if err != nil {
+		return fmt.Errorf("failed to read source directory: %w", err)
+	}
+
+	for _, entry := range entries {
+		sourceEntryPath := filepath.Join(sourcePath, entry.Name())
+		targetEntryPath := filepath.Join(targetPath, entry.Name())
+
+		if entry.IsDir() {
+			if err := m.copyDirectory(sourceEntryPath, targetEntryPath); err != nil {
+				return err
+			}
+		} else {
+			if err := m.copyFile(sourceEntryPath, targetEntryPath); err != nil {
+				return err
 			}
 		}
 	}

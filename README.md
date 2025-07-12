@@ -135,7 +135,47 @@ create_missing_branches = false
 [state]
 last_sync = "2025-07-01T10:30:00Z"
 tracked_vars = ["PROD", "PREVIEW", "MAIN", "STAGING"]
+
+[file_copy]
+[[file_copy.rules]]
+source_worktree = "master"
+files = [".env", "config/local.json", "scripts/"]
 ```
+
+### File Copying for Ad-Hoc Worktrees
+
+You can configure automatic file copying when creating new **ad-hoc worktrees** (created with `gbm add`, not tracked in `.gbm.config.yaml`) by adding `[file_copy]` rules to your `.gbm/config.toml`:
+
+```toml
+[file_copy]
+# Copy .env file from the master worktree to all new ad-hoc worktrees
+[[file_copy.rules]]
+source_worktree = "master"
+files = [".env"]
+
+# Copy multiple files and directories from a specific worktree
+[[file_copy.rules]]
+source_worktree = "main"
+files = [".env.local", "config/development.json", "scripts/"]
+```
+
+**Configuration Options:**
+- `source_worktree`: The name of the worktree to copy files from
+- `files`: Array of file paths or directory paths to copy (supports both files and directories)
+
+**File Copy Rules:**
+- Files are copied **only** when creating new ad-hoc worktrees with `gbm add`
+- Tracked worktrees (defined in `.gbm.config.yaml`) do **not** get file copying
+- If the source worktree doesn't exist, the rule is skipped with a warning
+- If a specific file doesn't exist in the source worktree, that file is skipped with a warning
+- If a file already exists in the target worktree, it is skipped
+- Directory permissions and file permissions are preserved during copying
+- Files are copied recursively for directories
+
+**Use Cases:**
+- Copy environment files (`.env`, `.env.local`) to new feature branches
+- Copy local configuration files that aren't tracked in git
+- Copy development scripts or tools to new worktrees
 
 ## Directory Structure
 

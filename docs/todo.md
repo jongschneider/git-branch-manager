@@ -73,7 +73,7 @@ ERROR: Error: exit status 1
 - [x] remove the `clean` verb
 - [x] make .gbm.config.yaml tests actually use yaml for validation instead of string contains.
 - [x] what's the point of TestCloneCommand_EmptyRepository?
-- [ ] configuration for copying files into new worktrees (.env, anything not tracked by git)
+- [x] configuration for copying files into new worktrees (.env, anything not tracked by git)
 - [ ] track merge backs... not sure how yet and how to prompt the user.
     - [ ] helper to create a merge worktree
 - [ ] add carapace completion

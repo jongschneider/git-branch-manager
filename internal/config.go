@@ -15,6 +15,7 @@ type Config struct {
 	State    ConfigState    `toml:"state"`
 	Icons    ConfigIcons    `toml:"icons"`
 	Jira     ConfigJira     `toml:"jira"`
+	FileCopy ConfigFileCopy `toml:"file_copy"`
 }
 
 type ConfigSettings struct {
@@ -22,6 +23,15 @@ type ConfigSettings struct {
 	AutoFetch             bool   `toml:"auto_fetch"`
 	CreateMissingBranches bool   `toml:"create_missing_branches"`
 	MergeBackAlerts       bool   `toml:"merge_back_alerts"`
+}
+
+type FileCopyRule struct {
+	SourceWorktree string   `toml:"source_worktree"`
+	Files          []string `toml:"files"`
+}
+
+type ConfigFileCopy struct {
+	Rules []FileCopyRule `toml:"rules"`
 }
 
 type ConfigState struct {
@@ -103,6 +113,9 @@ func DefaultConfig() *Config {
 		},
 		Jira: ConfigJira{
 			Me: "", // Will be populated when first used
+		},
+		FileCopy: ConfigFileCopy{
+			Rules: []FileCopyRule{},
 		},
 	}
 }
