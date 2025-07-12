@@ -16,13 +16,18 @@ var (
 )
 
 var addCmd = &cobra.Command{
-	Use:   "add <worktree-name> [branch-name]",
+	Use:   "add <worktree-name> [branch-name] [base-branch]",
 	Short: "Add a new worktree",
 	Long: `Add a new worktree with various options:
 - Create on existing branch: gbm add INGSVC-5544 existing-branch-name
 - Create on new branch: gbm add INGSVC-5544 feature/new-branch -b
+- Create on new branch with base: gbm add INGSVC-5544 feature/new-branch main -b
 - Interactive mode: gbm add INGSVC-5544 --interactive
-- Tab completion: Shows JIRA keys with summaries, suggests branch names when needed`,
+- Tab completion: Shows JIRA keys with summaries, suggests branch names when needed
+
+The third argument specifies which branch/commit to use as the starting point for new branches.
+If not specified for new branches, the repository's default branch (main/master) is used.
+This matches the behavior of 'git worktree add'.`,
 	Args: cobra.MinimumNArgs(1),
 	RunE: func(cmd *cobra.Command, args []string) error {
 		worktreeName := args[0]
@@ -45,6 +50,10 @@ var addCmd = &cobra.Command{
 			// Handle direct specification
 			if len(args) > 1 {
 				branchName = args[1]
+				// Check for third argument (base branch)
+				if len(args) > 2 {
+					baseBranch = args[2]
+				}
 			} else if newBranch {
 				// Generate branch name from worktree name
 				branchName = generateBranchName(worktreeName, manager)
@@ -59,8 +68,32 @@ var addCmd = &cobra.Command{
 
 		PrintInfo("Adding worktree '%s' on branch '%s'", worktreeName, branchName)
 
+		// Determine base branch for new branches
+		var resolvedBaseBranch string
+		if newBranch {
+			if baseBranch != "" {
+				// Validate that the base branch exists
+				exists, err := manager.GetGitManager().BranchExists(baseBranch)
+				if err != nil {
+					return fmt.Errorf("failed to check if base branch exists: %w", err)
+				}
+				if !exists {
+					return fmt.Errorf("base branch '%s' does not exist", baseBranch)
+				}
+				resolvedBaseBranch = baseBranch
+			} else {
+				// Use default branch
+				defaultBranch, err := manager.GetGitManager().GetDefaultBranch()
+				if err != nil {
+					return fmt.Errorf("failed to get default branch: %w", err)
+				}
+				resolvedBaseBranch = defaultBranch
+				PrintInfo("Using default base branch: %s", resolvedBaseBranch)
+			}
+		}
+
 		// Add the worktree
-		if err := manager.AddWorktree(worktreeName, branchName, newBranch); err != nil {
+		if err := manager.AddWorktree(worktreeName, branchName, newBranch, resolvedBaseBranch); err != nil {
 			return fmt.Errorf("failed to add worktree: %w", err)
 		}
 
@@ -101,6 +134,7 @@ func handleInteractive(manager *internal.Manager) (string, error) {
 		if _, err := fmt.Scanln(&branchName); err != nil {
 			return "", fmt.Errorf("failed to read branch name: %w", err)
 		}
+
 		return branchName, nil
 	} else {
 		// Use existing branch
@@ -141,7 +175,6 @@ func init() {
 	rootCmd.AddCommand(addCmd)
 
 	addCmd.Flags().BoolVarP(&newBranch, "new-branch", "b", false, "Create a new branch for the worktree")
-	addCmd.Flags().StringVar(&baseBranch, "base", "", "Base branch for new branch (default: current branch)")
 	addCmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Interactive mode to select branch")
 
 	// Add JIRA key completions for the first positional argument

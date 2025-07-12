@@ -352,8 +352,8 @@ func (m *Manager) GetAllWorktrees() (map[string]*WorktreeListInfo, error) {
 	return result, nil
 }
 
-func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool) error {
-	err := m.gitManager.AddWorktree(worktreeName, branchName, createBranch)
+func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool, baseBranch string) error {
+	err := m.gitManager.AddWorktree(worktreeName, branchName, createBranch, baseBranch)
 	if err != nil {
 		return err
 	}
@@ -529,6 +529,10 @@ func (m *Manager) GetRemoteBranches() ([]string, error) {
 
 func (m *Manager) GetCurrentBranch() (string, error) {
 	return m.gitManager.GetCurrentBranch()
+}
+
+func (m *Manager) GetGitManager() *GitManager {
+	return m.gitManager
 }
 
 func (m *Manager) PushWorktree(worktreeName string) error {

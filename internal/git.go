@@ -478,7 +478,7 @@ func (gm *GitManager) CreateBranch(branchName, baseBranch string) error {
 	return nil
 }
 
-func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch bool) error {
+func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch bool, baseBranch string) error {
 	worktreeDir := filepath.Join(gm.repoPath, gm.worktreePrefix)
 	worktreePath := filepath.Join(worktreeDir, worktreeName)
 
@@ -504,8 +504,13 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 			// Branch exists, create worktree on existing branch
 			cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
 		} else {
-			// Create new branch and worktree
-			cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath)
+			// Create new branch and worktree with base branch
+			if baseBranch != "" {
+				cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath, baseBranch)
+			} else {
+				// Use default behavior (current HEAD)
+				cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath)
+			}
 		}
 	} else {
 		// Create worktree on existing branch
@@ -548,6 +553,30 @@ func (gm *GitManager) GetCurrentBranch() (string, error) {
 	}
 
 	return strings.TrimSpace(string(output)), nil
+}
+
+func (gm *GitManager) GetDefaultBranch() (string, error) {
+	// Try to get the default branch from remote HEAD
+	output, err := ExecGitCommand(gm.repoPath, "symbolic-ref", "refs/remotes/origin/HEAD")
+	if err == nil {
+		// Parse refs/remotes/origin/main -> main
+		defaultRef := strings.TrimSpace(string(output))
+		if strings.HasPrefix(defaultRef, "refs/remotes/origin/") {
+			return strings.TrimPrefix(defaultRef, "refs/remotes/origin/"), nil
+		}
+	}
+
+	// Fallback: try common default branch names
+	commonDefaults := []string{"main", "master", "develop"}
+	for _, branch := range commonDefaults {
+		exists, err := gm.BranchExists(branch)
+		if err == nil && exists {
+			return branch, nil
+		}
+	}
+
+	// Last resort: get the current branch
+	return gm.GetCurrentBranch()
 }
 
 func (gm *GitManager) GetRemoteBranches() ([]string, error) {

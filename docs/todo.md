@@ -93,6 +93,8 @@ ERROR: Error: exit status 1
 - [x] add confirmation to the `gbm sync --force` because it is destructive.
     * give list of what will be destroyed
 - [x] make sure `gbm add xxxxxx` when performed in a worktree will create the new worktree in ./worktree/xxxx and not in the current worktree dir (like native wt add)
+- [x] add a base branch argument to `gbm add` so it acts like `git worktree add` command
+    * if no base branch is supplied, use the default branch.
 - [ ] add `gbm hotfix` or `gbm hf`
 - [ ] add `gbm mergeback` or `gbm mb`
 - [ ] ai plugin for:
@@ -102,10 +104,8 @@ ERROR: Error: exit status 1
     * .gbm/drift_tracker_timestamp
 - [ ] make --fetch the default for `gbm  sync`
   Summary:
-
   - gbm sync = "Sync worktrees with the branch versions I currently have locally"
   - gbm sync --fetch = "First get the latest from remote, then sync worktrees with those updated versions"
-
   The --fetch flag ensures you're always working with the most current version of your branches, which is
   especially important in collaborative environments where branches are frequently updated.
 
