@@ -488,6 +488,14 @@ func (m *Manager) GetCurrentWorktree() string {
 	return m.config.State.CurrentWorktree
 }
 
+func (m *Manager) GetConfig() *Config {
+	return m.config
+}
+
+func (m *Manager) SaveConfig() error {
+	return m.config.Save(m.gbmDir)
+}
+
 func (m *Manager) GetSortedWorktreeNames(worktrees map[string]*WorktreeListInfo) []string {
 	var trackedNames []string
 	var adHocNames []string

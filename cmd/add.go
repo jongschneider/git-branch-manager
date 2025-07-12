@@ -47,10 +47,10 @@ var addCmd = &cobra.Command{
 				branchName = args[1]
 			} else if newBranch {
 				// Generate branch name from worktree name
-				branchName = generateBranchName(worktreeName)
+				branchName = generateBranchName(worktreeName, manager)
 			} else if internal.IsJiraKey(worktreeName) {
 				// Auto-suggest branch name for JIRA keys
-				suggestedBranch := generateBranchName(worktreeName)
+				suggestedBranch := generateBranchName(worktreeName, manager)
 				return fmt.Errorf("branch name required. Suggested: %s\n\nTry: gbm add %s %s -b", suggestedBranch, worktreeName, suggestedBranch)
 			} else {
 				return fmt.Errorf("branch name required when not creating new branch (use -b to create new branch)")
@@ -109,10 +109,10 @@ func handleInteractive(manager *internal.Manager) (string, error) {
 	}
 }
 
-func generateBranchName(worktreeName string) string {
+func generateBranchName(worktreeName string, manager *internal.Manager) string {
 	// Check if this is a JIRA key first
 	if internal.IsJiraKey(worktreeName) {
-		branchName, err := internal.GenerateBranchFromJira(worktreeName)
+		branchName, err := internal.GenerateBranchFromJira(worktreeName, manager)
 		if err != nil {
 			PrintVerbose("Failed to generate branch name from JIRA issue %s: %v", worktreeName, err)
 			PrintInfo("Could not fetch JIRA issue details. Using default branch name format.")
@@ -147,8 +147,14 @@ func init() {
 	// Add JIRA key completions for the first positional argument
 	addCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
+			// Try to get config for JIRA completion, but don't fail if it's not available
+			manager, err := createInitializedManager()
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+
 			// Complete JIRA keys with summaries for context
-			jiraIssues, err := internal.GetJiraIssues()
+			jiraIssues, err := internal.GetJiraIssues(manager)
 			if err != nil {
 				// If JIRA CLI is not available, fall back to no completions
 				return nil, cobra.ShellCompDirectiveNoFileComp
@@ -165,7 +171,15 @@ func init() {
 			// Complete branch name based on the JIRA key
 			worktreeName := args[0]
 			if internal.IsJiraKey(worktreeName) {
-				branchName, err := internal.GenerateBranchFromJira(worktreeName)
+				// Try to get config for JIRA completion
+				manager, err := createInitializedManager()
+				if err != nil {
+					// Fallback to default branch name generation
+					branchName := fmt.Sprintf("feature/%s", strings.ToLower(worktreeName))
+					return []string{branchName}, cobra.ShellCompDirectiveNoFileComp
+				}
+
+				branchName, err := internal.GenerateBranchFromJira(worktreeName, manager)
 				if err != nil {
 					// Fallback to default branch name generation
 					branchName = fmt.Sprintf("feature/%s", strings.ToLower(worktreeName))

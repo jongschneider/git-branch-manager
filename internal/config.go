@@ -14,6 +14,7 @@ type Config struct {
 	Settings ConfigSettings `toml:"settings"`
 	State    ConfigState    `toml:"state"`
 	Icons    ConfigIcons    `toml:"icons"`
+	Jira     ConfigJira     `toml:"jira"`
 }
 
 type ConfigSettings struct {
@@ -49,6 +50,10 @@ type ConfigIcons struct {
 	GitBehind   string `toml:"git_behind"`
 	GitDiverged string `toml:"git_diverged"`
 	GitUnknown  string `toml:"git_unknown"`
+}
+
+type ConfigJira struct {
+	Me string `toml:"me"`
 }
 
 // YAML-based configuration structures
@@ -95,6 +100,9 @@ func DefaultConfig() *Config {
 			GitBehind:   "↓",
 			GitDiverged: "⇕",
 			GitUnknown:  "?",
+		},
+		Jira: ConfigJira{
+			Me: "", // Will be populated when first used
 		},
 	}
 }

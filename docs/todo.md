@@ -78,7 +78,7 @@ ERROR: Error: exit status 1
     - [ ] helper to create a merge worktree
 - [ ] add carapace completion
 - [ ] control branch name JIRA through config file (use current as defaults)
-- [ ] add jira me to config.toml
+- [x] add jira me to config.toml
 - [ ] replace confirmation with bubbltea confirmation (lipgloss?)
 - [ ] add `theme` verb with default themes
 - [ ] support `JIRA_CONFIG_FILE` env var (see https://github.com/ankitpokhrel/jira-cli?tab=readme-ov-file#multiple-projects)

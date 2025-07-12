@@ -21,15 +21,41 @@ func IsJiraKey(s string) bool {
 	return matched
 }
 
-// GetJiraKeys fetches all JIRA issue keys for the current user
-func GetJiraKeys() ([]string, error) {
-	// Get current user first
+// getJiraUser gets the current JIRA user, using cached value if available
+func getJiraUser(manager *Manager) (string, error) {
+	config := manager.GetConfig()
+
+	// If we have a cached value, use it
+	if config.Jira.Me != "" {
+		return config.Jira.Me, nil
+	}
+
+	// Otherwise, fetch it from jira CLI and cache it
 	meCmd := exec.Command("jira", "me")
 	userOutput, err := meCmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current JIRA user: %w", err)
+		return "", fmt.Errorf("failed to get current JIRA user: %w", err)
 	}
 	user := strings.TrimSpace(string(userOutput))
+
+	// Cache the result
+	config.Jira.Me = user
+
+	// Save the updated config
+	if saveErr := manager.SaveConfig(); saveErr != nil {
+		// Log warning but don't fail the operation
+		fmt.Printf("Warning: failed to save JIRA user to config: %v\n", saveErr)
+	}
+
+	return user, nil
+}
+
+// GetJiraKeys fetches all JIRA issue keys for the current user
+func GetJiraKeys(manager *Manager) ([]string, error) {
+	user, err := getJiraUser(manager)
+	if err != nil {
+		return nil, err
+	}
 
 	// Now list issues for the user
 	cmd := exec.Command("jira", "issue", "list", "-a"+user, "--plain")
@@ -57,14 +83,11 @@ func GetJiraKeys() ([]string, error) {
 }
 
 // GetJiraIssues fetches all JIRA issues for the current user with full details
-func GetJiraIssues() ([]JiraIssue, error) {
-	// Get current user first
-	meCmd := exec.Command("jira", "me")
-	userOutput, err := meCmd.Output()
+func GetJiraIssues(manager *Manager) ([]JiraIssue, error) {
+	user, err := getJiraUser(manager)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current JIRA user: %w", err)
+		return nil, err
 	}
-	user := strings.TrimSpace(string(userOutput))
 
 	// Now list issues for the user
 	cmd := exec.Command("jira", "issue", "list", "-a"+user, "--plain")
@@ -77,14 +100,11 @@ func GetJiraIssues() ([]JiraIssue, error) {
 }
 
 // GetJiraIssue fetches detailed information for a specific JIRA issue
-func GetJiraIssue(key string) (*JiraIssue, error) {
-	// Get current user first
-	meCmd := exec.Command("jira", "me")
-	userOutput, err := meCmd.Output()
+func GetJiraIssue(key string, manager *Manager) (*JiraIssue, error) {
+	user, err := getJiraUser(manager)
 	if err != nil {
-		return nil, fmt.Errorf("failed to get current JIRA user: %w", err)
+		return nil, err
 	}
-	user := strings.TrimSpace(string(userOutput))
 
 	// Get the issue from the list command
 	cmd := exec.Command("jira", "issue", "list", "-a"+user, "--plain")
@@ -215,8 +235,8 @@ func (j *JiraIssue) BranchName() string {
 }
 
 // GenerateBranchFromJira fetches a JIRA issue and generates a branch name
-func GenerateBranchFromJira(jiraKey string) (string, error) {
-	issue, err := GetJiraIssue(jiraKey)
+func GenerateBranchFromJira(jiraKey string, manager *Manager) (string, error) {
+	issue, err := GetJiraIssue(jiraKey, manager)
 	if err != nil {
 		return "", err
 	}
