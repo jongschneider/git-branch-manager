@@ -29,7 +29,7 @@ func TestSwitchCommand_BasicWorktreeSwitching(t *testing.T) {
 	}{
 		{
 			name:         "switch to main worktree",
-			worktreeName: "MAIN",
+			worktreeName: "main",
 		},
 		{
 			name:         "switch to dev worktree",
@@ -55,7 +55,7 @@ func TestSwitchCommand_BasicWorktreeSwitching(t *testing.T) {
 			})
 
 			require.NoError(t, err, "Switch command should succeed for %s", tt.worktreeName)
-			assert.Contains(t, output, "worktrees/"+strings.ToUpper(tt.worktreeName), "Output should contain correct worktree path")
+			assert.Contains(t, output, "worktrees/"+tt.worktreeName, "Output should contain correct worktree path")
 		})
 	}
 }
@@ -73,13 +73,13 @@ func TestSwitchCommand_PrintPathFlag(t *testing.T) {
 	}{
 		{
 			name:         "print path for main",
-			worktreeName: "MAIN",
-			expectedPath: filepath.Join(repoPath, "worktrees", "MAIN"),
+			worktreeName: "main",
+			expectedPath: filepath.Join(repoPath, "worktrees", "main"),
 		},
 		{
 			name:         "print path for dev",
 			worktreeName: "dev",
-			expectedPath: filepath.Join(repoPath, "worktrees", "DEV"),
+			expectedPath: filepath.Join(repoPath, "worktrees", "dev"),
 		},
 	}
 
@@ -116,14 +116,14 @@ func TestSwitchCommand_FuzzyMatching(t *testing.T) {
 		{
 			name:          "case insensitive match - dev",
 			input:         "dev",
-			expectedMatch: "DEV",
-			expectedPath:  filepath.Join(repoPath, "worktrees", "DEV"),
+			expectedMatch: "dev",
+			expectedPath:  filepath.Join(repoPath, "worktrees", "dev"),
 		},
 		{
 			name:          "case insensitive match - main",
 			input:         "main",
-			expectedMatch: "MAIN",
-			expectedPath:  filepath.Join(repoPath, "worktrees", "MAIN"),
+			expectedMatch: "main",
+			expectedPath:  filepath.Join(repoPath, "worktrees", "main"),
 		},
 		{
 			name:          "substring match - fea",
@@ -134,8 +134,8 @@ func TestSwitchCommand_FuzzyMatching(t *testing.T) {
 		{
 			name:          "prefix match preference - ma",
 			input:         "ma",
-			expectedMatch: "MAIN",
-			expectedPath:  filepath.Join(repoPath, "worktrees", "MAIN"),
+			expectedMatch: "main",
+			expectedPath:  filepath.Join(repoPath, "worktrees", "main"),
 		},
 		{
 			name:          "nonexistent worktree",
@@ -186,7 +186,7 @@ func TestSwitchCommand_ListWorktrees(t *testing.T) {
 	require.NoError(t, err, "List worktrees should succeed")
 
 	// Check that all expected worktrees are listed
-	expectedWorktrees := []string{"MAIN", "dev", "feat", "prod"}
+	expectedWorktrees := []string{"main", "dev", "feat", "prod"}
 	for _, worktree := range expectedWorktrees {
 		assert.Contains(t, output, worktree, "Should list worktree %s", worktree)
 	}
@@ -207,13 +207,13 @@ func TestSwitchCommand_PreviousWorktree(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err, "Initial switch to dev should succeed")
 
-	// Then switch to MAIN
+	// Then switch to main
 	cmd = rootCmd
-	cmd.SetArgs([]string{"switch", "MAIN"})
+	cmd.SetArgs([]string{"switch", "main"})
 	err = cmd.Execute()
-	require.NoError(t, err, "Switch to MAIN should succeed")
+	require.NoError(t, err, "Switch to main should succeed")
 
-	// Now switch back to previous (should be DEV) using --print-path to get the actual path
+	// Now switch back to previous (should be dev) using --print-path to get the actual path
 	cmd = rootCmd
 	cmd.SetArgs([]string{"switch", "--print-path", "-"})
 
@@ -222,7 +222,7 @@ func TestSwitchCommand_PreviousWorktree(t *testing.T) {
 	})
 
 	require.NoError(t, err, "Switch to previous worktree should succeed")
-	assert.Contains(t, output, "worktrees/DEV", "Should return path to dev worktree")
+	assert.Contains(t, output, "worktrees/dev", "Should return path to dev worktree")
 }
 
 func TestSwitchCommand_NoPreviousWorktree(t *testing.T) {

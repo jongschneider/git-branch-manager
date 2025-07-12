@@ -59,8 +59,6 @@ Examples:
 			}
 			PrintInfo("Switching to previous worktree: %s", previous)
 			worktreeName = previous
-		} else {
-			worktreeName = strings.ToUpper(worktreeName)
 		}
 
 		return switchToWorktree(manager, worktreeName)

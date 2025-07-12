@@ -43,7 +43,7 @@ func TestCloneCommand_Basic(t *testing.T) {
 	assert.DirExists(t, repoPath)
 	assert.DirExists(t, filepath.Join(repoPath, ".git"))
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees"))
-	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
+	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
 	assert.FileExists(t, filepath.Join(repoPath, ".gbm.config.yaml"))
 
 	config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
@@ -168,12 +168,12 @@ func TestCloneCommand_DifferentDefaultBranches(t *testing.T) {
 			repoName := sourceRepo.GetRepoName()
 			repoPath := filepath.Join(targetDir, repoName)
 
-			assert.DirExists(t, filepath.Join(repoPath, "worktrees", "MAIN"))
+			assert.DirExists(t, filepath.Join(repoPath, "worktrees", tt.defaultBranch))
 
 			config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
 			expected := &internal.GBMConfig{
 				Worktrees: map[string]internal.WorktreeConfig{
-					"main": {
+					tt.defaultBranch: {
 						Branch:      tt.defaultBranch,
 						Description: "Main production branch",
 					},
@@ -205,7 +205,7 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 	expectedDirs := []string{
 		".git",
 		"worktrees",
-		"worktrees/MAIN",
+		"worktrees/main",
 	}
 
 	for _, dir := range expectedDirs {
@@ -214,7 +214,7 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 
 	expectedFiles := []string{
 		".gbm.config.yaml",
-		"worktrees/MAIN/README.md",
+		"worktrees/main/README.md",
 	}
 
 	for _, file := range expectedFiles {

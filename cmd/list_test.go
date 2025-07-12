@@ -89,9 +89,9 @@ func TestListCommand_EmptyRepository(t *testing.T) {
 
 func TestListCommand_WithGBMConfigWorktrees(t *testing.T) {
 	repo := testutils.NewGBMConfigRepo(t, map[string]string{
-		"MAIN": "main",
-		"DEV":  "develop",
-		"FEAT": "feature/auth",
+		"main": "main",
+		"dev":  "develop",
+		"feat": "feature/auth",
 	})
 
 	originalDir, _ := os.Getwd()
@@ -145,12 +145,12 @@ func TestListCommand_UntrackedWorktrees(t *testing.T) {
 	// Should have exactly 2 worktrees
 	assert.Len(t, rows, 2)
 
-	// Verify MAIN worktree
-	mainWorktree, found := findWorktreeInRows(rows, "MAIN")
-	require.True(t, found, "MAIN worktree should be present")
+	// Verify main worktree
+	mainWorktree, found := findWorktreeInRows(rows, "main")
+	require.True(t, found, "main worktree should be present")
 	assert.Equal(t, "main", mainWorktree.Branch)
-	// When cloning without .gbm.config.yaml, MAIN worktree starts as UNTRACKED until config is properly set up
-	assert.Contains(t, mainWorktree.SyncStatus, "UNTRACKED")
+	// With the improved clone command, main worktree is now properly tracked in config
+	assert.Contains(t, mainWorktree.SyncStatus, "IN_SYNC")
 
 	// Verify UNTRACKED worktree
 	untrackedWorktree, found := findWorktreeInRows(rows, "UNTRACKED")
@@ -162,7 +162,7 @@ func TestListCommand_UntrackedWorktrees(t *testing.T) {
 func TestListCommand_OrphanedWorktrees(t *testing.T) {
 	// Create a repository with branches
 	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
-		"MAIN": "main",
+		"main": "main",
 		"DEV":  "develop",
 	})
 
@@ -170,7 +170,7 @@ func TestListCommand_OrphanedWorktrees(t *testing.T) {
 	setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Remove DEV from .gbm.config.yaml to make it orphaned
-	err := os.WriteFile(".gbm.config.yaml", []byte("worktrees:\n  MAIN:\n    branch: main\n"), 0644)
+	err := os.WriteFile(".gbm.config.yaml", []byte("worktrees:\n  main:\n    branch: main\n"), 0644)
 	require.NoError(t, err)
 
 	// Now test the list command
@@ -193,8 +193,8 @@ func TestListCommand_OrphanedWorktrees(t *testing.T) {
 	assert.Len(t, rows, 2)
 
 	// Verify MAIN worktree (should be in sync)
-	mainWorktree, found := findWorktreeInRows(rows, "MAIN")
-	require.True(t, found, "MAIN worktree should be present")
+	mainWorktree, found := findWorktreeInRows(rows, "main")
+	require.True(t, found, "main worktree should be present")
 	assert.Equal(t, "main", mainWorktree.Branch)
 	assert.Contains(t, mainWorktree.SyncStatus, "IN_SYNC")
 
@@ -212,8 +212,8 @@ func TestListCommand_GitStatus(t *testing.T) {
 	// Clone the repository (no sync needed since NewMultiBranchRepo doesn't have .gbm.config.yaml)
 	repoPath := setupClonedRepo(t, sourceRepo)
 
-	// Create a file in the MAIN worktree to create git status
-	mainWorktreePath := filepath.Join(repoPath, "worktrees", "MAIN")
+	// Create a file in the main worktree to create git status
+	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
 	err := os.WriteFile(filepath.Join(mainWorktreePath, "test.txt"), []byte("test content"), 0644)
 	require.NoError(t, err)
 
@@ -233,12 +233,12 @@ func TestListCommand_GitStatus(t *testing.T) {
 	rows, err := parseListOutput(outputStr)
 	require.NoError(t, err)
 
-	// Should have exactly 1 worktree (MAIN)
+	// Should have exactly 1 worktree (main)
 	assert.Len(t, rows, 1)
 
-	// Verify MAIN worktree
-	mainWorktree, found := findWorktreeInRows(rows, "MAIN")
-	require.True(t, found, "MAIN worktree should be present")
+	// Verify main worktree
+	mainWorktree, found := findWorktreeInRows(rows, "main")
+	require.True(t, found, "main worktree should be present")
 	assert.Equal(t, "main", mainWorktree.Branch)
 	// Should have some git status indication (the exact symbol may vary)
 	assert.NotEmpty(t, mainWorktree.GitStatus, "Git status should not be empty")
@@ -247,7 +247,7 @@ func TestListCommand_GitStatus(t *testing.T) {
 func TestListCommand_ExpectedBranchDisplay(t *testing.T) {
 	// Create a repository with branches
 	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
-		"MAIN": "main",
+		"main": "main",
 		"DEV":  "develop",
 	})
 
@@ -287,9 +287,9 @@ func TestListCommand_ExpectedBranchDisplay(t *testing.T) {
 	// Should have exactly 2 worktrees
 	assert.Len(t, rows, 2)
 
-	// Verify MAIN worktree (should show just "main")
-	mainWorktree, found := findWorktreeInRows(rows, "MAIN")
-	require.True(t, found, "MAIN worktree should be present")
+	// Verify main worktree (should show just "main")
+	mainWorktree, found := findWorktreeInRows(rows, "main")
+	require.True(t, found, "main worktree should be present")
 	assert.Equal(t, "main", mainWorktree.Branch)
 
 	// Verify DEV worktree (should show "feature/auth (expected: develop)")
@@ -301,9 +301,9 @@ func TestListCommand_ExpectedBranchDisplay(t *testing.T) {
 func TestListCommand_SortedOutput(t *testing.T) {
 	// Create a repository with branches
 	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
-		"MAIN": "main",
-		"DEV":  "develop",
-		"FEAT": "feature/auth",
+		"main": "main",
+		"dev":  "develop",
+		"feat": "feature/auth",
 	})
 
 	// Clone the repository and sync worktrees
@@ -311,7 +311,7 @@ func TestListCommand_SortedOutput(t *testing.T) {
 
 	// Create an additional ad-hoc worktree to test sorting
 	addCmd := rootCmd
-	addCmd.SetArgs([]string{"add", "--new-branch", "ADHOC", "production/v1.0"})
+	addCmd.SetArgs([]string{"add", "--new-branch", "adhoc", "production/v1.0"})
 	err := addCmd.Execute()
 	require.NoError(t, err)
 
@@ -335,23 +335,23 @@ func TestListCommand_SortedOutput(t *testing.T) {
 	assert.Len(t, rows, 4)
 
 	// Verify all expected worktrees are present
-	mainWorktree, found := findWorktreeInRows(rows, "MAIN")
-	require.True(t, found, "MAIN worktree should be present")
+	mainWorktree, found := findWorktreeInRows(rows, "main")
+	require.True(t, found, "main worktree should be present")
 	assert.Equal(t, "main", mainWorktree.Branch)
 
-	devWorktree, found := findWorktreeInRows(rows, "DEV")
-	require.True(t, found, "DEV worktree should be present")
+	devWorktree, found := findWorktreeInRows(rows, "dev")
+	require.True(t, found, "dev worktree should be present")
 	assert.Equal(t, "develop", devWorktree.Branch)
 
-	featWorktree, found := findWorktreeInRows(rows, "FEAT")
-	require.True(t, found, "FEAT worktree should be present")
+	featWorktree, found := findWorktreeInRows(rows, "feat")
+	require.True(t, found, "feat worktree should be present")
 	assert.Equal(t, "feature/auth", featWorktree.Branch)
 
-	adhocWorktree, found := findWorktreeInRows(rows, "ADHOC")
-	require.True(t, found, "ADHOC worktree should be present")
+	adhocWorktree, found := findWorktreeInRows(rows, "adhoc")
+	require.True(t, found, "adhoc worktree should be present")
 	assert.Equal(t, "production/v1.0", adhocWorktree.Branch)
 
-	// Verify sorting: .gbm.config.yaml worktrees (MAIN, DEV, FEAT) should come before ad-hoc (ADHOC)
+	// Verify sorting: .gbm.config.yaml worktrees (main, dev, feat) should come before ad-hoc (adhoc)
 	// The order in the rows slice should reflect the display order
 	worktreeNames := make([]string, len(rows))
 	for i, row := range rows {
@@ -365,25 +365,25 @@ func TestListCommand_SortedOutput(t *testing.T) {
 	adhocPos := -1
 	for i, name := range worktreeNames {
 		switch name {
-		case "MAIN":
+		case "main":
 			mainPos = i
-		case "DEV":
+		case "dev":
 			devPos = i
-		case "FEAT":
+		case "feat":
 			featPos = i
-		case "ADHOC":
+		case "adhoc":
 			adhocPos = i
 		}
 	}
 
 	// .gbm.config.yaml worktrees should come before ad-hoc worktrees
-	assert.True(t, mainPos < adhocPos, "MAIN should come before ADHOC")
-	assert.True(t, devPos < adhocPos, "DEV should come before ADHOC")
-	assert.True(t, featPos < adhocPos, "FEAT should come before ADHOC")
+	assert.True(t, mainPos < adhocPos, "main should come before adhoc")
+	assert.True(t, devPos < adhocPos, "dev should come before adhoc")
+	assert.True(t, featPos < adhocPos, "feat should come before adhoc")
 
 	// Verify the exact order of worktrees as they appear in the output
 	// Tracked worktrees should be sorted alphabetically, followed by ad-hoc worktrees
-	expectedOrder := []string{"DEV", "FEAT", "MAIN", "ADHOC"}
+	expectedOrder := []string{"dev", "feat", "main", "adhoc"}
 	actualOrder := worktreeNames
 	assert.Equal(t, expectedOrder, actualOrder, "Worktrees should be in the expected sorted order")
 }

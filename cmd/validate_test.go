@@ -208,13 +208,13 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 			name:      "non-existent branches",
 			setupRepo: testutils.NewBasicRepo,
 			gbmMapping: map[string]string{
-				"MAIN":    "main",
+				"main":    "main",
 				"missing": "does-not-exist",
 				"invalid": "also-missing",
 			},
 			shouldPass: false,
 			expectedResults: map[string]string{
-				"MAIN":    "VALID",
+				"main":    "VALID",
 				"missing": "NOT FOUND",
 				"invalid": "NOT FOUND",
 			},
@@ -223,13 +223,13 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 			name:      "branches with special characters/slashes",
 			setupRepo: testutils.NewMultiBranchRepo,
 			gbmMapping: map[string]string{
-				"MAIN":    "main",
+				"main":    "main",
 				"feature": "feature/auth",
 				"release": "production/v1.0",
 			},
 			shouldPass: true,
 			expectedResults: map[string]string{
-				"MAIN":    "VALID",
+				"main":    "VALID",
 				"feature": "VALID",
 				"release": "VALID",
 			},

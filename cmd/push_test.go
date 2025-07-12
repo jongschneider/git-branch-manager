@@ -184,7 +184,7 @@ func TestPushCommand_AllWorktrees(t *testing.T) {
 	initialFeatHash := getRemoteCommitHash(t, sourceRepo, "feature/auth")
 
 	// Make local changes in multiple worktrees
-	mainWorktreePath := filepath.Join(repoPath, "worktrees", "MAIN")
+	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
 
@@ -211,7 +211,7 @@ func TestPushCommand_AllWorktrees(t *testing.T) {
 	newDevHash := getRemoteCommitHash(t, sourceRepo, "develop")
 	newFeatHash := getRemoteCommitHash(t, sourceRepo, "feature/auth")
 
-	assert.NotEqual(t, initialMainHash, newMainHash, "MAIN remote commit hash should change")
+	assert.NotEqual(t, initialMainHash, newMainHash, "main remote commit hash should change")
 	assert.NotEqual(t, initialDevHash, newDevHash, "DEV remote commit hash should change")
 	assert.NotEqual(t, initialFeatHash, newFeatHash, "FEAT remote commit hash should change")
 }

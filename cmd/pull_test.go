@@ -132,7 +132,7 @@ func TestPullCommand_AllWorktrees(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// Get initial commit hashes for all worktrees
-	mainWorktreePath := filepath.Join(repoPath, "worktrees", "MAIN")
+	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
 	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
 
@@ -164,7 +164,7 @@ func TestPullCommand_AllWorktrees(t *testing.T) {
 	newDevHash := getCurrentCommitHash(t, devWorktreePath)
 	newFeatHash := getCurrentCommitHash(t, featWorktreePath)
 
-	assert.NotEqual(t, initialMainHash, newMainHash, "MAIN commit hash should change")
+	assert.NotEqual(t, initialMainHash, newMainHash, "main commit hash should change")
 	assert.NotEqual(t, initialDevHash, newDevHash, "dev commit hash should change")
 	assert.NotEqual(t, initialFeatHash, newFeatHash, "feat commit hash should change")
 }

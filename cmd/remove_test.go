@@ -187,12 +187,12 @@ func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
 	// Stay in repo root
 	os.Chdir(repoPath)
 
-	// Create uncommitted changes in MAIN worktree
+	// Create uncommitted changes in main worktree
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
 	createUncommittedChanges(t, mainWorktreePath)
 
 	// Verify worktree has uncommitted changes
-	assert.True(t, hasUncommittedChanges(t, mainWorktreePath), "MAIN worktree should have uncommitted changes")
+	assert.True(t, hasUncommittedChanges(t, mainWorktreePath), "main worktree should have uncommitted changes")
 
 	// Try to remove without force flag
 	cmd := rootCmd
@@ -204,7 +204,7 @@ func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
 	assert.Contains(t, err.Error(), "Use --force to remove anyway", "Error should suggest using --force")
 
 	// Verify worktree still exists
-	verifyWorktreeExists(t, repoPath, "MAIN")
+	verifyWorktreeExists(t, repoPath, "main")
 }
 
 func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
@@ -329,7 +329,7 @@ func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// Verify worktree exists before attempted removal
-	verifyWorktreeExists(t, repoPath, "MAIN")
+	verifyWorktreeExists(t, repoPath, "main")
 
 	// Remove worktree with user declining confirmation (simulate "n" input)
 	err := simulateUserInput("n", func() error {
@@ -341,7 +341,7 @@ func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
 	require.NoError(t, err, "Remove should complete without error when user declines")
 
 	// Verify worktree still exists
-	verifyWorktreeExists(t, repoPath, "MAIN")
+	verifyWorktreeExists(t, repoPath, "main")
 }
 
 func TestRemoveCommand_UserDeclinesWithEmptyInput(t *testing.T) {
@@ -418,7 +418,7 @@ func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// First, verify all expected worktrees exist
-	verifyWorktreeExists(t, repoPath, "MAIN")
+	verifyWorktreeExists(t, repoPath, "main")
 	verifyWorktreeExists(t, repoPath, "dev")
 	verifyWorktreeExists(t, repoPath, "feat")
 	verifyWorktreeExists(t, repoPath, "prod")
@@ -453,7 +453,7 @@ func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
 	}
 
 	// Verify other worktrees still exist
-	verifyWorktreeExists(t, repoPath, "MAIN")
+	verifyWorktreeExists(t, repoPath, "main")
 	verifyWorktreeExists(t, repoPath, "feat")
 	verifyWorktreeExists(t, repoPath, "prod")
 }
@@ -470,7 +470,7 @@ func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
 	// Stay in repo root
 	os.Chdir(repoPath)
 
-	// Add some files to the MAIN worktree
+	// Add some files to the main worktree
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
 	testFile := filepath.Join(mainWorktreePath, "test_file.txt")
 	err := os.WriteFile(testFile, []byte("test content"), 0644)

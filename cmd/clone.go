@@ -174,8 +174,9 @@ func createMainWorktree(defaultBranch string) error {
 		return fmt.Errorf("failed to create worktrees directory: %w", err)
 	}
 
-	// Create the main worktree
-	cmd := exec.Command("git", "worktree", "add", "worktrees/MAIN", defaultBranch)
+	// Create the main worktree using the default branch name as the worktree name
+	worktreeName := defaultBranch
+	cmd := exec.Command("git", "worktree", "add", filepath.Join("worktrees", worktreeName), defaultBranch)
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	if err := cmd.Run(); err != nil {
@@ -186,12 +187,12 @@ func createMainWorktree(defaultBranch string) error {
 }
 
 func setupGBMConfig(defaultBranch string) error {
-	worktreeConfigPath := filepath.Join("worktrees", "MAIN", ".gbm.config.yaml")
+	worktreeConfigPath := filepath.Join("worktrees", defaultBranch, ".gbm.config.yaml")
 	rootConfigPath := ".gbm.config.yaml"
 
-	// Check if .gbm.config.yaml exists in the MAIN worktree
+	// Check if .gbm.config.yaml exists in the default branch worktree
 	if _, err := os.Stat(worktreeConfigPath); err == nil {
-		PrintInfo("Found .gbm.config.yaml in MAIN worktree, copying to root...")
+		PrintInfo("Found .gbm.config.yaml in %s worktree, copying to root...", defaultBranch)
 		if err := copyFile(worktreeConfigPath, rootConfigPath); err != nil {
 			return fmt.Errorf("failed to copy .gbm.config.yaml from worktree: %w", err)
 		}
@@ -202,7 +203,7 @@ func setupGBMConfig(defaultBranch string) error {
 			// Don't overwrite existing .gbm.config.yaml from repository
 			return nil
 		} else if os.IsNotExist(err) {
-			PrintInfo("No .gbm.config.yaml found in MAIN worktree, creating new one...")
+			PrintInfo("No .gbm.config.yaml found in %s worktree, creating new one...", defaultBranch)
 			if err := createDefaultGBMConfig(rootConfigPath, defaultBranch); err != nil {
 				return fmt.Errorf("failed to create default .gbm.config.yaml: %w", err)
 			}
@@ -239,10 +240,10 @@ func createDefaultGBMConfig(path, defaultBranch string) error {
 # Worktree definitions - key is the worktree name, value defines the branch and merge strategy
 worktrees:
   # Primary worktree - no merge_into (root of merge chain)
-  main:
+  %s:
     branch: %s
     description: "Main production branch"
-`, defaultBranch)
+`, defaultBranch, defaultBranch)
 
 	return os.WriteFile(path, []byte(content), 0o644)
 }

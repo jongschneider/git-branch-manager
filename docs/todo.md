@@ -88,7 +88,7 @@ ERROR: Error: exit status 1
     * current behavior: input is normalized to uppercase, then fuzzy matched against actual config keys
     * this creates inconsistent behavior between direct matches (uppercase) and fuzzy matches (config case)
     * consider making the matching logic more intuitive and consistent
-- [ ] fix .gbm.config.yaml creation (clone.go) and make default branch not be MAIN, but what the default branch is called
+- [x] fix .gbm.config.yaml creation (clone.go) and make default branch not be MAIN, but what the default branch is called
     * don't enforce CAPS for worktree name
 - [x] add confirmation to the `gbm sync --force` because it is destructive.
     * give list of what will be destroyed
@@ -100,4 +100,13 @@ ERROR: Error: exit status 1
     * commit messages
 - [ ] consider a timestamp based approach for checking drift
     * .gbm/drift_tracker_timestamp
+- [ ] make --fetch the default for `gbm  sync`
+  Summary:
+
+  - gbm sync = "Sync worktrees with the branch versions I currently have locally"
+  - gbm sync --fetch = "First get the latest from remote, then sync worktrees with those updated versions"
+
+  The --fetch flag ensures you're always working with the most current version of your branches, which is
+  especially important in collaborative environments where branches are frequently updated.
+
 
