@@ -41,15 +41,15 @@ type BranchChange struct {
 type ConfirmationFunc func(message string) bool
 
 func NewManager(repoPath string) (*Manager, error) {
-	gitManager, err := NewGitManager(repoPath)
-	if err != nil {
-		return nil, err
-	}
-
 	gbmDir := filepath.Join(repoPath, ".gbm")
 	config, err := LoadConfig(gbmDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)
+	}
+
+	gitManager, err := NewGitManager(repoPath, config.Settings.WorktreePrefix)
+	if err != nil {
+		return nil, err
 	}
 
 	// Initialize the global icon manager with the loaded config

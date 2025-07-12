@@ -46,7 +46,7 @@ func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 		return nil, nil
 	}
 
-	gitManager, err := NewGitManager(gitRoot)
+	gitManager, err := NewGitManager(gitRoot, DefaultWorktreeDirname)
 	if err != nil {
 		return nil, nil
 	}

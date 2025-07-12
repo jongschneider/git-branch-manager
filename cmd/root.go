@@ -170,7 +170,7 @@ func createInitializedGitManager() (*internal.GitManager, error) {
 		return nil, fmt.Errorf("not in a git repository: %w", err)
 	}
 
-	gitManager, err := internal.NewGitManager(gitRoot)
+	gitManager, err := internal.NewGitManager(gitRoot, internal.DefaultWorktreeDirname)
 	if err != nil {
 		return nil, fmt.Errorf("failed to initialize git manager: %w", err)
 	}

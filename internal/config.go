@@ -10,6 +10,8 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
+const DefaultWorktreeDirname = "worktrees"
+
 type Config struct {
 	Settings ConfigSettings `toml:"settings"`
 	State    ConfigState    `toml:"state"`
@@ -80,7 +82,7 @@ type WorktreeConfig struct {
 func DefaultConfig() *Config {
 	return &Config{
 		Settings: ConfigSettings{
-			WorktreePrefix:        "worktrees",
+			WorktreePrefix:        DefaultWorktreeDirname,
 			AutoFetch:             true,
 			CreateMissingBranches: false,
 			MergeBackAlerts:       false, // Disabled by default

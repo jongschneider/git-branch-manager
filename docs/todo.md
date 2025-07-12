@@ -92,7 +92,7 @@ ERROR: Error: exit status 1
     * don't enforce CAPS for worktree name
 - [x] add confirmation to the `gbm sync --force` because it is destructive.
     * give list of what will be destroyed
-- [ ] make sure `gbm add xxxxxx` when performed in a worktree will create the new worktree in ./worktree/xxxx and not in the current worktree dir (like native wt add)
+- [x] make sure `gbm add xxxxxx` when performed in a worktree will create the new worktree in ./worktree/xxxx and not in the current worktree dir (like native wt add)
 - [ ] add `gbm hotfix` or `gbm hf`
 - [ ] add `gbm mergeback` or `gbm mb`
 - [ ] ai plugin for:

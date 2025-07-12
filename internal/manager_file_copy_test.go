@@ -20,7 +20,7 @@ func TestCopyFilesToWorktree_AdHocOnly(t *testing.T) {
 		repoPath: tmpDir,
 		config: &Config{
 			Settings: ConfigSettings{
-				WorktreePrefix: "worktrees",
+				WorktreePrefix: DefaultWorktreeDirname,
 			},
 			FileCopy: ConfigFileCopy{
 				Rules: []FileCopyRule{
@@ -84,7 +84,7 @@ func TestCopyFilesToWorktree_NoRules(t *testing.T) {
 		repoPath: tmpDir,
 		config: &Config{
 			Settings: ConfigSettings{
-				WorktreePrefix: "worktrees",
+				WorktreePrefix: DefaultWorktreeDirname,
 			},
 			FileCopy: ConfigFileCopy{
 				Rules: []FileCopyRule{},
@@ -106,7 +106,7 @@ func TestCopyFilesToWorktree_SourceNotExists(t *testing.T) {
 		repoPath: tmpDir,
 		config: &Config{
 			Settings: ConfigSettings{
-				WorktreePrefix: "worktrees",
+				WorktreePrefix: DefaultWorktreeDirname,
 			},
 			FileCopy: ConfigFileCopy{
 				Rules: []FileCopyRule{
@@ -138,7 +138,7 @@ func TestAddWorktree_TrackedWorktreeNoFileCopy(t *testing.T) {
 		repoPath: repoPath,
 		config: &Config{
 			Settings: ConfigSettings{
-				WorktreePrefix: "worktrees",
+				WorktreePrefix: DefaultWorktreeDirname,
 			},
 			FileCopy: ConfigFileCopy{
 				Rules: []FileCopyRule{
@@ -201,7 +201,7 @@ func TestAddWorktree_AdHocWorktreeFileCopy(t *testing.T) {
 		repoPath: repoPath,
 		config: &Config{
 			Settings: ConfigSettings{
-				WorktreePrefix: "worktrees",
+				WorktreePrefix: DefaultWorktreeDirname,
 			},
 			FileCopy: ConfigFileCopy{
 				Rules: []FileCopyRule{

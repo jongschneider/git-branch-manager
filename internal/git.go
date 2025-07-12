@@ -14,8 +14,9 @@ import (
 )
 
 type GitManager struct {
-	repo     *git.Repository
-	repoPath string
+	repo           *git.Repository
+	repoPath       string
+	worktreePrefix string
 }
 
 type WorktreeInfo struct {
@@ -199,15 +200,16 @@ func FindGitRoot(startPath string) (string, error) {
 	return "", fmt.Errorf("not in a git repository and no git repositories found in subdirectories")
 }
 
-func NewGitManager(repoPath string) (*GitManager, error) {
+func NewGitManager(repoPath string, worktreePrefix string) (*GitManager, error) {
 	repo, err := git.PlainOpen(repoPath)
 	if err != nil {
 		return nil, fmt.Errorf("not a git repository: %w", err)
 	}
 
 	return &GitManager{
-		repo:     repo,
-		repoPath: repoPath,
+		repo:           repo,
+		repoPath:       repoPath,
+		worktreePrefix: worktreePrefix,
 	}, nil
 }
 
@@ -477,7 +479,7 @@ func (gm *GitManager) CreateBranch(branchName, baseBranch string) error {
 }
 
 func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch bool) error {
-	worktreeDir := filepath.Join(gm.repoPath, "worktrees")
+	worktreeDir := filepath.Join(gm.repoPath, gm.worktreePrefix)
 	worktreePath := filepath.Join(worktreeDir, worktreeName)
 
 	// Check if worktree already exists
