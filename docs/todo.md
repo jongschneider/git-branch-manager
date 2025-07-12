@@ -64,22 +64,24 @@ ERROR: Error: exit status 1
 - [x] support `gbm switch -` to go to previous worktree
 - [x] sort branches by .envrc first, then worktree createdAt DESC
 - [x] add info verb (see info_prd.md and info_ascii_mockup.md)
+- [x] jira-cli support
+- [x] combine list and status. they do the same thing.
+    - [x] use `list` and remove `status`
+    - [x] columns should be WORKTREE | BRANCH | GIT STATUS | SYNC STATUS | PATH (if not enough room in terminal, omit PATH)
+- [x] make output adaptive layout.
+    - [x] responsive table design for gbm list - hides PATH column when terminal is narrow (< 100 chars)
+- [x] remove the `clean` verb
+- [x] make .gbm.config.yaml tests actually use yaml for validation instead of string contains.
+- [x] what's the point of TestCloneCommand_EmptyRepository?
 - [ ] configuration for copying files into new worktrees (.env, anything not tracked by git)
 - [ ] track merge backs... not sure how yet and how to prompt the user.
     - [ ] helper to create a merge worktree
 - [ ] add carapace completion
-- [x] jira-cli support
 - [ ] control branch name JIRA through config file (use current as defaults)
 - [ ] add jira me to config.toml
 - [ ] replace confirmation with bubbltea confirmation (lipgloss?)
-- [x] combine list and status. they do the same thing.
-    - [x] use `list` and remove `status`
-    - [x] columns should be WORKTREE | BRANCH | GIT STATUS | SYNC STATUS | PATH (if not enough room in terminal, omit PATH)
 - [ ] add `theme` verb with default themes
-- [ ] support `JIRA_CONFIG_FILE` env var ( see https://github.com/ankitpokhrel/jira-cli?tab=readme-ov-file#multiple-projects)
-- [x] make output adaptive layout.
-    - [x] responsive table design for gbm list - hides PATH column when terminal is narrow (< 100 chars)
-- [x] remove the `clean` verb
+- [ ] support `JIRA_CONFIG_FILE` env var (see https://github.com/ankitpokhrel/jira-cli?tab=readme-ov-file#multiple-projects)
 - [ ] add hooks (for automating tasked before/after a command is run)
     * example: after `gbm add` copy `.env` file from MAIN
 - [ ] review and improve fuzzy matching logic in switch command
@@ -88,7 +90,14 @@ ERROR: Error: exit status 1
     * consider making the matching logic more intuitive and consistent
 - [ ] fix .gbm.config.yaml creation (clone.go) and make default branch not be MAIN, but what the default branch is called
     * don't enforce CAPS for worktree name
-- [x] make .gbm.config.yaml tests actually use yaml for validation instead of string contains.
-- [x] what's the point of TestCloneCommand_EmptyRepository?
-- [ ] add confirmation to the `gbm sync --force` because it is destructive.
+- [x] add confirmation to the `gbm sync --force` because it is destructive.
     * give list of what will be destroyed
+- [ ] make sure `gbm add xxxxxx` when performed in a worktree will create the new worktree in ./worktree/xxxx and not in the current worktree dir (like native wt add)
+- [ ] add `gbm hotfix` or `gbm hf`
+- [ ] add `gbm mergeback` or `gbm mb`
+- [ ] ai plugin for:
+    * merge conflict resolution
+    * commit messages
+- [ ] consider a timestamp based approach for checking drift
+    * .gbm/drift_tracker_timestamp
+

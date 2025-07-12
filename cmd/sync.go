@@ -1,6 +1,9 @@
 package cmd
 
 import (
+	"fmt"
+	"strings"
+
 	"gbm/internal"
 
 	"github.com/spf13/cobra"
@@ -66,7 +69,20 @@ if branch references have changed, and optionally removes orphaned worktrees.`,
 		}
 
 		PrintVerbose("Synchronizing worktrees (force=%v, fetch=%v)", syncForce, syncFetch)
-		if err := manager.Sync(syncDryRun, syncForce, syncFetch); err != nil {
+
+		// Create confirmation function for destructive operations
+		// Only prompt when force is used (to confirm destructive actions)
+		var confirmFunc internal.ConfirmationFunc
+		if syncForce {
+			confirmFunc = func(message string) bool {
+				fmt.Print(message + " [y/N]: ")
+				var response string
+				fmt.Scanln(&response)
+				return strings.ToLower(response) == "y" || strings.ToLower(response) == "yes"
+			}
+		}
+
+		if err := manager.SyncWithConfirmation(syncDryRun, syncForce, syncFetch, confirmFunc); err != nil {
 			return err
 		}
 

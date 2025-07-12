@@ -123,7 +123,7 @@ func TestSyncCommand_Flags(t *testing.T) {
 			},
 		},
 		{
-			name: "force flag removes orphaned worktrees",
+			name: "force flag removes orphaned worktrees with confirmation",
 			args: []string{"sync", "--force"},
 			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
 				// Create untracked worktree
@@ -139,14 +139,10 @@ func TestSyncCommand_Flags(t *testing.T) {
 				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
 			},
 			validate: func(t *testing.T, repoPath string, output string, err error) {
-				require.NoError(t, err)
-				// main should still exist (still in .gbm.config.yaml)
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
-				// Orphaned worktrees should be removed by --force
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "feat"))
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "prod"))
-				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "orphan"))
+				// This test should fail because confirmation is required
+				// We need to use the manager directly with mock confirmation instead
+				require.Error(t, err)
+				assert.ErrorContains(t, err, "sync cancelled by user")
 			},
 		},
 		{
@@ -473,13 +469,38 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 
 			// Run the sync command with specified args
 			var buf bytes.Buffer
-			cmd := rootCmd
-			cmd.SetArgs(tt.syncArgs)
-			cmd.SetOut(&buf)
-			cmd.SetErr(&buf)
+			var err error
+			var output string
 
-			err := cmd.Execute()
-			output := buf.String()
+			// Check if this test uses --force and needs confirmation
+			usesForce := false
+			for _, arg := range tt.syncArgs {
+				if arg == "--force" {
+					usesForce = true
+					break
+				}
+			}
+
+			if usesForce {
+				// Use simulateUserInput for tests that use --force
+				err = simulateUserInput("y", func() error {
+					cmd := rootCmd
+					cmd.SetArgs(tt.syncArgs)
+					cmd.SetOut(&buf)
+					cmd.SetErr(&buf)
+					return cmd.Execute()
+				})
+				output = buf.String()
+			} else {
+				// Standard execution for non-force tests
+				cmd := rootCmd
+				cmd.SetArgs(tt.syncArgs)
+				cmd.SetOut(&buf)
+				cmd.SetErr(&buf)
+				err = cmd.Execute()
+				output = buf.String()
+			}
+
 			require.NoError(t, err)
 
 			tt.validateResult(t, repoPath, output)
@@ -584,9 +605,12 @@ func TestSyncCommand_Integration(t *testing.T) {
 				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
 
 				// 3. Run sync with --force to remove orphaned worktrees and create new ones
-				cmd := rootCmd
-				cmd.SetArgs([]string{"sync", "--force"})
-				require.NoError(t, cmd.Execute())
+				err := simulateUserInput("y", func() error {
+					cmd := rootCmd
+					cmd.SetArgs([]string{"sync", "--force"})
+					return cmd.Execute()
+				})
+				require.NoError(t, err)
 			},
 			validate: func(t *testing.T, repoPath string) {
 				// Verify new worktrees exist
@@ -657,4 +681,139 @@ func createUntrackedWorktree(t *testing.T, repoPath, name, branch string) {
 	}
 	require.NoError(t, err, "Failed to create untracked worktree %s", name)
 }
+
+func TestSyncCommand_ForceConfirmationDirectManagerTest(t *testing.T) {
+	resetSyncFlags()
+
+	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+	repoPath := setupClonedRepo(t, sourceRepo)
+
+	// Create untracked worktree
+	createUntrackedWorktree(t, repoPath, "orphan", "main")
+
+	// Modify .gbm.config.yaml to remove some existing worktrees (making them orphaned)
+	gbmContent := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+`
+	require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
+
+	// Create manager
+	manager, err := createInitializedManagerStrict()
+	require.NoError(t, err)
+
+	// Create confirmation function that accepts
+	confirmFunc := func(message string) bool {
+		// Verify message contains what we expect
+		assert.Contains(t, message, "PERMANENTLY DELETED")
+		return true // Confirm deletion
+	}
+
+	// Test sync with force and confirmation
+	err = manager.SyncWithConfirmation(false, true, false, confirmFunc)
+	require.NoError(t, err)
+
+	// Verify orphaned worktrees were removed
+	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
+	assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
+	assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "feat"))
+	assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "prod"))
+	assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "orphan"))
+}
+
+func TestSyncCommand_ForceConfirmation(t *testing.T) {
+	tests := []struct {
+		name           string
+		userResponse   string
+		expectedAction string
+		shouldSucceed  bool
+	}{
+		{
+			name:           "user confirms deletion with 'y'",
+			userResponse:   "y",
+			expectedAction: "delete orphaned worktrees",
+			shouldSucceed:  true,
+		},
+		{
+			name:           "user confirms deletion with 'yes'",
+			userResponse:   "yes",
+			expectedAction: "delete orphaned worktrees",
+			shouldSucceed:  true,
+		},
+		{
+			name:           "user cancels deletion with 'n'",
+			userResponse:   "n",
+			expectedAction: "cancel sync operation",
+			shouldSucceed:  false,
+		},
+		{
+			name:           "user cancels deletion with empty response",
+			userResponse:   "",
+			expectedAction: "cancel sync operation",
+			shouldSucceed:  false,
+		},
+		{
+			name:           "user cancels deletion with 'no'",
+			userResponse:   "no",
+			expectedAction: "cancel sync operation",
+			shouldSucceed:  false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			resetSyncFlags()
+
+			// Setup a repo with orphaned worktrees
+			sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+			repoPath := setupClonedRepo(t, sourceRepo)
+
+			// Create orphaned worktree
+			createUntrackedWorktree(t, repoPath, "orphan", "main")
+
+			// Modify .gbm.config.yaml to remove some worktrees (making them orphaned)
+			gbmContent := `worktrees:
+  main:
+    branch: main
+    description: "Main branch"
+`
+			require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
+
+			// Create manager to test confirmation directly
+			manager, err := createInitializedManagerStrict()
+			require.NoError(t, err)
+
+			// Create mock confirmation function
+			confirmFunc := func(message string) bool {
+				// Verify message contains what we expect
+				assert.Contains(t, message, "PERMANENTLY DELETED")
+				assert.Contains(t, message, "orphan")
+
+				// Simulate user response
+				switch strings.ToLower(tt.userResponse) {
+				case "y", "yes":
+					return true
+				default:
+					return false
+				}
+			}
+
+			// Test sync with confirmation
+			err = manager.SyncWithConfirmation(false, true, false, confirmFunc)
+
+			if tt.shouldSucceed {
+				require.NoError(t, err)
+				// Verify orphaned worktree was deleted
+				assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "orphan"))
+			} else {
+				require.Error(t, err)
+				assert.ErrorContains(t, err, "sync cancelled by user")
+				// Verify orphaned worktree still exists
+				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "orphan"))
+			}
+		})
+	}
+}
+
 

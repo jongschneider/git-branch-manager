@@ -37,6 +37,8 @@ type BranchChange struct {
 	NewBranch string
 }
 
+type ConfirmationFunc func(message string) bool
+
 func NewManager(repoPath string) (*Manager, error) {
 	gitManager, err := NewGitManager(repoPath)
 	if err != nil {
@@ -128,6 +130,10 @@ func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 }
 
 func (m *Manager) Sync(dryRun, force, fetch bool) error {
+	return m.SyncWithConfirmation(dryRun, force, fetch, nil)
+}
+
+func (m *Manager) SyncWithConfirmation(dryRun, force, fetch bool, confirmFunc ConfirmationFunc) error {
 	// Validate all branches exist before performing any operations
 	if err := m.ValidateConfig(); err != nil {
 		return err
@@ -153,7 +159,21 @@ func (m *Manager) Sync(dryRun, force, fetch bool) error {
 	}
 
 	// Remove orphaned worktrees first (if --force is used) to free up branches
-	if force {
+	if force && len(status.OrphanedWorktrees) > 0 {
+		// Ask for confirmation unless a confirmation function is provided and returns true
+		if confirmFunc != nil {
+			message := fmt.Sprintf("The following worktrees will be PERMANENTLY DELETED:\n")
+			for _, envVar := range status.OrphanedWorktrees {
+				worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
+				message += fmt.Sprintf("  • %s (%s)\n", envVar, worktreePath)
+			}
+			message += "Do you want to continue?"
+
+			if !confirmFunc(message) {
+				return fmt.Errorf("sync cancelled by user")
+			}
+		}
+
 		for _, envVar := range status.OrphanedWorktrees {
 			worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
 			err := m.gitManager.RemoveWorktree(worktreePath)
