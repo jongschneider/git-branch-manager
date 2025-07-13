@@ -6,6 +6,7 @@ This document tracks the elimination of global state for command flags. Each com
 
 ### ✅ Completed Commands
 - [x] **cmd/push.go** - Removed `pushAll` global variable, updated to use `cmd.Flags().GetBool("all")`
+- [x] **cmd/pull.go** - Removed `pullAll` global variable, updated to use `cmd.Flags().GetBool("all")`, fixed flag state pollution in tests
 
 ### 🔄 In Progress
 - [ ] None currently
@@ -13,7 +14,7 @@ This document tracks the elimination of global state for command flags. Each com
 ### ⏳ Pending Commands
 
 
-#### 1. cmd/pull.go (PRIORITY: HIGH - Simple)
+#### ~~1. cmd/pull.go (PRIORITY: HIGH - Simple) - COMPLETED~~
 **Global State to Remove:**
 ```go
 var (
@@ -47,13 +48,18 @@ var (
 )
 ```
 
+**CRITICAL: Convert to Factory Function Pattern (like cmd/push.go and cmd/pull.go)**
+
 **Files to Modify:**
 - [ ] **cmd/remove.go**:
-  - [ ] Remove `var (force bool)` (lines 10-12)
+  - [ ] Convert `var removeCmd = &cobra.Command{...}` to `func newRemoveCommand() *cobra.Command { cmd := &cobra.Command{...}`
+  - [ ] Move flag registration and completion setup inside the function before `return cmd`
   - [ ] Update `RunE` function: Add `force, _ := cmd.Flags().GetBool("force")` at start
-  - [ ] Update `init()`: Change `removeCmd.Flags().BoolVarP(&force, "force", "f", false, "...")` to `removeCmd.Flags().BoolP("force", "f", false, "...")`
+  - [ ] Change flag registration to `cmd.Flags().BoolP("force", "f", false, "...")`
+- [ ] **cmd/root.go**:
+  - [ ] Update `rootCmd.AddCommand(removeCmd)` to `rootCmd.AddCommand(newRemoveCommand())`
 - [ ] **cmd/remove_test.go**:
-  - [ ] Remove all 13 instances of `force = false` lines
+  - [ ] Remove all 13 instances of `force = false` lines (no longer needed with factory function)
   - [ ] Verify tests still pass
 
 **Testing Checklist:**
@@ -73,13 +79,18 @@ var (
 )
 ```
 
+**CRITICAL: Convert to Factory Function Pattern (like cmd/push.go and cmd/pull.go)**
+
 **Files to Modify:**
 - [ ] **cmd/switch.go**:
-  - [ ] Remove `var (printPath bool)` (lines 14-16)
+  - [ ] Convert `var switchCmd = &cobra.Command{...}` to `func newSwitchCommand() *cobra.Command { cmd := &cobra.Command{...}`
+  - [ ] Move flag registration and completion setup inside the function before `return cmd`
   - [ ] Update `RunE` function: Add `printPath, _ := cmd.Flags().GetBool("print-path")` at start
-  - [ ] Update `init()`: Change flag registration to use `.Bool()` instead of `.BoolVar()`
+  - [ ] Change flag registration to `cmd.Flags().Bool("print-path", false, "...")`
+- [ ] **cmd/root.go**:
+  - [ ] Update `rootCmd.AddCommand(switchCmd)` to `rootCmd.AddCommand(newSwitchCommand())`
 - [ ] **cmd/switch_test.go**:
-  - [ ] Remove 2 instances of `printPath = false` lines
+  - [ ] Remove 2 instances of `printPath = false` lines (no longer needed with factory function)
   - [ ] Verify tests still pass
 
 **Testing Checklist:**
@@ -100,17 +111,22 @@ var (
 )
 ```
 
+**CRITICAL: Convert to Factory Function Pattern (like cmd/push.go and cmd/pull.go)**
+
 **Files to Modify:**
 - [ ] **cmd/sync.go**:
-  - [ ] Remove `var (syncDryRun bool, syncForce bool)` (lines 12-15)
+  - [ ] Convert `var syncCmd = &cobra.Command{...}` to `func newSyncCommand() *cobra.Command { cmd := &cobra.Command{...}`
+  - [ ] Move flag registration inside the function before `return cmd`
   - [ ] Update `RunE` function: Add at start:
     ```go
     syncDryRun, _ := cmd.Flags().GetBool("dry-run")
     syncForce, _ := cmd.Flags().GetBool("force")
     ```
-  - [ ] Update `init()`: Change to use `.Bool()` instead of `.BoolVar()`
+  - [ ] Change flag registration to use `cmd.Flags().Bool()`
+- [ ] **cmd/root.go**:
+  - [ ] Update `rootCmd.AddCommand(syncCmd)` to `rootCmd.AddCommand(newSyncCommand())`
 - [ ] **cmd/sync_test.go**:
-  - [ ] Remove `resetSyncFlags()` function (lines 18-21)
+  - [ ] Remove `resetSyncFlags()` function (no longer needed with factory function)
   - [ ] Remove all calls to `resetSyncFlags()`
   - [ ] Verify tests still pass
 
@@ -134,19 +150,24 @@ var (
 )
 ```
 
+**CRITICAL: Convert to Factory Function Pattern (like cmd/push.go and cmd/pull.go)**
+
 **Files to Modify:**
 - [ ] **cmd/add.go**:
-  - [ ] Remove `var (newBranch bool, baseBranch string, interactive bool)` (lines 12-16)
+  - [ ] Convert `var addCmd = &cobra.Command{...}` to `func newAddCommand() *cobra.Command { cmd := &cobra.Command{...}`
+  - [ ] Move flag registration and completion setup inside the function before `return cmd`
   - [ ] Update `RunE` function: Add at start:
     ```go
     newBranch, _ := cmd.Flags().GetBool("new-branch")
     interactive, _ := cmd.Flags().GetBool("interactive")
     ```
   - [ ] Note: `baseBranch` comes from `args[2]`, not flags
-  - [ ] Update `init()`: Change to use `.Bool()` instead of `.BoolVar()`
+  - [ ] Change flag registration to use `cmd.Flags().Bool()`
   - [ ] Update `handleInteractive()` function to pass `newBranch` as parameter instead of using global
+- [ ] **cmd/root.go**:
+  - [ ] Update `rootCmd.AddCommand(addCmd)` to `rootCmd.AddCommand(newAddCommand())`
 - [ ] **cmd/add_test.go**:
-  - [ ] Remove all 30+ instances of flag reset lines:
+  - [ ] Remove all 30+ instances of flag reset lines (no longer needed with factory function):
     ```go
     newBranch = false
     interactive = false
@@ -258,12 +279,21 @@ These can be done in any order after root.go is complete:
 3. [ ] Identify all global variables used
 4. [ ] Identify all test files that reset flags
 
-### During Implementation:
-1. [ ] Remove global variable declarations
-2. [ ] Add `cmd.Flags().Get*()` calls at start of `RunE` function
-3. [ ] Update flag registration in `init()` function
-4. [ ] Remove flag reset lines from test files
-5. [ ] Test incrementally
+### During Implementation - CRITICAL FACTORY FUNCTION PATTERN:
+1. [ ] **Convert to Factory Function**: Change `var cmdName = &cobra.Command{...}` to `func newCmdNameCommand() *cobra.Command { cmd := &cobra.Command{...}`
+2. [ ] **Move all setup inside function**: Move flag registration, completion setup, etc. before `return cmd`
+3. [ ] **Update RunE function**: Add `flagVar, _ := cmd.Flags().Get*()` calls at start
+4. [ ] **Update root.go**: Change `rootCmd.AddCommand(cmdName)` to `rootCmd.AddCommand(newCmdNameCommand())`
+5. [ ] **Remove global variables**: Delete all global flag variables
+6. [ ] **Remove flag reset lines**: Delete all test flag reset code (no longer needed)
+7. [ ] **Test incrementally**: Verify each step works
+
+### Why Factory Function Pattern:
+- **Eliminates global state pollution** between test runs
+- **Each command execution gets fresh state**
+- **No manual flag resets needed** in tests
+- **Follows established pattern** from cmd/push.go and cmd/pull.go
+- **Cleaner, more testable code**
 
 ### After Completing Each Command:
 1. [ ] Run command-specific tests
@@ -289,12 +319,28 @@ A command is considered complete when:
 - **Testing Strategy**: The existing test suite uses `rootCmd.SetArgs()` and `cmd.Execute()`, which naturally works with the new flag approach.
 - **Rollback Strategy**: Each command can be reverted independently if issues arise.
 
-## Lessons Learned from cmd/push.go Implementation
+## Lessons Learned from cmd/push.go and cmd/pull.go Implementation
 
-- **Flag State Pollution**: Cobra commands maintain flag state between executions when reusing the same command instance. Tests that fail unexpectedly may be due to flags remaining set from previous test runs.
-- **Test Isolation Fix**: Add explicit flag resets in tests where needed using `commandName.Flags().Set("flag-name", "default-value")` before executing commands that expect clean flag state.
-- **Test Assertion Cleanup**: When removing global variables, also remove test assertions that checked the global state (e.g., `assert.True(t, globalFlag, "message")`). These assertions are no longer possible or necessary after the refactoring.
-- **Flag Access Pattern**: The pattern `flagValue, _ := cmd.Flags().GetBool("flag-name")` should be added at the very beginning of the `RunE` function, before any other logic.
+### CRITICAL: Factory Function Pattern is the ONLY Correct Approach
+- **Factory Functions Eliminate All Issues**: Convert `var cmdName = &cobra.Command{...}` to `func newCmdNameCommand() *cobra.Command { ... }`
+- **Root Cause Solution**: Factory functions create fresh command instances for each execution, completely eliminating global state pollution
+- **No Manual Flag Resets Needed**: With factory functions, test flag reset code becomes unnecessary and should be removed
+
+### Why Other Approaches Fail:
+- **Flag State Pollution**: Cobra commands maintain flag state between executions when reusing the same command instance
+- **Manual Flag Resets are Band-aids**: Using `cmd.Flags().Set("flag-name", "false")` in tests is a workaround, not a solution
+- **Global Variables Create Test Dependencies**: Any global command variables cause state pollution between test runs
+
+### Correct Implementation Pattern:
+1. **Factory Function**: `func newCmdNameCommand() *cobra.Command { cmd := &cobra.Command{...}; return cmd }`
+2. **Flag Access**: `flagValue, _ := cmd.Flags().GetBool("flag-name")` at start of `RunE` function
+3. **Root Registration**: `rootCmd.AddCommand(newCmdNameCommand())` in root.go
+4. **Clean Tests**: Remove all flag reset code from test files
+5. **No Global Variables**: Zero global command or flag variables
+
+### Test Assertion Cleanup:
+- Remove test assertions that checked global state (e.g., `assert.True(t, globalFlag, "message")`)
+- These assertions are impossible and unnecessary with factory functions
 
 ## Final Verification
 

@@ -9,41 +9,53 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	pullAll bool
-)
-
-var pullCmd = &cobra.Command{
-	Use:   "pull [worktree-name]",
-	Short: "Pull worktree changes from remote",
-	Long: `Pull changes from the remote repository to a worktree.
+func newPullCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "pull [worktree-name]",
+		Short: "Pull worktree changes from remote",
+		Long: `Pull changes from the remote repository to a worktree.
 
 Usage:
   gbm pull                    # Pull current worktree (if in a worktree)
   gbm pull <worktree-name>    # Pull specific worktree
   gbm pull --all              # Pull all worktrees`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		wd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
-		}
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pullAll, _ := cmd.Flags().GetBool("all")
 
-		manager, err := createInitializedManager()
-		if err != nil {
-			return err
-		}
+			wd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
 
-		if pullAll {
-			return handlePullAll(manager)
-		}
+			manager, err := createInitializedManager()
+			if err != nil {
+				return err
+			}
 
-		if len(args) == 0 {
-			return handlePullCurrent(manager, wd)
-		}
+			if pullAll {
+				return handlePullAll(manager)
+			}
 
-		return handlePullNamed(manager, args[0])
-	},
+			if len(args) == 0 {
+				return handlePullCurrent(manager, wd)
+			}
+
+			return handlePullNamed(manager, args[0])
+		},
+	}
+
+	cmd.Flags().Bool("all", false, "Pull all worktrees")
+
+	// Add completion for worktree names
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getWorktreeNames(), cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return cmd
 }
 
 func handlePullAll(manager *internal.Manager) error {
@@ -79,16 +91,4 @@ func handlePullNamed(manager *internal.Manager, worktreeName string) error {
 
 	PrintInfo("Pulling worktree '%s'...", worktreeName)
 	return manager.PullWorktree(worktreeName)
-}
-
-func init() {
-	pullCmd.Flags().BoolVar(&pullAll, "all", false, "Pull all worktrees")
-
-	// Add completion for worktree names
-	pullCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) != 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		return getWorktreeNames(), cobra.ShellCompDirectiveNoFileComp
-	}
 }

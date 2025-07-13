@@ -48,7 +48,7 @@ notifications when configurations drift out of sync.`,
 	rootCmd.AddCommand(infoCmd)
 	rootCmd.AddCommand(listCmd)
 	rootCmd.AddCommand(mergebackCmd)
-	rootCmd.AddCommand(pullCmd)
+	rootCmd.AddCommand(newPullCommand())
 	rootCmd.AddCommand(removeCmd)
 	rootCmd.AddCommand(shellIntegrationCmd)
 	rootCmd.AddCommand(switchCmd)

@@ -52,8 +52,6 @@ func getCurrentCommitHash(t *testing.T, dir string) string {
 
 
 func TestPullCommand_CurrentWorktree(t *testing.T) {
-	// Reset global flag state
-	pullAll = false
 
 	// Create source repo with multiple branches and .gbm.config.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -86,8 +84,6 @@ func TestPullCommand_CurrentWorktree(t *testing.T) {
 }
 
 func TestPullCommand_NamedWorktree(t *testing.T) {
-	// Reset global flag state
-	pullAll = false
 
 	// Create source repo with multiple branches and .gbm.config.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -120,8 +116,6 @@ func TestPullCommand_NamedWorktree(t *testing.T) {
 }
 
 func TestPullCommand_AllWorktrees(t *testing.T) {
-	// Reset global flag state
-	pullAll = false
 
 	// Create source repo with multiple branches and .gbm.config.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -152,7 +146,6 @@ func TestPullCommand_AllWorktrees(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err, "Pull all command should succeed")
 
-	assert.True(t, pullAll, "pullAll flag should be set to true")
 
 	// Verify all worktrees were updated
 	verifyWorktreeContent(t, mainWorktreePath, "main_update.txt", "Main branch update")
@@ -178,8 +171,6 @@ func TestPullCommand_NotInWorktree(t *testing.T) {
 	// Stay in repo root (not in a worktree)
 	os.Chdir(repoPath)
 
-	// Reset global flag state
-	pullAll = false
 
 	// Try to pull without specifying worktree name
 	cmd := newRootCommand()
@@ -199,8 +190,6 @@ func TestPullCommand_NonexistentWorktree(t *testing.T) {
 	// Stay in repo root
 	os.Chdir(repoPath)
 
-	// Reset global flag state
-	pullAll = false
 
 	// Try to pull nonexistent worktree
 	cmd := newRootCommand()
@@ -219,8 +208,6 @@ func TestPullCommand_NotInGitRepo(t *testing.T) {
 
 	os.Chdir(tempDir)
 
-	// Reset global flag state
-	pullAll = false
 
 	// Try to pull in non-git directory
 	cmd := newRootCommand()
@@ -232,8 +219,6 @@ func TestPullCommand_NotInGitRepo(t *testing.T) {
 }
 
 func TestPullCommand_FastForward(t *testing.T) {
-	// Reset global flag state
-	pullAll = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -266,8 +251,6 @@ func TestPullCommand_FastForward(t *testing.T) {
 }
 
 func TestPullCommand_UpToDate(t *testing.T) {
-	// Reset global flag state
-	pullAll = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -294,8 +277,6 @@ func TestPullCommand_UpToDate(t *testing.T) {
 }
 
 func TestPullCommand_WithLocalChanges(t *testing.T) {
-	// Reset global flag state
-	pullAll = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
