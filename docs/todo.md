@@ -77,12 +77,10 @@ ERROR: Error: exit status 1
 - [ ] track merge backs... not sure how yet and how to prompt the user.
     - [ ] helper to create a merge worktree
 - [ ] add carapace completion
-- [ ] control branch name JIRA through config file (use current as defaults)
 - [x] add jira me to config.toml
 - [ ] replace confirmation with bubbltea confirmation (lipgloss?)
 - [ ] add `theme` verb with default themes
-- [ ] support `JIRA_CONFIG_FILE` env var (see https://github.com/ankitpokhrel/jira-cli?tab=readme-ov-file#multiple-projects)
-- [ ] add hooks (for automating tasked before/after a command is run)
+- [ ] add hooks (for automating tasks before/after a command is run)
     * example: after `gbm add` copy `.env` file from MAIN
 - [ ] review and improve fuzzy matching logic in switch command
     * current behavior: input is normalized to uppercase, then fuzzy matched against actual config keys
@@ -114,7 +112,9 @@ ERROR: Error: exit status 1
   - gbm sync --fetch = "First get the latest from remote, then sync worktrees with those updated versions"
   The --fetch flag ensures you're always working with the most current version of your branches, which is
   especially important in collaborative environments where branches are frequently updated.
-- [ ] add tests for `gbm add`
+- [x] add tests for `gbm add`
 - [ ] split out state from the .gbm/config.toml into a separate .gbm/state.toml
+- [ ] don't use global state for flags
+    * will improve testability
 
 
