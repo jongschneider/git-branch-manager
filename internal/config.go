@@ -25,6 +25,7 @@ type ConfigSettings struct {
 	AutoFetch             bool   `toml:"auto_fetch"`
 	CreateMissingBranches bool   `toml:"create_missing_branches"`
 	MergeBackAlerts       bool   `toml:"merge_back_alerts"`
+	HotfixPrefix          string `toml:"hotfix_prefix"`
 }
 
 type FileCopyRule struct {
@@ -86,6 +87,7 @@ func DefaultConfig() *Config {
 			AutoFetch:             true,
 			CreateMissingBranches: false,
 			MergeBackAlerts:       false, // Disabled by default
+			HotfixPrefix:          "HOTFIX", // Default hotfix prefix
 		},
 		State: ConfigState{
 			LastSync:         time.Time{},

@@ -95,7 +95,10 @@ ERROR: Error: exit status 1
 - [x] make sure `gbm add xxxxxx` when performed in a worktree will create the new worktree in ./worktree/xxxx and not in the current worktree dir (like native wt add)
 - [x] add a base branch argument to `gbm add` so it acts like `git worktree add` command
     * if no base branch is supplied, use the default branch.
-- [ ] add `gbm hotfix` or `gbm hf`
+- [x] add `gbm hotfix` or `gbm hf`
+    * base will be the last branch in the mergeback list (main <- preview <- production) means use production as the base
+    * the branch should be prefixed with hotfix/<PROJECT-123_summary_of_ticket>
+    * worktree directory uses configurable prefix (default: HOTFIX_)
 - [ ] add `gbm mergeback` or `gbm mb`
 - [ ] ai plugin for:
     * merge conflict resolution
