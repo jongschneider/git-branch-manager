@@ -41,7 +41,7 @@ notifications when configurations drift out of sync.`,
 
 	// Add all subcommands
 	rootCmd.AddCommand(newPushCommand())
-	rootCmd.AddCommand(addCmd)
+	rootCmd.AddCommand(newAddCommand())
 	rootCmd.AddCommand(cloneCmd)
 	rootCmd.AddCommand(completionCmd)
 	rootCmd.AddCommand(hotfixCmd)

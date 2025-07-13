@@ -18,10 +18,6 @@ func TestAddCommand_NewBranchFromRemote(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	repoPath := setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
@@ -56,10 +52,6 @@ func TestAddCommand_NewBranch(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	repoPath := setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
@@ -95,10 +87,6 @@ func TestAddCommand_NewBranchWithBaseBranch(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	repoPath := setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
@@ -131,10 +119,6 @@ func TestAddCommand_InvalidBaseBranch(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
@@ -157,10 +141,6 @@ func TestAddCommand_JIRAKeyGeneration(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
@@ -223,10 +203,6 @@ func TestAddCommand_MissingBranchName(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
@@ -249,10 +225,6 @@ func TestAddCommand_NewBranchWithoutFlag(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
@@ -275,10 +247,6 @@ func TestAddCommand_AutoGenerateBranchWithFlag(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	repoPath := setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
@@ -311,10 +279,6 @@ func TestAddCommand_DuplicateWorktreeName(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
@@ -365,7 +329,8 @@ func TestAddCommand_ValidArgsFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			completions, directive := addCmd.ValidArgsFunction(addCmd, tt.args, "")
+			cmd := newAddCommand()
+			completions, directive := cmd.ValidArgsFunction(cmd, tt.args, "")
 
 			// Just verify the function doesn't panic and returns appropriate directive
 			assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
@@ -381,10 +346,6 @@ func TestAddCommand_FromWorktreeDirectory(t *testing.T) {
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 	repoPath := setupClonedRepo(t, sourceRepo)
 
-	// Reset flags to ensure clean state
-	newBranch = false
-	interactive = false
-	baseBranch = ""
 
 	// Create .gbm.config.yaml in the cloned repo
 	gbmContent := `worktrees:
