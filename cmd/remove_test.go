@@ -107,8 +107,6 @@ func captureOutput(fn func() error) (string, error) {
 }
 
 func TestRemoveCommand_SuccessfulRemoval(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with multiple branches and .envrc
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -135,8 +133,6 @@ func TestRemoveCommand_SuccessfulRemoval(t *testing.T) {
 }
 
 func TestRemoveCommand_NonexistentWorktree(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -163,8 +159,6 @@ func TestRemoveCommand_NotInGitRepo(t *testing.T) {
 
 	os.Chdir(tempDir)
 
-	// Reset global flag state
-	force = false
 
 	// Try to remove in non-git directory
 	cmd := newRootCommand()
@@ -176,8 +170,6 @@ func TestRemoveCommand_NotInGitRepo(t *testing.T) {
 }
 
 func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -208,8 +200,6 @@ func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
 }
 
 func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -238,8 +228,6 @@ func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
 }
 
 func TestRemoveCommand_ForceBypassesConfirmation(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -261,8 +249,6 @@ func TestRemoveCommand_ForceBypassesConfirmation(t *testing.T) {
 }
 
 func TestRemoveCommand_UserAcceptsConfirmation(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -289,8 +275,6 @@ func TestRemoveCommand_UserAcceptsConfirmation(t *testing.T) {
 }
 
 func TestRemoveCommand_UserAcceptsConfirmationWithYes(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -317,8 +301,6 @@ func TestRemoveCommand_UserAcceptsConfirmationWithYes(t *testing.T) {
 }
 
 func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -345,8 +327,6 @@ func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
 }
 
 func TestRemoveCommand_UserDeclinesWithEmptyInput(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -373,8 +353,6 @@ func TestRemoveCommand_UserDeclinesWithEmptyInput(t *testing.T) {
 }
 
 func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -406,8 +384,6 @@ func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
 }
 
 func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
@@ -459,8 +435,6 @@ func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
 }
 
 func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
-	// Reset global flag state
-	force = false
 
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
