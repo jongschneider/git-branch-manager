@@ -52,7 +52,7 @@ notifications when configurations drift out of sync.`,
 	rootCmd.AddCommand(newRemoveCommand())
 	rootCmd.AddCommand(shellIntegrationCmd)
 	rootCmd.AddCommand(newSwitchCommand())
-	rootCmd.AddCommand(syncCmd)
+	rootCmd.AddCommand(newSyncCommand())
 	rootCmd.AddCommand(validateCmd)
 
 	return rootCmd

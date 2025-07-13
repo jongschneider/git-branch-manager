@@ -14,11 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// Helper function to reset sync command flags to default values
-func resetSyncFlags() {
-	syncDryRun = false
-	syncForce = false
-}
 
 
 func TestSyncCommand_BasicOperations(t *testing.T) {
@@ -61,7 +56,6 @@ func TestSyncCommand_BasicOperations(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetSyncFlags() // Reset flags before each test
 			sourceRepo := tt.setupRepo(t)
 			setupClonedRepo(t, sourceRepo)
 
@@ -148,7 +142,6 @@ func TestSyncCommand_Flags(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetSyncFlags() // Reset flags before each test
 			sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 			repoPath := setupClonedRepo(t, sourceRepo)
 
@@ -275,7 +268,6 @@ func TestSyncCommand_SyncScenarios(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetSyncFlags() // Reset flags before each test
 			// Create source repo with initial .gbm.config.yaml
 			sourceRepo := testutils.NewMultiBranchRepo(t)
 			require.NoError(t, sourceRepo.WriteFile(".gbm.config.yaml", tt.initialGBMConfig))
@@ -409,7 +401,6 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetSyncFlags() // Reset flags before each test
 			var sourceRepo *testutils.GitTestRepo
 
 			if tt.createTrackedWorktrees {
@@ -543,7 +534,6 @@ func TestSyncCommand_ErrorHandling(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetSyncFlags() // Reset flags before each test
 			workingDir := tt.setup(t)
 			originalDir, _ := os.Getwd()
 			defer os.Chdir(originalDir)
@@ -640,7 +630,6 @@ func TestSyncCommand_Integration(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetSyncFlags() // Reset flags before each test
 			sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 			repoPath := setupClonedRepo(t, sourceRepo)
 
@@ -667,7 +656,6 @@ func createUntrackedWorktree(t *testing.T, repoPath, name, branch string) {
 }
 
 func TestSyncCommand_ForceConfirmationDirectManagerTest(t *testing.T) {
-	resetSyncFlags()
 
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 	repoPath := setupClonedRepo(t, sourceRepo)
@@ -747,7 +735,6 @@ func TestSyncCommand_ForceConfirmation(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			resetSyncFlags()
 
 			// Setup a repo with orphaned worktrees
 			sourceRepo := testutils.NewStandardGBMConfigRepo(t)
