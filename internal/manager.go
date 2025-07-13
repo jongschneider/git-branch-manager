@@ -13,6 +13,7 @@ import (
 
 type Manager struct {
 	config     *Config
+	state      *State
 	gitManager *GitManager
 	gbmConfig  *GBMConfig
 	repoPath   string
@@ -47,6 +48,11 @@ func NewManager(repoPath string) (*Manager, error) {
 		return nil, fmt.Errorf("failed to load config: %w", err)
 	}
 
+	state, err := LoadState(gbmDir)
+	if err != nil {
+		return nil, fmt.Errorf("failed to load state: %w", err)
+	}
+
 	gitManager, err := NewGitManager(repoPath, config.Settings.WorktreePrefix)
 	if err != nil {
 		return nil, err
@@ -58,6 +64,7 @@ func NewManager(repoPath string) (*Manager, error) {
 
 	return &Manager{
 		config:     config,
+		state:      state,
 		gitManager: gitManager,
 		repoPath:   repoPath,
 		gbmDir:     gbmDir,
@@ -215,10 +222,10 @@ func (m *Manager) SyncWithConfirmation(dryRun, force, fetch bool, confirmFunc Co
 	for worktreeName := range m.gbmConfig.Worktrees {
 		trackedWorktrees = append(trackedWorktrees, worktreeName)
 	}
-	m.config.State.TrackedVars = trackedWorktrees
-	m.config.State.LastSync = time.Now()
+	m.state.TrackedVars = trackedWorktrees
+	m.state.LastSync = time.Now()
 
-	return m.config.Save(m.gbmDir)
+	return m.SaveState()
 }
 
 func (m *Manager) ValidateConfig() error {
@@ -377,12 +384,12 @@ func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool
 	if m.gbmConfig != nil {
 		if _, exists := m.gbmConfig.Worktrees[worktreeName]; !exists {
 			// Add to ad hoc worktrees list if not already there
-			if !contains(m.config.State.AdHocWorktrees, worktreeName) {
-				m.config.State.AdHocWorktrees = append(m.config.State.AdHocWorktrees, worktreeName)
-				// Save the updated config
-				if saveErr := m.config.Save(m.gbmDir); saveErr != nil {
+			if !contains(m.state.AdHocWorktrees, worktreeName) {
+				m.state.AdHocWorktrees = append(m.state.AdHocWorktrees, worktreeName)
+				// Save the updated state
+				if saveErr := m.SaveState(); saveErr != nil {
 					// Log warning but don't fail the operation
-					fmt.Printf("Warning: failed to save config: %v\n", saveErr)
+					fmt.Printf("Warning: failed to save state: %v\n", saveErr)
 				}
 			}
 		}
@@ -594,17 +601,17 @@ func (m *Manager) RemoveWorktree(worktreeName string) error {
 	}
 
 	// Remove from ad hoc worktrees list if it exists there
-	for i, name := range m.config.State.AdHocWorktrees {
+	for i, name := range m.state.AdHocWorktrees {
 		if name == worktreeName {
-			m.config.State.AdHocWorktrees = append(m.config.State.AdHocWorktrees[:i], m.config.State.AdHocWorktrees[i+1:]...)
+			m.state.AdHocWorktrees = append(m.state.AdHocWorktrees[:i], m.state.AdHocWorktrees[i+1:]...)
 			break
 		}
 	}
 
-	// Save the updated config
-	if err := m.config.Save(m.gbmDir); err != nil {
+	// Save the updated state
+	if err := m.SaveState(); err != nil {
 		// Log warning but don't fail the operation
-		fmt.Printf("Warning: failed to save config: %v\n", err)
+		fmt.Printf("Warning: failed to save state: %v\n", err)
 	}
 
 	return nil
@@ -616,27 +623,35 @@ func (m *Manager) GetWorktreeStatus(worktreePath string) (*GitStatus, error) {
 
 func (m *Manager) SetCurrentWorktree(worktreeName string) error {
 	// Update previous worktree before changing current
-	if m.config.State.CurrentWorktree != "" && m.config.State.CurrentWorktree != worktreeName {
-		m.config.State.PreviousWorktree = m.config.State.CurrentWorktree
+	if m.state.CurrentWorktree != "" && m.state.CurrentWorktree != worktreeName {
+		m.state.PreviousWorktree = m.state.CurrentWorktree
 	}
-	m.config.State.CurrentWorktree = worktreeName
-	return m.config.Save(m.gbmDir)
+	m.state.CurrentWorktree = worktreeName
+	return m.SaveState()
 }
 
 func (m *Manager) GetPreviousWorktree() string {
-	return m.config.State.PreviousWorktree
+	return m.state.PreviousWorktree
 }
 
 func (m *Manager) GetCurrentWorktree() string {
-	return m.config.State.CurrentWorktree
+	return m.state.CurrentWorktree
 }
 
 func (m *Manager) GetConfig() *Config {
 	return m.config
 }
 
+func (m *Manager) GetState() *State {
+	return m.state
+}
+
 func (m *Manager) SaveConfig() error {
 	return m.config.Save(m.gbmDir)
+}
+
+func (m *Manager) SaveState() error {
+	return m.state.Save(m.gbmDir)
 }
 
 func (m *Manager) GetSortedWorktreeNames(worktrees map[string]*WorktreeListInfo) []string {

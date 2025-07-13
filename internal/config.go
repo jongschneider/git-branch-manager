@@ -4,7 +4,6 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 
 	"github.com/BurntSushi/toml"
 	"gopkg.in/yaml.v3"
@@ -14,7 +13,6 @@ const DefaultWorktreeDirname = "worktrees"
 
 type Config struct {
 	Settings ConfigSettings `toml:"settings"`
-	State    ConfigState    `toml:"state"`
 	Icons    ConfigIcons    `toml:"icons"`
 	Jira     ConfigJira     `toml:"jira"`
 	FileCopy ConfigFileCopy `toml:"file_copy"`
@@ -36,14 +34,6 @@ type FileCopyRule struct {
 
 type ConfigFileCopy struct {
 	Rules []FileCopyRule `toml:"rules"`
-}
-
-type ConfigState struct {
-	LastSync         time.Time `toml:"last_sync"`
-	TrackedVars      []string  `toml:"tracked_vars"`
-	AdHocWorktrees   []string  `toml:"ad_hoc_worktrees"`
-	CurrentWorktree  string    `toml:"current_worktree"`
-	PreviousWorktree string    `toml:"previous_worktree"`
 }
 
 type ConfigIcons struct {
@@ -90,13 +80,6 @@ func DefaultConfig() *Config {
 			MergeBackAlerts:       false, // Disabled by default
 			HotfixPrefix:          "HOTFIX", // Default hotfix prefix
 			MergebackPrefix:       "MERGE", // Default mergeback prefix
-		},
-		State: ConfigState{
-			LastSync:         time.Time{},
-			TrackedVars:      []string{},
-			AdHocWorktrees:   []string{},
-			CurrentWorktree:  "",
-			PreviousWorktree: "",
 		},
 		Icons: ConfigIcons{
 			// Status icons

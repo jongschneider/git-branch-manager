@@ -6,13 +6,6 @@
   hotfix_prefix = "HOTFIX"
   mergeback_prefix = "MERGE"
 
-[state]
-  last_sync = 0001-01-01T00:00:00Z
-  tracked_vars = []
-  ad_hoc_worktrees = []
-  current_worktree = ""
-  previous_worktree = ""
-
 [icons]
   success = "✅"
   warning = "⚠️"
