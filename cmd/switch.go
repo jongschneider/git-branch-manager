@@ -11,14 +11,11 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	printPath bool
-)
-
-var switchCmd = &cobra.Command{
-	Use:   "switch [WORKTREE_NAME]",
-	Short: "Switch to a different worktree",
-	Long: `Switch to a different worktree by environment variable name.
+func newSwitchCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "switch [WORKTREE_NAME]",
+		Short: "Switch to a different worktree",
+		Long: `Switch to a different worktree by environment variable name.
 
 If no worktree name is provided, lists all available worktrees.
 Use with shell integration for automatic directory switching:
@@ -37,35 +34,53 @@ Examples:
   gbm switch STAGING   # Show path to STAGING worktree
   gbm switch -         # Switch to previous worktree
   gbm switch           # List all available worktrees`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		PrintVerbose("Running switch command")
+		RunE: func(cmd *cobra.Command, args []string) error {
+			printPath, _ := cmd.Flags().GetBool("print-path")
+			PrintVerbose("Running switch command")
 
-		manager, err := createInitializedManager()
-		if err != nil {
-			return err
-		}
-
-		if len(args) == 0 {
-			return listWorktrees(manager)
-		}
-
-		worktreeName := args[0]
-
-		// Handle special case of "-" to switch to previous worktree
-		if worktreeName == "-" {
-			previous := manager.GetPreviousWorktree()
-			if previous == "" {
-				return fmt.Errorf("no previous worktree available")
+			manager, err := createInitializedManager()
+			if err != nil {
+				return err
 			}
-			PrintInfo("Switching to previous worktree: %s", previous)
-			worktreeName = previous
-		}
 
-		return switchToWorktree(manager, worktreeName)
-	},
+			if len(args) == 0 {
+				return listWorktrees(manager)
+			}
+
+			worktreeName := args[0]
+
+			// Handle special case of "-" to switch to previous worktree
+			if worktreeName == "-" {
+				previous := manager.GetPreviousWorktree()
+				if previous == "" {
+					return fmt.Errorf("no previous worktree available")
+				}
+				PrintInfo("Switching to previous worktree: %s", previous)
+				worktreeName = previous
+			}
+
+			return switchToWorktreeWithFlag(manager, worktreeName, printPath)
+		},
+	}
+
+	cmd.Flags().Bool("print-path", false, "Print the worktree path only (for shell integration)")
+
+	// Add completion for worktree names
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getWorktreeNames(), cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return cmd
 }
 
 func switchToWorktree(manager *internal.Manager, worktreeName string) error {
+	return switchToWorktreeWithFlag(manager, worktreeName, false)
+}
+
+func switchToWorktreeWithFlag(manager *internal.Manager, worktreeName string, printPath bool) error {
 	PrintVerbose("Switching to worktree: %s", worktreeName)
 
 	// Try exact match first
@@ -183,17 +198,6 @@ func listWorktrees(manager *internal.Manager) error {
 	return nil
 }
 
-func init() {
-	switchCmd.Flags().BoolVar(&printPath, "print-path", false, "Print the worktree path only (for shell integration)")
-
-	// Add completion for worktree names
-	switchCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) != 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		return getWorktreeNames(), cobra.ShellCompDirectiveNoFileComp
-	}
-}
 
 func getWorktreeNames() []string {
 	manager, err := createInitializedManager()

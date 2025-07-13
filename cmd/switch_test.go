@@ -14,8 +14,6 @@ import (
 
 
 func TestSwitchCommand_BasicWorktreeSwitching(t *testing.T) {
-	// Reset global flag state
-	printPath = false
 
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
@@ -241,8 +239,6 @@ func TestSwitchCommand_NoPreviousWorktree(t *testing.T) {
 }
 
 func TestSwitchCommand_ShellIntegration(t *testing.T) {
-	// Reset global flag state
-	printPath = false
 
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
