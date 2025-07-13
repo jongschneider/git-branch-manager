@@ -67,12 +67,12 @@ func TestSyncCommand_BasicOperations(t *testing.T) {
 
 			// For the idempotent test, run sync twice
 			if strings.Contains(tt.name, "idempotent") {
-				cmd := rootCmd
+				cmd := newRootCommand()
 				cmd.SetArgs([]string{"sync"})
 				require.NoError(t, cmd.Execute()) // First sync
 			}
 
-			cmd := rootCmd
+			cmd := newRootCommand()
 			cmd.SetArgs([]string{"sync"})
 
 			err := cmd.Execute()
@@ -155,7 +155,7 @@ func TestSyncCommand_Flags(t *testing.T) {
 			tt.setup(t, &testutils.GitTestRepo{LocalDir: repoPath})
 
 			var buf bytes.Buffer
-			cmd := rootCmd
+			cmd := newRootCommand()
 			cmd.SetArgs(tt.args)
 			cmd.SetOut(&buf)
 			cmd.SetErr(&buf)
@@ -288,7 +288,7 @@ func TestSyncCommand_SyncScenarios(t *testing.T) {
 			require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(tt.updatedGBMConfig), 0644))
 
 			// Run sync with updated .gbm.config.yaml
-			cmd := rootCmd
+			cmd := newRootCommand()
 			cmd.SetArgs([]string{"sync"})
 			err := cmd.Execute()
 			require.NoError(t, err)
@@ -468,7 +468,7 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 			if usesForce {
 				// Use simulateUserInput for tests that use --force
 				err = simulateUserInput("y", func() error {
-					cmd := rootCmd
+					cmd := newRootCommand()
 					cmd.SetArgs(tt.syncArgs)
 					cmd.SetOut(&buf)
 					cmd.SetErr(&buf)
@@ -477,7 +477,7 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 				output = buf.String()
 			} else {
 				// Standard execution for non-force tests
-				cmd := rootCmd
+				cmd := newRootCommand()
 				cmd.SetArgs(tt.syncArgs)
 				cmd.SetOut(&buf)
 				cmd.SetErr(&buf)
@@ -550,7 +550,7 @@ func TestSyncCommand_ErrorHandling(t *testing.T) {
 
 			require.NoError(t, os.Chdir(workingDir))
 
-			cmd := rootCmd
+			cmd := newRootCommand()
 			cmd.SetArgs(tt.args)
 
 			err := cmd.Execute()
@@ -590,7 +590,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 
 				// 3. Run sync with --force to remove orphaned worktrees and create new ones
 				err := simulateUserInput("y", func() error {
-					cmd := rootCmd
+					cmd := newRootCommand()
 					cmd.SetArgs([]string{"sync", "--force"})
 					return cmd.Execute()
 				})
@@ -623,7 +623,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 				require.NoError(t, pruneCmd.Run())
 
 				// Run sync to fix things (recreate missing worktree)
-				cmd := rootCmd
+				cmd := newRootCommand()
 				cmd.SetArgs([]string{"sync"})
 				require.NoError(t, cmd.Execute())
 			},

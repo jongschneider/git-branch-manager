@@ -123,7 +123,7 @@ func TestRemoveCommand_SuccessfulRemoval(t *testing.T) {
 
 	// Remove FEAT worktree with user confirmation (simulate "y" input)
 	err := simulateUserInput("y", func() error {
-		cmd := rootCmd
+		cmd := newRootCommand()
 		cmd.SetArgs([]string{"remove", "feat"})
 		return cmd.Execute()
 	})
@@ -147,7 +147,7 @@ func TestRemoveCommand_NonexistentWorktree(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// Try to remove nonexistent worktree
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"remove", "NONEXISTENT"})
 
 	err := cmd.Execute()
@@ -167,7 +167,7 @@ func TestRemoveCommand_NotInGitRepo(t *testing.T) {
 	force = false
 
 	// Try to remove in non-git directory
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"remove", "SOME_WORKTREE"})
 
 	err := cmd.Execute()
@@ -195,7 +195,7 @@ func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
 	assert.True(t, hasUncommittedChanges(t, mainWorktreePath), "main worktree should have uncommitted changes")
 
 	// Try to remove without force flag
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"remove", "main"})
 
 	err := cmd.Execute()
@@ -227,7 +227,7 @@ func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
 	assert.True(t, hasUncommittedChanges(t, prodWorktreePath), "PROD worktree should have uncommitted changes")
 
 	// Remove with force flag should succeed despite uncommitted changes
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"remove", "prod", "--force"})
 
 	err := cmd.Execute()
@@ -250,7 +250,7 @@ func TestRemoveCommand_ForceBypassesConfirmation(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// Remove with force flag should bypass confirmation prompt
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"remove", "dev", "--force"})
 
 	err := cmd.Execute()
@@ -277,7 +277,7 @@ func TestRemoveCommand_UserAcceptsConfirmation(t *testing.T) {
 
 	// Remove worktree with user accepting confirmation (simulate "y" input)
 	err := simulateUserInput("y", func() error {
-		cmd := rootCmd
+		cmd := newRootCommand()
 		cmd.SetArgs([]string{"remove", "feat"})
 		return cmd.Execute()
 	})
@@ -305,7 +305,7 @@ func TestRemoveCommand_UserAcceptsConfirmationWithYes(t *testing.T) {
 
 	// Remove worktree with user accepting confirmation (simulate "yes" input)
 	err := simulateUserInput("yes", func() error {
-		cmd := rootCmd
+		cmd := newRootCommand()
 		cmd.SetArgs([]string{"remove", "dev"})
 		return cmd.Execute()
 	})
@@ -333,7 +333,7 @@ func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
 
 	// Remove worktree with user declining confirmation (simulate "n" input)
 	err := simulateUserInput("n", func() error {
-		cmd := rootCmd
+		cmd := newRootCommand()
 		cmd.SetArgs([]string{"remove", "main"})
 		return cmd.Execute()
 	})
@@ -361,7 +361,7 @@ func TestRemoveCommand_UserDeclinesWithEmptyInput(t *testing.T) {
 
 	// Remove worktree with user providing empty input (just hitting enter)
 	err := simulateUserInput("", func() error {
-		cmd := rootCmd
+		cmd := newRootCommand()
 		cmd.SetArgs([]string{"remove", "prod"})
 		return cmd.Execute()
 	})
@@ -392,7 +392,7 @@ func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
 	assert.Equal(t, featWorktreePath, currentDir, "Should be in FEAT worktree directory")
 
 	// Remove the worktree we're currently in (with force to avoid confirmation)
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"remove", "feat", "--force"})
 
 	err := cmd.Execute()
@@ -431,7 +431,7 @@ func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
 	initialWorktrees := strings.Split(strings.TrimSpace(string(initialOutput)), "\n")
 
 	// Remove one worktree
-	removeCmd := rootCmd
+	removeCmd := newRootCommand()
 	removeCmd.SetArgs([]string{"remove", "dev", "--force"})
 
 	err = removeCmd.Execute()
@@ -481,7 +481,7 @@ func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
 	require.NoError(t, err, "Test file should exist before removal")
 
 	// Remove worktree
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"remove", "main", "--force"})
 
 	err = cmd.Execute()

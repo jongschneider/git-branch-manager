@@ -188,7 +188,6 @@ func generateHotfixBranchName(worktreeName, jiraTicket string, manager *internal
 }
 
 func init() {
-	rootCmd.AddCommand(hotfixCmd)
 
 	// Add JIRA key completions for both positional arguments
 	hotfixCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

@@ -31,7 +31,7 @@ func TestCloneCommand_Basic(t *testing.T) {
 
 	os.Chdir(targetDir)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
 
 	err := cmd.Execute()
@@ -71,7 +71,7 @@ func TestCloneCommand_WithExistingGBMConfig(t *testing.T) {
 
 	os.Chdir(targetDir)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
 
 	err := cmd.Execute()
@@ -113,7 +113,7 @@ func TestCloneCommand_WithoutGBMConfig(t *testing.T) {
 
 	os.Chdir(targetDir)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
 
 	err := cmd.Execute()
@@ -159,7 +159,7 @@ func TestCloneCommand_DifferentDefaultBranches(t *testing.T) {
 
 			os.Chdir(targetDir)
 
-			cmd := rootCmd
+			cmd := newRootCommand()
 			cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
 
 			err := cmd.Execute()
@@ -193,7 +193,7 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 
 	os.Chdir(targetDir)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
 
 	err := cmd.Execute()
@@ -229,7 +229,7 @@ func TestCloneCommand_InvalidRepository(t *testing.T) {
 
 	os.Chdir(targetDir)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", "/nonexistent/repo"})
 
 	err := cmd.Execute()

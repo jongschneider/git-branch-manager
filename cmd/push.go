@@ -9,14 +9,12 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	pushAll bool
-)
 
-var pushCmd = &cobra.Command{
-	Use:   "push [worktree-name]",
-	Short: "Push worktree changes to remote",
-	Long: `Push changes from a worktree to the remote repository.
+func newPushCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "push [worktree-name]",
+		Short: "Push worktree changes to remote",
+		Long: `Push changes from a worktree to the remote repository.
 
 Usage:
   gbm push                    # Push current worktree (if in a worktree)
@@ -24,28 +22,43 @@ Usage:
   gbm push --all              # Push all worktrees
 
 The command will automatically set upstream (-u) if not already set.`,
-	Args: cobra.MaximumNArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		wd, err := os.Getwd()
-		if err != nil {
-			return fmt.Errorf("failed to get working directory: %w", err)
-		}
+		Args: cobra.MaximumNArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			pushAll, _ := cmd.Flags().GetBool("all")
 
-		manager, err := createInitializedManager()
-		if err != nil {
-			return err
-		}
+			wd, err := os.Getwd()
+			if err != nil {
+				return fmt.Errorf("failed to get working directory: %w", err)
+			}
 
-		if pushAll {
-			return handlePushAll(manager)
-		}
+			manager, err := createInitializedManager()
+			if err != nil {
+				return err
+			}
 
-		if len(args) == 0 {
-			return handlePushCurrent(manager, wd)
-		}
+			if pushAll {
+				return handlePushAll(manager)
+			}
 
-		return handlePushNamed(manager, args[0])
-	},
+			if len(args) == 0 {
+				return handlePushCurrent(manager, wd)
+			}
+
+			return handlePushNamed(manager, args[0])
+		},
+	}
+
+	cmd.Flags().Bool("all", false, "Push all worktrees")
+
+	// Add completion for worktree names
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
+		}
+		return getWorktreeNames(), cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return cmd
 }
 
 func handlePushAll(manager *internal.Manager) error {
@@ -83,15 +96,3 @@ func handlePushNamed(manager *internal.Manager, worktreeName string) error {
 	return manager.PushWorktree(worktreeName)
 }
 
-func init() {
-	rootCmd.AddCommand(pushCmd)
-	pushCmd.Flags().BoolVar(&pushAll, "all", false, "Push all worktrees")
-
-	// Add completion for worktree names
-	pushCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) != 0 {
-			return nil, cobra.ShellCompDirectiveNoFileComp
-		}
-		return getWorktreeNames(), cobra.ShellCompDirectiveNoFileComp
-	}
-}

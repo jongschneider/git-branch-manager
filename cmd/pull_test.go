@@ -71,7 +71,7 @@ func TestPullCommand_CurrentWorktree(t *testing.T) {
 	makeRemoteChanges(t, sourceRepo, "develop", "new_feature.txt", "New feature content")
 
 	// Pull current worktree (should pull dev since we're in it)
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull"})
 
 	err := cmd.Execute()
@@ -105,7 +105,7 @@ func TestPullCommand_NamedWorktree(t *testing.T) {
 	makeRemoteChanges(t, sourceRepo, "feature/auth", "auth_changes.txt", "Authentication improvements")
 
 	// Pull specific worktree by name
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull", "feat"})
 
 	err := cmd.Execute()
@@ -146,7 +146,7 @@ func TestPullCommand_AllWorktrees(t *testing.T) {
 	makeRemoteChanges(t, sourceRepo, "feature/auth", "feat_update.txt", "Feature update")
 
 	// Pull all worktrees
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull", "--all"})
 
 	err := cmd.Execute()
@@ -182,7 +182,7 @@ func TestPullCommand_NotInWorktree(t *testing.T) {
 	pullAll = false
 
 	// Try to pull without specifying worktree name
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull"})
 
 	err := cmd.Execute()
@@ -203,7 +203,7 @@ func TestPullCommand_NonexistentWorktree(t *testing.T) {
 	pullAll = false
 
 	// Try to pull nonexistent worktree
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull", "NONEXISTENT"})
 
 	err := cmd.Execute()
@@ -223,7 +223,7 @@ func TestPullCommand_NotInGitRepo(t *testing.T) {
 	pullAll = false
 
 	// Try to pull in non-git directory
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull"})
 
 	err := cmd.Execute()
@@ -251,7 +251,7 @@ func TestPullCommand_FastForward(t *testing.T) {
 	makeRemoteChanges(t, sourceRepo, "develop", "fast_forward.txt", "Fast forward content")
 
 	// Pull changes
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull"})
 
 	err := cmd.Execute()
@@ -282,7 +282,7 @@ func TestPullCommand_UpToDate(t *testing.T) {
 	initialHash := getCurrentCommitHash(t, devWorktreePath)
 
 	// Pull without any remote changes (should be up to date)
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull"})
 
 	err := cmd.Execute()
@@ -315,7 +315,7 @@ func TestPullCommand_WithLocalChanges(t *testing.T) {
 	makeRemoteChanges(t, sourceRepo, "develop", "remote_changes.txt", "Remote changes")
 
 	// Pull should succeed (merge scenario)
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull"})
 
 	err = cmd.Execute()

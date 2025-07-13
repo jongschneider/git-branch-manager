@@ -16,7 +16,7 @@ import (
 // Helper function to make local changes in a worktree
 func makeLocalChanges(t *testing.T, worktreePath, filename, content string) {
 	filePath := filepath.Join(worktreePath, filename)
-	err := os.WriteFile(filePath, []byte(content), 0644)
+	err := os.WriteFile(filePath, []byte(content), 0o644)
 	require.NoError(t, err, "Failed to write file %s", filePath)
 
 	// Stage and commit the changes
@@ -99,9 +99,6 @@ func checkUpstreamExists(t *testing.T, worktreePath string) bool {
 }
 
 func TestPushCommand_CurrentWorktree(t *testing.T) {
-	// Reset global flag state
-	pushAll = false
-
 	// Create source repo with multiple branches and .gbm.config.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -118,7 +115,7 @@ func TestPushCommand_CurrentWorktree(t *testing.T) {
 	makeLocalChanges(t, devWorktreePath, "push_test.txt", "Local changes to push")
 
 	// Push current worktree (should push DEV since we're in it)
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push"})
 
 	err := cmd.Execute()
@@ -133,9 +130,6 @@ func TestPushCommand_CurrentWorktree(t *testing.T) {
 }
 
 func TestPushCommand_NamedWorktree(t *testing.T) {
-	// Reset global flag state
-	pushAll = false
-
 	// Create source repo with multiple branches and .gbm.config.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -152,7 +146,7 @@ func TestPushCommand_NamedWorktree(t *testing.T) {
 	makeLocalChanges(t, featWorktreePath, "named_push.txt", "Changes pushed by name")
 
 	// Push specific worktree by name
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push", "feat"})
 
 	err := cmd.Execute()
@@ -167,9 +161,6 @@ func TestPushCommand_NamedWorktree(t *testing.T) {
 }
 
 func TestPushCommand_AllWorktrees(t *testing.T) {
-	// Reset global flag state
-	pushAll = false
-
 	// Create source repo with multiple branches and .gbm.config.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -193,13 +184,11 @@ func TestPushCommand_AllWorktrees(t *testing.T) {
 	makeLocalChanges(t, featWorktreePath, "feat_push.txt", "Feature changes")
 
 	// Push all worktrees
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push", "--all"})
 
 	err := cmd.Execute()
 	require.NoError(t, err, "Push all command should succeed")
-
-	assert.True(t, pushAll, "pushAll flag should be set to true")
 
 	// Verify all changes were pushed to remote
 	verifyRemoteHasCommit(t, sourceRepo, "main", "Local change to main_push.txt")
@@ -217,9 +206,6 @@ func TestPushCommand_AllWorktrees(t *testing.T) {
 }
 
 func TestPushCommand_WithExistingUpstream(t *testing.T) {
-	// Reset global flag state
-	pushAll = false
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -236,7 +222,7 @@ func TestPushCommand_WithExistingUpstream(t *testing.T) {
 	makeLocalChanges(t, devWorktreePath, "upstream_test.txt", "Changes with existing upstream")
 
 	// Push changes
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push"})
 
 	err := cmd.Execute()
@@ -247,9 +233,6 @@ func TestPushCommand_WithExistingUpstream(t *testing.T) {
 }
 
 func TestPushCommand_WithoutUpstream(t *testing.T) {
-	// Reset global flag state
-	pushAll = false
-
 	// Create source repo and manually create a new branch without upstream
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -272,7 +255,7 @@ func TestPushCommand_WithoutUpstream(t *testing.T) {
 	makeLocalChanges(t, devWorktreePath, "no_upstream.txt", "Changes on new branch")
 
 	// Push changes (should set upstream)
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push"})
 
 	err = cmd.Execute()
@@ -291,11 +274,8 @@ func TestPushCommand_NotInWorktree(t *testing.T) {
 	// Stay in repo root (not in a worktree)
 	os.Chdir(repoPath)
 
-	// Reset global flag state
-	pushAll = false
-
 	// Try to push without specifying worktree name
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push"})
 
 	err := cmd.Execute()
@@ -312,11 +292,8 @@ func TestPushCommand_NonexistentWorktree(t *testing.T) {
 	// Stay in repo root
 	os.Chdir(repoPath)
 
-	// Reset global flag state
-	pushAll = false
-
 	// Try to push nonexistent worktree
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push", "NONEXISTENT"})
 
 	err := cmd.Execute()
@@ -332,11 +309,8 @@ func TestPushCommand_NotInGitRepo(t *testing.T) {
 
 	os.Chdir(tempDir)
 
-	// Reset global flag state
-	pushAll = false
-
 	// Try to push in non-git directory
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push"})
 
 	err := cmd.Execute()
@@ -345,9 +319,6 @@ func TestPushCommand_NotInGitRepo(t *testing.T) {
 }
 
 func TestPushCommand_WithLocalCommits(t *testing.T) {
-	// Reset global flag state
-	pushAll = false
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -366,7 +337,7 @@ func TestPushCommand_WithLocalCommits(t *testing.T) {
 	makeLocalChanges(t, devWorktreePath, "commit3.txt", "Third commit")
 
 	// Push all local commits
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push"})
 
 	err := cmd.Execute()
@@ -383,9 +354,6 @@ func TestPushCommand_WithLocalCommits(t *testing.T) {
 }
 
 func TestPushCommand_UpToDate(t *testing.T) {
-	// Reset global flag state
-	pushAll = false
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -399,7 +367,7 @@ func TestPushCommand_UpToDate(t *testing.T) {
 	initialHash := getRemoteCommitHash(t, sourceRepo, "develop")
 
 	// Push without any local changes (should be up to date)
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push"})
 
 	err := cmd.Execute()
@@ -411,9 +379,6 @@ func TestPushCommand_UpToDate(t *testing.T) {
 }
 
 func TestPushCommand_EmptyWorktreeList(t *testing.T) {
-	// Reset global flag state
-	pushAll = false
-
 	// Create basic repo without worktrees
 	sourceRepo := testutils.NewBasicRepo(t)
 
@@ -424,7 +389,7 @@ func TestPushCommand_EmptyWorktreeList(t *testing.T) {
 	os.Chdir(targetDir)
 
 	// Clone the repository but don't sync worktrees
-	cloneCmd := rootCmd
+	cloneCmd := newRootCommand()
 	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
 	err := cloneCmd.Execute()
 	require.NoError(t, err, "Failed to clone repository")
@@ -435,11 +400,9 @@ func TestPushCommand_EmptyWorktreeList(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// Try to push all worktrees when none exist
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"push", "--all"})
 
 	err = cmd.Execute()
 	require.NoError(t, err, "Push all should succeed even with no worktrees")
-
-	assert.True(t, pushAll, "pushAll flag should be set to true")
 }

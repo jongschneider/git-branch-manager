@@ -19,29 +19,49 @@ var (
 	logFile     *os.File
 )
 
-var rootCmd = &cobra.Command{
-	Use:   "gbm",
-	Short: "Git Branch Manager - Manage Git worktrees based on .envrc configuration",
-	Long: `Git Branch Manager (gbm) is a CLI tool that manages Git repository branches
+func newRootCommand() *cobra.Command {
+	rootCmd := &cobra.Command{
+		Use:   "gbm",
+		Short: "Git Branch Manager - Manage Git worktrees based on .envrc configuration",
+		Long: `Git Branch Manager (gbm) is a CLI tool that manages Git repository branches
 and worktrees based on environment variables defined in a .envrc file.
 
 The tool synchronizes local worktrees with branch definitions and provides
 notifications when configurations drift out of sync.`,
-	PersistentPreRun: func(cmd *cobra.Command, args []string) {
-		InitializeLogging()
-		checkAndDisplayMergeBackAlerts()
-	},
-}
+		PersistentPreRun: func(cmd *cobra.Command, args []string) {
+			InitializeLogging()
+			checkAndDisplayMergeBackAlerts()
+		},
+	}
 
-func Execute() error {
-	return rootCmd.Execute()
-}
-
-func init() {
+	// Add persistent flags
 	rootCmd.PersistentFlags().StringVarP(&configPath, "config", "c", "", "specify custom .envrc path")
 	rootCmd.PersistentFlags().StringVarP(&worktreeDir, "worktree-dir", "w", "", "override worktree directory location")
 	rootCmd.PersistentFlags().BoolVarP(&debug, "debug", "d", false, "enable debug logging to ./gbm.log")
+
+	// Add all subcommands
+	rootCmd.AddCommand(newPushCommand())
+	rootCmd.AddCommand(addCmd)
+	rootCmd.AddCommand(cloneCmd)
+	rootCmd.AddCommand(completionCmd)
+	rootCmd.AddCommand(hotfixCmd)
+	rootCmd.AddCommand(infoCmd)
+	rootCmd.AddCommand(listCmd)
+	rootCmd.AddCommand(mergebackCmd)
+	rootCmd.AddCommand(pullCmd)
+	rootCmd.AddCommand(removeCmd)
+	rootCmd.AddCommand(shellIntegrationCmd)
+	rootCmd.AddCommand(switchCmd)
+	rootCmd.AddCommand(syncCmd)
+	rootCmd.AddCommand(validateCmd)
+
+	return rootCmd
 }
+
+func Execute() error {
+	return newRootCommand().Execute()
+}
+
 
 func GetConfigPath() string {
 	if configPath != "" {

@@ -67,7 +67,7 @@ func TestMergebackCommand(t *testing.T) {
 			require.NoError(t, err)
 
 			// Create fresh root command to avoid state conflicts
-			cmd := rootCmd
+			cmd := newRootCommand()
 			args := append([]string{"mergeback"}, tt.args...)
 			cmd.SetArgs(args)
 
@@ -438,7 +438,7 @@ func TestMergebackIntegration(t *testing.T) {
 	// Test manual mergeback creation
 	t.Run("manual mergeback creation", func(t *testing.T) {
 		// Create a fresh root command instance
-		cmd := rootCmd
+		cmd := newRootCommand()
 		cmd.SetArgs([]string{"mergeback", "fix-auth", "SHOP-456"})
 
 		err := cmd.Execute()
@@ -537,7 +537,7 @@ last_sync = "1970-01-01T00:00:00Z"
 		require.NoError(t, err)
 
 		// Test mergeback creation without prefix
-		cmd := rootCmd
+		cmd := newRootCommand()
 		cmd.SetArgs([]string{"mergeback", "fix-auth", "SHOP-456"})
 
 		err = cmd.Execute()

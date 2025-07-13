@@ -23,7 +23,7 @@ func setupClonedRepo(t *testing.T, sourceRepo *testutils.GitTestRepo) string {
 	os.Chdir(targetDir)
 
 	// Clone the repository
-	cloneCmd := rootCmd
+	cloneCmd := newRootCommand()
 	cloneCmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
 	err := cloneCmd.Execute()
 	require.NoError(t, err, "Failed to clone repository")
@@ -43,7 +43,7 @@ func setupClonedRepoWithWorktrees(t *testing.T, sourceRepo *testutils.GitTestRep
 	repoPath := setupClonedRepo(t, sourceRepo)
 
 	// Sync worktrees
-	syncCmd := rootCmd
+	syncCmd := newRootCommand()
 	syncCmd.SetArgs([]string{"sync"})
 	err := syncCmd.Execute()
 	require.NoError(t, err, "Failed to sync worktrees")

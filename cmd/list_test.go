@@ -74,7 +74,7 @@ func TestListCommand_EmptyRepository(t *testing.T) {
 	repo.WriteFile(".gbm.config.yaml", "# Empty .gbm.config.yaml")
 	repo.CommitChanges("Add empty .gbm.config.yaml")
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
 
 	var output bytes.Buffer
@@ -99,7 +99,7 @@ func TestListCommand_WithGBMConfigWorktrees(t *testing.T) {
 
 	os.Chdir(repo.GetLocalPath())
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
 
 	var output bytes.Buffer
@@ -121,13 +121,13 @@ func TestListCommand_UntrackedWorktrees(t *testing.T) {
 	setupClonedRepo(t, sourceRepo)
 
 	// Create an additional worktree that's not in .gbm.config.yaml (untracked)
-	addCmd := rootCmd
+	addCmd := newRootCommand()
 	addCmd.SetArgs([]string{"add", "--new-branch", "UNTRACKED", "develop"})
 	err := addCmd.Execute()
 	require.NoError(t, err)
 
 	// Now test the list command
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
 
 	var output bytes.Buffer
@@ -174,7 +174,7 @@ func TestListCommand_OrphanedWorktrees(t *testing.T) {
 	require.NoError(t, err)
 
 	// Now test the list command
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
 
 	var output bytes.Buffer
@@ -218,7 +218,7 @@ func TestListCommand_GitStatus(t *testing.T) {
 	require.NoError(t, err)
 
 	// Now test the list command
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
 
 	var output bytes.Buffer
@@ -269,7 +269,7 @@ func TestListCommand_ExpectedBranchDisplay(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// Now test the list command
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
 
 	var output bytes.Buffer
@@ -310,13 +310,13 @@ func TestListCommand_SortedOutput(t *testing.T) {
 	setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Create an additional ad-hoc worktree to test sorting
-	addCmd := rootCmd
+	addCmd := newRootCommand()
 	addCmd.SetArgs([]string{"add", "--new-branch", "adhoc", "production/v1.0"})
 	err := addCmd.Execute()
 	require.NoError(t, err)
 
 	// Now test the list command
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
 
 	var output bytes.Buffer
@@ -395,7 +395,7 @@ func TestListCommand_NoGitRepository(t *testing.T) {
 
 	os.Chdir(tempDir)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
 
 	err := cmd.Execute()
@@ -416,7 +416,7 @@ func TestListCommand_NoGBMConfigFile(t *testing.T) {
 		os.Remove(gbmConfigPath)
 	}
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
 
 	err := cmd.Execute()

@@ -82,7 +82,6 @@ func handlePullNamed(manager *internal.Manager, worktreeName string) error {
 }
 
 func init() {
-	rootCmd.AddCommand(pullCmd)
 	pullCmd.Flags().BoolVar(&pullAll, "all", false, "Pull all worktrees")
 
 	// Add completion for worktree names

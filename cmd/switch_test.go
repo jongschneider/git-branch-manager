@@ -47,7 +47,7 @@ func TestSwitchCommand_BasicWorktreeSwitching(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := rootCmd
+			cmd := newRootCommand()
 			cmd.SetArgs([]string{"switch", tt.worktreeName})
 
 			output, err := captureOutput(func() error {
@@ -85,7 +85,7 @@ func TestSwitchCommand_PrintPathFlag(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := rootCmd
+			cmd := newRootCommand()
 			cmd.SetArgs([]string{"switch", "--print-path", tt.worktreeName})
 
 			output, err := captureOutput(func() error {
@@ -147,7 +147,7 @@ func TestSwitchCommand_FuzzyMatching(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := rootCmd
+			cmd := newRootCommand()
 			cmd.SetArgs([]string{"switch", tt.input})
 
 			output, err := captureOutput(func() error {
@@ -176,7 +176,7 @@ func TestSwitchCommand_ListWorktrees(t *testing.T) {
 
 	os.Chdir(repoPath)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"switch"})
 
 	output, err := captureOutput(func() error {
@@ -202,19 +202,19 @@ func TestSwitchCommand_PreviousWorktree(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// First, switch to dev to establish a previous worktree
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"switch", "dev"})
 	err := cmd.Execute()
 	require.NoError(t, err, "Initial switch to dev should succeed")
 
 	// Then switch to main
-	cmd = rootCmd
+	cmd = newRootCommand()
 	cmd.SetArgs([]string{"switch", "main"})
 	err = cmd.Execute()
 	require.NoError(t, err, "Switch to main should succeed")
 
 	// Now switch back to previous (should be dev) using --print-path to get the actual path
-	cmd = rootCmd
+	cmd = newRootCommand()
 	cmd.SetArgs([]string{"switch", "--print-path", "-"})
 
 	output, err := captureOutput(func() error {
@@ -232,7 +232,7 @@ func TestSwitchCommand_NoPreviousWorktree(t *testing.T) {
 	os.Chdir(repoPath)
 
 	// Try to switch to previous without any previous worktree
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"switch", "-"})
 
 	err := cmd.Execute()
@@ -252,7 +252,7 @@ func TestSwitchCommand_ShellIntegration(t *testing.T) {
 	// Set shell integration environment variable
 	t.Setenv("GBM_SHELL_INTEGRATION", "1")
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"switch", "FEAT"})
 
 	output, err := captureOutput(func() error {
@@ -319,7 +319,7 @@ func TestSwitchCommand_ErrorConditions(t *testing.T) {
 
 			os.Chdir(repoPath)
 
-			cmd := rootCmd
+			cmd := newRootCommand()
 			cmd.SetArgs(tt.args)
 
 			output, err := captureOutput(func() error {

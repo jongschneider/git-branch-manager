@@ -507,5 +507,4 @@ func formatJiraURL(selfURL, key string) string {
 }
 
 func init() {
-	rootCmd.AddCommand(infoCmd)
 }

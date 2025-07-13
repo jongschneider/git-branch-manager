@@ -33,7 +33,7 @@ func runValidateCommand(t *testing.T, workDir string, args []string) (string, er
 	require.NoError(t, err)
 
 	// Use the actual root command to ensure flags are properly handled
-	cmd := rootCmd
+	cmd := newRootCommand()
 
 	// Capture both stdout and stderr since validate command uses fmt.Println
 	var buf bytes.Buffer

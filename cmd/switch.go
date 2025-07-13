@@ -184,7 +184,6 @@ func listWorktrees(manager *internal.Manager) error {
 }
 
 func init() {
-	rootCmd.AddCommand(switchCmd)
 	switchCmd.Flags().BoolVar(&printPath, "print-path", false, "Print the worktree path only (for shell integration)")
 
 	// Add completion for worktree names

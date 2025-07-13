@@ -68,5 +68,4 @@ and ensuring configuration correctness before syncing.`,
 }
 
 func init() {
-	rootCmd.AddCommand(validateCmd)
 }

@@ -72,7 +72,6 @@ Examples:
 }
 
 func init() {
-	rootCmd.AddCommand(removeCmd)
 
 	removeCmd.Flags().BoolVarP(&force, "force", "f", false, "Force removal even if worktree has uncommitted changes")
 

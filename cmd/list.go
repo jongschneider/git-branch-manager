@@ -101,5 +101,4 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 }
 
 func init() {
-	rootCmd.AddCommand(listCmd)
 }

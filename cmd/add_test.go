@@ -34,7 +34,7 @@ func TestAddCommand_NewBranchFromRemote(t *testing.T) {
 
 	// Test adding worktree with a new branch name based on a remote branch
 	// This should create a new branch and worktree
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"add", "TEST", "test-branch", "develop", "-b"})
 
 	err = cmd.Execute()
@@ -70,7 +70,7 @@ func TestAddCommand_NewBranch(t *testing.T) {
 	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"add", "FEATURE", "feature/new-feature", "-b"})
 
 	err = cmd.Execute()
@@ -109,7 +109,7 @@ func TestAddCommand_NewBranchWithBaseBranch(t *testing.T) {
 	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"add", "HOTFIX", "hotfix/urgent-fix", "develop", "-b"})
 
 	err = cmd.Execute()
@@ -145,7 +145,7 @@ func TestAddCommand_InvalidBaseBranch(t *testing.T) {
 	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"add", "TEST", "feature/test", "nonexistent-branch", "-b"})
 
 	err = cmd.Execute()
@@ -173,7 +173,7 @@ func TestAddCommand_JIRAKeyGeneration(t *testing.T) {
 
 	// Test JIRA key without branch name and no -b flag
 	// Should give a specific error with suggestion
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"add", "PROJ-123"})
 
 	err = cmd.Execute()
@@ -237,7 +237,7 @@ func TestAddCommand_MissingBranchName(t *testing.T) {
 	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"add", "TEST"})
 
 	err = cmd.Execute()
@@ -263,7 +263,7 @@ func TestAddCommand_NewBranchWithoutFlag(t *testing.T) {
 	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"add", "TEST", "nonexistent-branch"})
 
 	err = cmd.Execute()
@@ -289,7 +289,7 @@ func TestAddCommand_AutoGenerateBranchWithFlag(t *testing.T) {
 	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
-	cmd := rootCmd
+	cmd := newRootCommand()
 	cmd.SetArgs([]string{"add", "TEST-FEATURE", "-b"})
 
 	err = cmd.Execute()
@@ -326,13 +326,13 @@ func TestAddCommand_DuplicateWorktreeName(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add first worktree (create new branch to avoid the existing branch issue)
-	cmd1 := rootCmd
+	cmd1 := newRootCommand()
 	cmd1.SetArgs([]string{"add", "TEST", "test-branch-1", "-b"})
 	err = cmd1.Execute()
 	require.NoError(t, err)
 
 	// Try to add worktree with same name
-	cmd2 := rootCmd
+	cmd2 := newRootCommand()
 	cmd2.SetArgs([]string{"add", "TEST", "test-branch-2", "-b"})
 	err = cmd2.Execute()
 	assert.Error(t, err)
@@ -396,7 +396,7 @@ func TestAddCommand_FromWorktreeDirectory(t *testing.T) {
 	require.NoError(t, err)
 
 	// First add a worktree (create new branch to avoid existing branch issues)
-	cmd1 := rootCmd
+	cmd1 := newRootCommand()
 	cmd1.SetArgs([]string{"add", "DEV", "dev-branch", "-b"})
 	err = cmd1.Execute()
 	require.NoError(t, err)
@@ -410,7 +410,7 @@ func TestAddCommand_FromWorktreeDirectory(t *testing.T) {
 	require.NoError(t, err)
 
 	// Add another worktree from within the first worktree
-	cmd2 := rootCmd
+	cmd2 := newRootCommand()
 	cmd2.SetArgs([]string{"add", "FEATURE", "feature/test", "-b"})
 	err = cmd2.Execute()
 	require.NoError(t, err)

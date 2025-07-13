@@ -549,7 +549,6 @@ func getJiraCompletions() []string {
 }
 
 func init() {
-	rootCmd.AddCommand(mergebackCmd)
 
 	// Add smart auto-detection results as tab completion for first argument
 	mergebackCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {

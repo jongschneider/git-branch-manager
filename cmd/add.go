@@ -172,7 +172,6 @@ func generateBranchName(worktreeName string, manager *internal.Manager) string {
 }
 
 func init() {
-	rootCmd.AddCommand(addCmd)
 
 	addCmd.Flags().BoolVarP(&newBranch, "new-branch", "b", false, "Create a new branch for the worktree")
 	addCmd.Flags().BoolVarP(&interactive, "interactive", "i", false, "Interactive mode to select branch")

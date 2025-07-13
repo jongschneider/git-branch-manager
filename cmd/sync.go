@@ -91,7 +91,6 @@ updates existing worktrees if branch references have changed, and optionally rem
 }
 
 func init() {
-	rootCmd.AddCommand(syncCmd)
 	syncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false, "show what would be changed without making changes")
 	syncCmd.Flags().BoolVar(&syncForce, "force", false, "skip confirmation prompts and remove orphaned worktrees")
 }

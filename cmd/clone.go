@@ -279,5 +279,4 @@ func initializeWorktreeManagement() error {
 }
 
 func init() {
-	rootCmd.AddCommand(cloneCmd)
 }
