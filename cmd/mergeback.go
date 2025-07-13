@@ -11,7 +11,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var mergebackCmd = &cobra.Command{
+func newMergebackCommand() *cobra.Command {
+	cmd := &cobra.Command{
 	Use:     "mergeback [worktree-name] [jira-ticket]",
 	Aliases: []string{"mb"},
 	Short:   "Create a mergeback worktree to merge changes up the deployment chain",
@@ -42,7 +43,7 @@ Tab Completion:
 		var jiraTicket string
 
 		// Create manager
-		manager, err := createInitializedManager()
+		manager, err := createInitializedManagerWithCmd(cmd)
 		if err != nil {
 			return err
 		}
@@ -100,6 +101,21 @@ Tab Completion:
 
 		return nil
 	},
+	}
+
+	// Add smart auto-detection results as tab completion for first argument
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 {
+			// First argument: provide smart detection results + JIRA completions
+			return getSmartMergebackCompletions(), cobra.ShellCompDirectiveNoFileComp
+		} else if len(args) == 1 {
+			// Second argument: JIRA ticket completions
+			return getJiraCompletions(), cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return cmd
 }
 
 // findMergeTargetBranchAndWorktree finds the branch and worktree that should be used as the base for mergeback
@@ -471,7 +487,7 @@ func getSmartMergebackCompletions() []string {
 	var completions []string
 
 	// Try to get smart detection results
-	manager, err := createInitializedManager()
+	manager, err := createInitializedManager() // Legacy call in helper function
 	if err != nil {
 		// Fallback to JIRA completions if manager fails
 		return getJiraCompletions()
@@ -529,7 +545,7 @@ func getJiraCompletions() []string {
 	var completions []string
 
 	// Try to get config for JIRA completion
-	manager, err := createInitializedManager()
+	manager, err := createInitializedManager() // Legacy call in helper function
 	if err != nil {
 		return completions
 	}
@@ -548,17 +564,3 @@ func getJiraCompletions() []string {
 	return completions
 }
 
-func init() {
-
-	// Add smart auto-detection results as tab completion for first argument
-	mergebackCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			// First argument: provide smart detection results + JIRA completions
-			return getSmartMergebackCompletions(), cobra.ShellCompDirectiveNoFileComp
-		} else if len(args) == 1 {
-			// Second argument: JIRA ticket completions
-			return getJiraCompletions(), cobra.ShellCompDirectiveNoFileComp
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-}

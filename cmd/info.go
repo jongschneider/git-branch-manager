@@ -15,19 +15,30 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var infoCmd = &cobra.Command{
-	Use:   "info <worktree-name>",
-	Short: "Display detailed information about a worktree",
-	Long: `Display comprehensive information about a specific worktree including:
+func newInfoCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "info <worktree-name>",
+		Short: "Display detailed information about a worktree",
+		Long: `Display comprehensive information about a specific worktree including:
 - Worktree metadata (name, path, branch, creation date)
 - Git status and branch information
 - JIRA ticket details (if the worktree name matches a JIRA key)
 - Recent commits and modified files`,
-	Args: cobra.ExactArgs(1),
-	RunE: runInfoCommand,
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			return runInfoCommandWithCmd(cmd, args)
+		},
+	}
+
+	return cmd
 }
 
 func runInfoCommand(cmd *cobra.Command, args []string) error {
+	// Legacy function
+	return runInfoCommandWithCmd(nil, args)
+}
+
+func runInfoCommandWithCmd(cmd *cobra.Command, args []string) error {
 	worktreeName := args[0]
 
 	// Handle current directory reference
@@ -40,7 +51,7 @@ func runInfoCommand(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize git manager
-	gitManager, err := createInitializedGitManager()
+	gitManager, err := createInitializedGitManagerWithCmd(cmd)
 	if err != nil {
 		return err
 	}

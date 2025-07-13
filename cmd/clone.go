@@ -13,46 +13,50 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var cloneCmd = &cobra.Command{
-	Use:   "clone <repository-url>",
-	Short: "Clone a repository as a bare repo and create the main worktree",
-	Long: `Clone a repository as a bare repository and create the main worktree
+func newCloneCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "clone <repository-url>",
+		Short: "Clone a repository as a bare repo and create the main worktree",
+		Long: `Clone a repository as a bare repository and create the main worktree
 using the HEAD branch. This sets up the repository structure for
 worktree-based development.`,
-	Args: cobra.ExactArgs(1),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		repoUrl := args[0]
+		Args: cobra.ExactArgs(1),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			repoUrl := args[0]
 
-		PrintInfo("Cloning repository using git-bare-clone.sh...")
-		if err := runGitBareClone(repoUrl); err != nil {
-			return fmt.Errorf("failed to clone repository: %w", err)
-		}
+			PrintInfo("Cloning repository using git-bare-clone.sh...")
+			if err := runGitBareClone(repoUrl); err != nil {
+				return fmt.Errorf("failed to clone repository: %w", err)
+			}
 
-		PrintInfo("Discovering default branch...")
-		defaultBranch, err := getDefaultBranch()
-		if err != nil {
-			return fmt.Errorf("failed to discover default branch: %w", err)
-		}
-		PrintInfo("Default branch: %s", defaultBranch)
+			PrintInfo("Discovering default branch...")
+			defaultBranch, err := getDefaultBranch()
+			if err != nil {
+				return fmt.Errorf("failed to discover default branch: %w", err)
+			}
+			PrintInfo("Default branch: %s", defaultBranch)
 
-		PrintInfo("Creating main worktree...")
-		if err := createMainWorktree(defaultBranch); err != nil {
-			return fmt.Errorf("failed to create main worktree: %w", err)
-		}
+			PrintInfo("Creating main worktree...")
+			if err := createMainWorktree(defaultBranch); err != nil {
+				return fmt.Errorf("failed to create main worktree: %w", err)
+			}
 
-		PrintInfo("Setting up .gbm.config.yaml configuration...")
-		if err := setupGBMConfig(defaultBranch); err != nil {
-			return fmt.Errorf("failed to setup .gbm.config.yaml: %w", err)
-		}
+			PrintInfo("Setting up .gbm.config.yaml configuration...")
+			if err := setupGBMConfig(defaultBranch); err != nil {
+				return fmt.Errorf("failed to setup .gbm.config.yaml: %w", err)
+			}
 
-		PrintInfo("Initializing worktree management...")
-		if err := initializeWorktreeManagement(); err != nil {
-			return fmt.Errorf("failed to initialize worktree management: %w", err)
-		}
+			PrintInfo("Initializing worktree management...")
+			if err := initializeWorktreeManagementWithCmd(cmd); err != nil {
+				return fmt.Errorf("failed to initialize worktree management: %w", err)
+			}
 
-		PrintInfo("Repository cloned successfully!")
-		return nil
-	},
+			PrintInfo("Repository cloned successfully!")
+			return nil
+		},
+	}
+
+	return cmd
 }
 
 func runGitBareClone(repoUrl string) error {
@@ -249,6 +253,11 @@ worktrees:
 }
 
 func initializeWorktreeManagement() error {
+	// Legacy function - uses default config path
+	return initializeWorktreeManagementWithCmd(nil)
+}
+
+func initializeWorktreeManagementWithCmd(cmd *cobra.Command) error {
 	// Get current working directory (repository root)
 	wd, err := os.Getwd()
 	if err != nil {
@@ -262,7 +271,12 @@ func initializeWorktreeManagement() error {
 	}
 
 	// Load .gbm.config.yaml configuration
-	if err := manager.LoadGBMConfig(GetConfigPath()); err != nil {
+	configPath := GetConfigPath() // Default fallback
+	if cmd != nil {
+		configPath = getConfigPath(cmd)
+	}
+
+	if err := manager.LoadGBMConfig(configPath); err != nil {
 		return fmt.Errorf("failed to load .gbm.config.yaml: %w", err)
 	}
 

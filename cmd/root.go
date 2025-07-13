@@ -39,18 +39,18 @@ notifications when configurations drift out of sync.`,
 	// Add all subcommands
 	rootCmd.AddCommand(newPushCommand())
 	rootCmd.AddCommand(newAddCommand())
-	rootCmd.AddCommand(cloneCmd)
+	rootCmd.AddCommand(newCloneCommand())
 	rootCmd.AddCommand(completionCmd)
-	rootCmd.AddCommand(hotfixCmd)
-	rootCmd.AddCommand(infoCmd)
-	rootCmd.AddCommand(listCmd)
-	rootCmd.AddCommand(mergebackCmd)
+	rootCmd.AddCommand(newHotfixCommand())
+	rootCmd.AddCommand(newInfoCommand())
+	rootCmd.AddCommand(newListCommand())
+	rootCmd.AddCommand(newMergebackCommand())
 	rootCmd.AddCommand(newPullCommand())
 	rootCmd.AddCommand(newRemoveCommand())
 	rootCmd.AddCommand(shellIntegrationCmd)
 	rootCmd.AddCommand(newSwitchCommand())
 	rootCmd.AddCommand(newSyncCommand())
-	rootCmd.AddCommand(validateCmd)
+	rootCmd.AddCommand(newValidateCommand())
 
 	return rootCmd
 }

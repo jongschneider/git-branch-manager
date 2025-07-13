@@ -35,21 +35,22 @@ func TestGetJiraCompletions(t *testing.T) {
 func TestMergebackValidArgsFunction(t *testing.T) {
 	t.Run("returns completions for first argument", func(t *testing.T) {
 		// Test the ValidArgsFunction for the mergeback command
-		validArgsFunc := mergebackCmd.ValidArgsFunction
+		cmd := newMergebackCommand()
+		validArgsFunc := cmd.ValidArgsFunction
 		assert.NotNil(t, validArgsFunc)
 
 		// Test first argument (should get smart completions)
-		completions, directive := validArgsFunc(mergebackCmd, []string{}, "")
+		completions, directive := validArgsFunc(cmd, []string{}, "")
 		assert.NotNil(t, completions)
 		assert.Equal(t, int(cobra.ShellCompDirectiveNoFileComp), int(directive))
 
 		// Test second argument (should get JIRA completions)
-		completions2, directive2 := validArgsFunc(mergebackCmd, []string{"test"}, "")
+		completions2, directive2 := validArgsFunc(cmd, []string{"test"}, "")
 		assert.NotNil(t, completions2)
 		assert.Equal(t, int(cobra.ShellCompDirectiveNoFileComp), int(directive2))
 
 		// Test third argument (should return nil)
-		completions3, directive3 := validArgsFunc(mergebackCmd, []string{"test", "jira"}, "")
+		completions3, directive3 := validArgsFunc(cmd, []string{"test", "jira"}, "")
 		assert.Nil(t, completions3)
 		assert.Equal(t, int(cobra.ShellCompDirectiveNoFileComp), int(directive3))
 	})

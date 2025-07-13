@@ -11,7 +11,8 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var hotfixCmd = &cobra.Command{
+func newHotfixCommand() *cobra.Command {
+	cmd := &cobra.Command{
 	Use:     "hotfix <worktree-name> [jira-ticket]",
 	Aliases: []string{"hf"},
 	Short:   "Create a hotfix worktree from the production branch",
@@ -35,7 +36,7 @@ Examples:
 		worktreeName := args[0]
 
 		// Create manager
-		manager, err := createInitializedManager()
+		manager, err := createInitializedManagerWithCmd(cmd)
 		if err != nil {
 			return err
 		}
@@ -82,6 +83,34 @@ Examples:
 
 		return nil
 	},
+	}
+
+	// Add JIRA key completions for both positional arguments
+	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
+		if len(args) == 0 || len(args) == 1 {
+			// Try to get config for JIRA completion
+			manager, err := createInitializedManager() // Legacy call in completion function
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			// Complete JIRA keys with summaries for context
+			jiraIssues, err := internal.GetJiraIssues(manager)
+			if err != nil {
+				return nil, cobra.ShellCompDirectiveNoFileComp
+			}
+
+			var completions []string
+			for _, issue := range jiraIssues {
+				completion := fmt.Sprintf("%s\t%s", issue.Key, issue.Summary)
+				completions = append(completions, completion)
+			}
+			return completions, cobra.ShellCompDirectiveNoFileComp
+		}
+		return nil, cobra.ShellCompDirectiveNoFileComp
+	}
+
+	return cmd
 }
 
 // findProductionBranch finds the branch at the bottom of the mergeback chain
@@ -187,30 +216,3 @@ func generateHotfixBranchName(worktreeName, jiraTicket string, manager *internal
 	return branchName, nil
 }
 
-func init() {
-
-	// Add JIRA key completions for both positional arguments
-	hotfixCmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 || len(args) == 1 {
-			// Try to get config for JIRA completion
-			manager, err := createInitializedManager()
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-
-			// Complete JIRA keys with summaries for context
-			jiraIssues, err := internal.GetJiraIssues(manager)
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-
-			var completions []string
-			for _, issue := range jiraIssues {
-				completion := fmt.Sprintf("%s\t%s", issue.Key, issue.Summary)
-				completions = append(completions, completion)
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
-		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
-	}
-}

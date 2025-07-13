@@ -8,18 +8,19 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var validateCmd = &cobra.Command{
-	Use:   "validate",
-	Short: "Validate .gbm.config.yaml syntax and branch references",
-	Long: `Validate .gbm.config.yaml syntax and branch references.
+func newValidateCommand() *cobra.Command {
+	cmd := &cobra.Command{
+		Use:   "validate",
+		Short: "Validate .gbm.config.yaml syntax and branch references",
+		Long: `Validate .gbm.config.yaml syntax and branch references.
 
 Checks if referenced branches exist locally or remotely. Useful for CI/CD integration
 and ensuring configuration correctness before syncing.`,
-	RunE: func(cmd *cobra.Command, args []string) error {
-		manager, err := createInitializedManagerStrict()
-		if err != nil {
-			return err
-		}
+		RunE: func(cmd *cobra.Command, args []string) error {
+			manager, err := createInitializedManagerStrictWithCmd(cmd)
+			if err != nil {
+				return err
+			}
 
 		PrintVerbose("Validating branch references...")
 
@@ -65,6 +66,9 @@ and ensuring configuration correctness before syncing.`,
 
 		return nil
 	},
+	}
+
+	return cmd
 }
 
 func init() {
