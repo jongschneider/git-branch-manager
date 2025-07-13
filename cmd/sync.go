@@ -12,7 +12,6 @@ import (
 var (
 	syncDryRun bool
 	syncForce  bool
-	syncFetch  bool
 )
 
 var syncCmd = &cobra.Command{
@@ -20,8 +19,8 @@ var syncCmd = &cobra.Command{
 	Short: "Synchronize all worktrees with current .gbm.config.yaml definitions",
 	Long: `Synchronize all worktrees with current .gbm.config.yaml definitions.
 
-Creates missing worktrees for new worktree configurations, updates existing worktrees
-if branch references have changed, and optionally removes orphaned worktrees.`,
+Fetches from remote first, then creates missing worktrees for new worktree configurations,
+updates existing worktrees if branch references have changed, and optionally removes orphaned worktrees.`,
 	RunE: func(cmd *cobra.Command, args []string) error {
 		manager, err := createInitializedManagerStrict()
 		if err != nil {
@@ -68,7 +67,7 @@ if branch references have changed, and optionally removes orphaned worktrees.`,
 			return nil
 		}
 
-		PrintVerbose("Synchronizing worktrees (force=%v, fetch=%v)", syncForce, syncFetch)
+		PrintVerbose("Synchronizing worktrees (force=%v)", syncForce)
 
 		// Create confirmation function for destructive operations
 		// Only prompt when force is used (to confirm destructive actions)
@@ -82,7 +81,7 @@ if branch references have changed, and optionally removes orphaned worktrees.`,
 			}
 		}
 
-		if err := manager.SyncWithConfirmation(syncDryRun, syncForce, syncFetch, confirmFunc); err != nil {
+		if err := manager.SyncWithConfirmation(syncDryRun, syncForce, confirmFunc); err != nil {
 			return err
 		}
 
@@ -95,5 +94,4 @@ func init() {
 	rootCmd.AddCommand(syncCmd)
 	syncCmd.Flags().BoolVar(&syncDryRun, "dry-run", false, "show what would be changed without making changes")
 	syncCmd.Flags().BoolVar(&syncForce, "force", false, "skip confirmation prompts and remove orphaned worktrees")
-	syncCmd.Flags().BoolVar(&syncFetch, "fetch", false, "update remote tracking before sync")
 }

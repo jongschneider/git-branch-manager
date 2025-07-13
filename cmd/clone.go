@@ -268,7 +268,7 @@ func initializeWorktreeManagement() error {
 
 	// Initialize worktree management - create worktrees for each .gbm.config.yaml mapping
 	// Use a more permissive sync that doesn't fail on invalid branches during clone
-	if err := manager.Sync(false, false, false); err != nil {
+	if err := manager.Sync(false, false); err != nil {
 		// For clone operations, we want to be more permissive and not fail
 		// if there are invalid branch references in the .gbm.config.yaml file
 		PrintInfo("Warning: some branch references in .gbm.config.yaml may be invalid: %v", err)

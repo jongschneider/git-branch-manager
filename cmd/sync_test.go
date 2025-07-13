@@ -18,7 +18,6 @@ import (
 func resetSyncFlags() {
 	syncDryRun = false
 	syncForce = false
-	syncFetch = false
 }
 
 
@@ -143,21 +142,6 @@ func TestSyncCommand_Flags(t *testing.T) {
 				// We need to use the manager directly with mock confirmation instead
 				require.Error(t, err)
 				assert.ErrorContains(t, err, "sync cancelled by user")
-			},
-		},
-		{
-			name: "fetch flag updates remote tracking",
-			args: []string{"sync", "--fetch"},
-			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
-				// Basic setup - sync should work normally with fetch
-			},
-			validate: func(t *testing.T, repoPath string, output string, err error) {
-				require.NoError(t, err)
-				// Verify worktrees exist (fetch doesn't prevent sync)
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "dev"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "feat"))
-				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "prod"))
 			},
 		},
 	}
@@ -711,7 +695,7 @@ func TestSyncCommand_ForceConfirmationDirectManagerTest(t *testing.T) {
 	}
 
 	// Test sync with force and confirmation
-	err = manager.SyncWithConfirmation(false, true, false, confirmFunc)
+	err = manager.SyncWithConfirmation(false, true, confirmFunc)
 	require.NoError(t, err)
 
 	// Verify orphaned worktrees were removed
@@ -800,7 +784,7 @@ func TestSyncCommand_ForceConfirmation(t *testing.T) {
 			}
 
 			// Test sync with confirmation
-			err = manager.SyncWithConfirmation(false, true, false, confirmFunc)
+			err = manager.SyncWithConfirmation(false, true, confirmFunc)
 
 			if tt.shouldSucceed {
 				require.NoError(t, err)

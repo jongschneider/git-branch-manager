@@ -137,20 +137,19 @@ func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 	return status, nil
 }
 
-func (m *Manager) Sync(dryRun, force, fetch bool) error {
-	return m.SyncWithConfirmation(dryRun, force, fetch, nil)
+func (m *Manager) Sync(dryRun, force bool) error {
+	return m.SyncWithConfirmation(dryRun, force, nil)
 }
 
-func (m *Manager) SyncWithConfirmation(dryRun, force, fetch bool, confirmFunc ConfirmationFunc) error {
+func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc ConfirmationFunc) error {
 	// Validate all branches exist before performing any operations
 	if err := m.ValidateConfig(); err != nil {
 		return err
 	}
 
-	if fetch {
-		if err := m.gitManager.FetchAll(); err != nil {
-			return fmt.Errorf("failed to fetch: %w", err)
-		}
+	// Always fetch from remote before sync
+	if err := m.gitManager.FetchAll(); err != nil {
+		return fmt.Errorf("failed to fetch: %w", err)
 	}
 
 	status, err := m.GetSyncStatus()

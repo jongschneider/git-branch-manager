@@ -106,14 +106,13 @@ ERROR: Error: exit status 1
     * commit messages
 - [ ] consider a timestamp based approach for checking drift
     * .gbm/drift_tracker_timestamp
-- [ ] make --fetch the default for `gbm  sync`
+- [x] make --fetch the default for `gbm  sync`
   Summary:
-  - gbm sync = "Sync worktrees with the branch versions I currently have locally"
-  - gbm sync --fetch = "First get the latest from remote, then sync worktrees with those updated versions"
-  The --fetch flag ensures you're always working with the most current version of your branches, which is
+  - gbm sync = "First get the latest from remote, then sync worktrees with those updated versions"
+  The fetch behavior is now always enabled, ensuring you're always working with the most current version of your branches, which is
   especially important in collaborative environments where branches are frequently updated.
 - [x] add tests for `gbm add`
-- [ ] split out state from the .gbm/config.toml into a separate .gbm/state.toml
+- [x] split out state from the .gbm/config.toml into a separate .gbm/state.toml
 - [ ] don't use global state for flags
     * will improve testability
 
