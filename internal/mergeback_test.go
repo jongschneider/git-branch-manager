@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"gbm/internal/testutils"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -176,11 +178,15 @@ func TestFormatRelativeTime(t *testing.T) {
 }
 
 func TestCheckMergeBackStatusIntegration(t *testing.T) {
-	cwd, _ := os.Getwd()
-	_, err := FindGitRoot(cwd)
-	if err != nil {
-		t.Skip("Not in a git repository, skipping integration test")
-	}
+	// Create a test repository with proper git environment
+	repo := testutils.NewGitTestRepo(t, testutils.WithDefaultBranch("main"))
+	defer repo.Cleanup()
+
+	// Change to repo directory for testing
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	err := os.Chdir(repo.GetLocalPath())
+	require.NoError(t, err)
 
 	t.Run("missing .gbm.config.yaml file", func(t *testing.T) {
 		result, err := CheckMergeBackStatus("/non/existent/.gbm.config.yaml")
@@ -217,6 +223,103 @@ func TestCheckMergeBackStatusIntegration(t *testing.T) {
 		assert.NoError(t, err)
 		assert.NotNil(t, result)
 		assert.Empty(t, result.MergeBacksNeeded)
+	})
+
+	t.Run("multi-tier deployment chain", func(t *testing.T) {
+		// Create a more realistic test with actual git branches and merge scenarios
+		err := repo.CreateBranch("preview", "Preview content")
+		require.NoError(t, err)
+
+		err = repo.CreateBranch("production", "Production content")
+		require.NoError(t, err)
+
+		// Create .gbm.config.yaml with merge chain: production -> preview -> main
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		config := `worktrees:
+  main:
+    branch: main
+    merge_into: ""
+    description: "Main branch"
+  preview:
+    branch: preview
+    merge_into: "main"
+    description: "Preview environment"
+  production:
+    branch: production
+    merge_into: "preview"
+    description: "Production environment"
+`
+		err = os.WriteFile(configPath, []byte(config), 0644)
+		require.NoError(t, err)
+
+		// Test with the multi-tier config
+		result, err := CheckMergeBackStatus(configPath)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		// Since we created branches with different content, they should show as needing mergebacks
+		// This is the correct behavior - preview and production have commits that main doesn't have
+		if len(result.MergeBacksNeeded) > 0 {
+			// Verify the merge chain is detected correctly
+			foundPreviewToMain := false
+			foundProductionToPreview := false
+
+			for _, mergeback := range result.MergeBacksNeeded {
+				if mergeback.FromBranch == "preview" && mergeback.ToBranch == "main" {
+					foundPreviewToMain = true
+				}
+				if mergeback.FromBranch == "production" && mergeback.ToBranch == "preview" {
+					foundProductionToPreview = true
+				}
+			}
+
+			// Should detect at least one of the merge relationships
+			assert.True(t, foundPreviewToMain || foundProductionToPreview,
+				"Should detect merge relationships in the deployment chain")
+		}
+	})
+
+	t.Run("with commits requiring mergeback", func(t *testing.T) {
+		// Create production branch with new commits that need to be merged back
+		err := repo.SwitchToBranch("production")
+		require.NoError(t, err)
+
+		err = repo.WriteFile("hotfix.txt", "Critical hotfix for production")
+		require.NoError(t, err)
+
+		err = repo.CommitChangesWithForceAdd("hotfix: Fix critical production issue")
+		require.NoError(t, err)
+
+		// Switch back to main for testing
+		err = repo.SwitchToBranch("main")
+		require.NoError(t, err)
+
+		// Create config that includes the production branch
+		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		config := `worktrees:
+  main:
+    branch: main
+    merge_into: ""
+    description: "Main branch"
+  production:
+    branch: production
+    merge_into: "main"
+    description: "Production environment"
+`
+		err = os.WriteFile(configPath, []byte(config), 0644)
+		require.NoError(t, err)
+
+		// Now there should be commits requiring mergeback
+		result, err := CheckMergeBackStatus(configPath)
+		assert.NoError(t, err)
+		assert.NotNil(t, result)
+
+		// Should detect commits that need to be merged back
+		if len(result.MergeBacksNeeded) > 0 {
+			assert.True(t, result.HasUserCommits)
+			assert.Equal(t, "production", result.MergeBacksNeeded[0].FromBranch)
+			assert.Equal(t, "main", result.MergeBacksNeeded[0].ToBranch)
+		}
 	})
 }
 

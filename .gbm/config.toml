@@ -1,0 +1,36 @@
+[settings]
+  worktree_prefix = "worktrees"
+  auto_fetch = true
+  create_missing_branches = false
+  merge_back_alerts = false
+  hotfix_prefix = "HOTFIX"
+  mergeback_prefix = "MERGE"
+
+[state]
+  last_sync = 0001-01-01T00:00:00Z
+  tracked_vars = []
+  ad_hoc_worktrees = []
+  current_worktree = ""
+  previous_worktree = ""
+
+[icons]
+  success = "✅"
+  warning = "⚠️"
+  error = "❌"
+  info = "💡"
+  orphaned = "🗑️"
+  dry_run = "🔍"
+  missing = "📁"
+  changes = "🔄"
+  git_clean = "✓"
+  git_dirty = "~"
+  git_ahead = "↑"
+  git_behind = "↓"
+  git_diverged = "⇕"
+  git_unknown = "?"
+
+[jira]
+  me = "jonathan.schneider@thetalake.com"
+
+[file_copy]
+  rules = []

@@ -99,7 +99,10 @@ ERROR: Error: exit status 1
     * base will be the last branch in the mergeback list (main <- preview <- production) means use production as the base
     * the branch should be prefixed with hotfix/<PROJECT-123_summary_of_ticket>
     * worktree directory uses configurable prefix (default: HOTFIX_)
-- [ ] add `gbm mergeback` or `gbm mb`
+- [x] add `gbm mergeback` or `gbm mb`
+    * base will be the detected branch that needs to be merged into (main <- preview <- production) - if hotfix went into production, then preview is the base. if preview was merged into, then main is the base.
+    * the branch should be prefixed with merge/<PROJECT-123_summary_of_ticket>
+    * worktree directory uses configurable prefix (default: MERGE_<base>_) where base is the base branch of the created worktree
 - [ ] ai plugin for:
     * merge conflict resolution
     * commit messages
@@ -111,5 +114,7 @@ ERROR: Error: exit status 1
   - gbm sync --fetch = "First get the latest from remote, then sync worktrees with those updated versions"
   The --fetch flag ensures you're always working with the most current version of your branches, which is
   especially important in collaborative environments where branches are frequently updated.
+- [ ] add tests for `gbm add`
+- [ ] split out state from the .gbm/config.toml into a separate .gbm/state.toml
 
 

@@ -5,6 +5,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"regexp"
 	"strings"
 	"time"
 
@@ -488,7 +489,7 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 	}
 
 	// Create worktrees directory if it doesn't exist
-	if err := os.MkdirAll(worktreeDir, 0755); err != nil {
+	if err := os.MkdirAll(worktreeDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create worktrees directory: %w", err)
 	}
 
@@ -770,4 +771,296 @@ type Comment struct {
 	Author    string
 	Content   string
 	Timestamp time.Time
+}
+
+// RecentActivity represents recent git activity that might necessitate a mergeback
+type RecentActivity struct {
+	Type          string // "hotfix", "merge", "feature"
+	WorktreeName  string
+	BranchName    string
+	SourceBranch  string // For merges, what was merged
+	TargetBranch  string // For merges, what it was merged into
+	CommitHash    string
+	CommitMessage string
+	Author        string
+	Timestamp     time.Time
+	JiraTicket    string // Extracted JIRA ticket if found
+}
+
+// GetRecentMergeableActivity analyzes recent git history to find hotfixes or merges
+// that might necessitate a mergeback operation
+func (gm *GitManager) GetRecentMergeableActivity(maxDays int) ([]RecentActivity, error) {
+	if maxDays <= 0 {
+		maxDays = 7 // Default to last 7 days
+	}
+
+	var activities []RecentActivity
+
+	// Get recent commits that might indicate hotfix/merge activity
+	since := fmt.Sprintf("--since=%d.days.ago", maxDays)
+
+	// Look for merge commits first
+	mergeCommits, err := gm.getRecentMergeCommits(since)
+	if err == nil {
+		activities = append(activities, mergeCommits...)
+	}
+
+	// Look for hotfix branches that were recently created or merged
+	hotfixCommits, err := gm.getRecentHotfixActivity(since)
+	if err == nil {
+		activities = append(activities, hotfixCommits...)
+	}
+
+	// Note: Removed feature branch detection per user request
+	// Only consider hotfix and merge commits for auto-detection
+
+	return activities, nil
+}
+
+// getRecentMergeCommits finds recent merge commits
+func (gm *GitManager) getRecentMergeCommits(since string) ([]RecentActivity, error) {
+	var activities []RecentActivity
+
+	// Get merge commits with format: hash|author|date|message
+	output, err := ExecGitCommand(gm.repoPath, "log", "--merges", since, "--pretty=format:%H|%an|%at|%s")
+	if err != nil {
+		return activities, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "|", 4)
+		if len(parts) != 4 {
+			continue
+		}
+
+		hash := parts[0]
+		author := parts[1]
+		timestampStr := parts[2]
+		message := parts[3]
+
+		timestamp, err := parseTimestamp(timestampStr)
+		if err != nil {
+			continue
+		}
+
+		activity := RecentActivity{
+			Type:          "merge",
+			CommitHash:    hash,
+			CommitMessage: message,
+			Author:        author,
+			Timestamp:     timestamp,
+			JiraTicket:    ExtractJiraTicket(message),
+		}
+
+		// Try to extract source and target branches from merge commit
+		sourceBranch, targetBranch := gm.extractMergeBranches(hash)
+		activity.SourceBranch = sourceBranch
+		activity.TargetBranch = targetBranch
+
+		// Generate worktree name from branch or JIRA ticket
+		if activity.JiraTicket != "" {
+			activity.WorktreeName = activity.JiraTicket
+		} else if sourceBranch != "" {
+			activity.WorktreeName = ExtractWorktreeNameFromBranch(sourceBranch)
+		}
+
+		activities = append(activities, activity)
+	}
+
+	return activities, nil
+}
+
+// getRecentHotfixActivity finds recent hotfix branch activity
+func (gm *GitManager) getRecentHotfixActivity(since string) ([]RecentActivity, error) {
+	var activities []RecentActivity
+
+	// Get commits on hotfix branches
+	output, err := ExecGitCommand(gm.repoPath, "log", "--all", since, "--pretty=format:%H|%an|%at|%s|%D", "--grep=hotfix")
+	if err != nil {
+		return activities, err
+	}
+
+	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
+	for _, line := range lines {
+		if line == "" {
+			continue
+		}
+
+		parts := strings.SplitN(line, "|", 5)
+		if len(parts) < 4 {
+			continue
+		}
+
+		hash := parts[0]
+		author := parts[1]
+		timestampStr := parts[2]
+		message := parts[3]
+		refs := ""
+		if len(parts) > 4 {
+			refs = parts[4]
+		}
+
+		timestamp, err := parseTimestamp(timestampStr)
+		if err != nil {
+			continue
+		}
+
+		// Look for hotfix patterns in refs or message
+		if !strings.Contains(refs, "hotfix") && !strings.Contains(strings.ToLower(message), "hotfix") {
+			continue
+		}
+
+		activity := RecentActivity{
+			Type:          "hotfix",
+			CommitHash:    hash,
+			CommitMessage: message,
+			Author:        author,
+			Timestamp:     timestamp,
+			JiraTicket:    ExtractJiraTicket(message),
+		}
+
+		// Extract branch name from refs
+		if refs != "" {
+			for _, ref := range strings.Split(refs, ", ") {
+				if strings.Contains(ref, "hotfix/") {
+					activity.BranchName = extractBranchFromRef(ref)
+					activity.WorktreeName = ExtractWorktreeNameFromBranch(activity.BranchName)
+					break
+				}
+			}
+		}
+
+		// Fallback: extract from JIRA ticket or commit message
+		if activity.WorktreeName == "" {
+			if activity.JiraTicket != "" {
+				activity.WorktreeName = activity.JiraTicket
+			} else {
+				activity.WorktreeName = ExtractWorktreeNameFromMessage(message)
+			}
+		}
+
+		activities = append(activities, activity)
+	}
+
+	return activities, nil
+}
+
+// Helper functions for parsing git data
+func parseTimestamp(timestampStr string) (time.Time, error) {
+	timestamp, err := time.Parse("1136073600", timestampStr) // Unix timestamp format
+	if err != nil {
+		// Try parsing as Unix timestamp
+		var unixTime int64
+		if _, err := fmt.Sscanf(timestampStr, "%d", &unixTime); err == nil {
+			timestamp = time.Unix(unixTime, 0)
+			return timestamp, nil
+		}
+		return time.Time{}, err
+	}
+	return timestamp, nil
+}
+
+func ExtractJiraTicket(message string) string {
+	// Common JIRA patterns: PROJECT-123, ABC-456, etc.
+	jiraPattern := `[A-Z]{2,}-\d+`
+	re := regexp.MustCompile(jiraPattern)
+	match := re.FindString(message)
+	return match
+}
+
+func ExtractWorktreeNameFromBranch(branchName string) string {
+	// Extract meaningful part from branch names like:
+	// hotfix/PROJECT-123_fix_auth -> PROJECT-123
+	// feature/PROJECT-456_new_api -> PROJECT-456
+	// hotfix/critical-bug -> critical-bug
+
+	if branchName == "" {
+		return ""
+	}
+
+	// Remove common prefixes
+	prefixes := []string{"hotfix/", "feature/", "bugfix/", "merge/"}
+	for _, prefix := range prefixes {
+		if strings.HasPrefix(branchName, prefix) {
+			branchName = strings.TrimPrefix(branchName, prefix)
+			break
+		}
+	}
+
+	// If it looks like a JIRA ticket, extract just that
+	if jira := ExtractJiraTicket(branchName); jira != "" {
+		return jira
+	}
+
+	// Otherwise use the cleaned branch name
+	return branchName
+}
+
+func ExtractWorktreeNameFromMessage(message string) string {
+	// Try to extract JIRA ticket first
+	if jira := ExtractJiraTicket(message); jira != "" {
+		return jira
+	}
+
+	// Fallback: use first few words of commit message
+	words := strings.Fields(strings.ToLower(message))
+	if len(words) > 0 {
+		// Remove common commit prefixes
+		commonPrefixes := []string{"feat:", "fix:", "hotfix:", "merge:", "add:", "update:"}
+		firstWord := words[0]
+		for _, prefix := range commonPrefixes {
+			if firstWord == prefix && len(words) > 1 {
+				firstWord = words[1]
+				break
+			}
+		}
+		return firstWord
+	}
+
+	return "unknown"
+}
+
+func extractBranchFromRef(ref string) string {
+	// Parse refs like "origin/hotfix/PROJECT-123" -> "hotfix/PROJECT-123"
+	parts := strings.Split(ref, "/")
+	if len(parts) >= 2 {
+		// Skip "origin" if present
+		if parts[0] == "origin" {
+			return strings.Join(parts[1:], "/")
+		}
+		return ref
+	}
+	return ref
+}
+
+func (gm *GitManager) extractMergeBranches(commitHash string) (string, string) {
+	// Get the merge commit details to extract source and target branches
+	output, err := ExecGitCommand(gm.repoPath, "show", "--format=%P %s", "--no-patch", commitHash)
+	if err != nil {
+		return "", ""
+	}
+
+	line := strings.TrimSpace(string(output))
+	parts := strings.SplitN(line, " ", 2)
+	if len(parts) < 2 {
+		return "", ""
+	}
+
+	// For merge commits, try to extract from commit message
+	message := parts[1]
+
+	// Look for patterns like "Merge branch 'feature/xyz' into main"
+	mergePattern := `Merge branch '([^']+)' into (.+)`
+	re := regexp.MustCompile(mergePattern)
+	matches := re.FindStringSubmatch(message)
+	if len(matches) >= 3 {
+		return matches[1], matches[2] // source, target
+	}
+
+	return "", ""
 }
