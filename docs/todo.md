@@ -104,8 +104,8 @@ ERROR: Error: exit status 1
 - [ ] ai plugin for:
     * merge conflict resolution
     * commit messages
-- [ ] consider a timestamp based approach for checking drift
-    * .gbm/drift_tracker_timestamp
+- [ ] timestamp based approach for checking drift
+    * .gbm/state.toml
 - [x] make --fetch the default for `gbm  sync`
   Summary:
   - gbm sync = "First get the latest from remote, then sync worktrees with those updated versions"
@@ -115,6 +115,6 @@ ERROR: Error: exit status 1
 - [x] split out state from the .gbm/config.toml into a separate .gbm/state.toml
 - [x] don't use global state for flags
     * will improve testability
-- [ ] replace worktreedirnam flag with config.toml
+- [ ] replace worktreedirname flag with config.toml
 - [ ] manage branchconfig.toml with go templates (should clean up tests)
 
