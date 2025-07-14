@@ -26,19 +26,14 @@ func newInfoCommand() *cobra.Command {
 - Recent commits and modified files`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runInfoCommandWithCmd(cmd, args)
+			return runInfoCommand(cmd, args)
 		},
 	}
 
 	return cmd
 }
 
-func runInfoCommand(cmd *cobra.Command, args []string) error {
-	// Legacy function
-	return runInfoCommandWithCmd(nil, args)
-}
-
-func runInfoCommandWithCmd(cmd *cobra.Command, args []string) error {
+func runInfoCommand(_ *cobra.Command, args []string) error {
 	worktreeName := args[0]
 
 	// Handle current directory reference
@@ -51,7 +46,7 @@ func runInfoCommandWithCmd(cmd *cobra.Command, args []string) error {
 	}
 
 	// Initialize git manager
-	gitManager, err := createInitializedGitManagerWithCmd(cmd)
+	gitManager, err := createInitializedGitManager()
 	if err != nil {
 		return err
 	}

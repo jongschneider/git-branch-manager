@@ -27,7 +27,7 @@ func TestMergeBackDetection_RealWorldDemo(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized production branches
@@ -59,7 +59,7 @@ def validate_user_input(input_data):
 
 	// Demonstrate the merge-back detection in action
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)

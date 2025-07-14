@@ -188,15 +188,15 @@ func TestCheckMergeBackStatusIntegration(t *testing.T) {
 	err := os.Chdir(repo.GetLocalPath())
 	require.NoError(t, err)
 
-	t.Run("missing .gbm.config.yaml file", func(t *testing.T) {
-		result, err := CheckMergeBackStatus("/non/existent/.gbm.config.yaml")
+	t.Run("missing gbm.branchconfig.yaml file", func(t *testing.T) {
+		result, err := CheckMergeBackStatus("/non/existent/gbm.branchconfig.yaml")
 		assert.NoError(t, err)
 		assert.Nil(t, result)
 	})
 
-	t.Run("empty .gbm.config.yaml file", func(t *testing.T) {
+	t.Run("empty gbm.branchconfig.yaml file", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		configPath := filepath.Join(tmpDir, ".gbm.config.yaml")
+		configPath := filepath.Join(tmpDir, DefaultBranchConfigFilename)
 
 		err := os.WriteFile(configPath, []byte(""), 0644)
 		require.NoError(t, err)
@@ -209,7 +209,7 @@ func TestCheckMergeBackStatusIntegration(t *testing.T) {
 
 	t.Run("single environment", func(t *testing.T) {
 		tmpDir := t.TempDir()
-		configPath := filepath.Join(tmpDir, ".gbm.config.yaml")
+		configPath := filepath.Join(tmpDir, DefaultBranchConfigFilename)
 
 		config := `worktrees:
   main:
@@ -233,8 +233,8 @@ func TestCheckMergeBackStatusIntegration(t *testing.T) {
 		err = repo.CreateBranch("production", "Production content")
 		require.NoError(t, err)
 
-		// Create .gbm.config.yaml with merge chain: production -> preview -> main
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		// Create gbm.branchconfig.yaml with merge chain: production -> preview -> main
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		config := `worktrees:
   main:
     branch: main
@@ -295,7 +295,7 @@ func TestCheckMergeBackStatusIntegration(t *testing.T) {
 		require.NoError(t, err)
 
 		// Create config that includes the production branch
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		config := `worktrees:
   main:
     branch: main

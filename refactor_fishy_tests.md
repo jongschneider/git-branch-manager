@@ -1,6 +1,6 @@
 # Refactor Fishy Tests Report
 
-This document identifies potentially problematic tests after the refactoring from `.envrc` to `.gbm.config.yaml`. These tests may contain workarounds or behavior changes that mask underlying issues rather than properly testing the intended functionality.
+This document identifies potentially problematic tests after the refactoring from `.envrc` to `gbm.branchconfig.yaml`. These tests may contain workarounds or behavior changes that mask underlying issues rather than properly testing the intended functionality.
 
 ## 🚨 High Priority Issues
 
@@ -16,7 +16,7 @@ This document identifies potentially problematic tests after the refactoring fro
 assert.Contains(t, mainWorktree.SyncStatus, "IN_SYNC")
 
 // NEW BEHAVIOR:
-// When cloning without .gbm.config.yaml, MAIN worktree starts as UNTRACKED until config is properly set up
+// When cloning without gbm.branchconfig.yaml, MAIN worktree starts as UNTRACKED until config is properly set up
 assert.Contains(t, mainWorktree.SyncStatus, "UNTRACKED")
 ```
 
@@ -39,7 +39,7 @@ assert.Contains(t, mainWorktree.SyncStatus, "UNTRACKED")
 // Verify that the last occurrence wins (MAIN=develop, not MAIN=main)
 
 // NEW BEHAVIOR:
-// Create .gbm.config.yaml with duplicate worktree names (invalid YAML)
+// Create gbm.branchconfig.yaml with duplicate worktree names (invalid YAML)
 configContent := `worktrees:
   main:
     branch: main
@@ -92,7 +92,7 @@ mainWorktree, found := findWorktreeInRows(rows, "MAIN")
 // OLD (.envrc):
 orderedKeys := []string{"MAIN", "PREVIEW", "PROD"}
 
-// NEW (.gbm.config.yaml):
+// NEW (gbm.branchconfig.yaml):
 orderedKeys := []string{"main", "preview", "staging", "dev", "feat", "prod", "hotfix"}
 ```
 
@@ -106,7 +106,7 @@ orderedKeys := []string{"main", "preview", "staging", "dev", "feat", "prod", "ho
 
 **Location**: Various test files
 
-**Issue**: Many tests updated error message expectations from ".envrc" to ".gbm.config.yaml" without verifying the new error messages are equally helpful.
+**Issue**: Many tests updated error message expectations from ".envrc" to "gbm.branchconfig.yaml" without verifying the new error messages are equally helpful.
 
 **Example**:
 ```go
@@ -114,7 +114,7 @@ orderedKeys := []string{"main", "preview", "staging", "dev", "feat", "prod", "ho
 assert.Contains(t, err.Error(), ".envrc")
 
 // NEW:
-assert.Contains(t, err.Error(), ".gbm.config.yaml")
+assert.Contains(t, err.Error(), "gbm.branchconfig.yaml")
 ```
 
 **Why it's worth noting**: While these changes are expected, some error messages might be less clear than before, and the tests might be passing without anyone verifying the user experience is equivalent or better.
@@ -134,4 +134,4 @@ The refactoring appears to have several concerning patterns:
 2. **Restore duplicate handling**: Decide if duplicate worktree handling should be implemented or document as breaking change
 3. **Standardize naming**: Establish clear naming conventions for worktree names and configuration keys
 4. **Verify error messages**: Ensure new error messages are as helpful as the old ones
-5. **Add integration tests**: Consider adding end-to-end tests that verify the migration path from `.envrc` to `.gbm.config.yaml` works correctly
+5. **Add integration tests**: Consider adding end-to-end tests that verify the migration path from `.envrc` to `gbm.branchconfig.yaml` works correctly

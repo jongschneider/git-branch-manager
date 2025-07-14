@@ -8,6 +8,7 @@ import (
 	"strings"
 	"testing"
 
+	"gbm/internal"
 	"gbm/internal/testutils"
 
 	"github.com/stretchr/testify/assert"
@@ -38,7 +39,7 @@ func TestSyncCommand_BasicOperations(t *testing.T) {
     branch: main
     description: "Main branch"
 `
-				require.NoError(t, repo.WriteFile(".gbm.config.yaml", gbmContent))
+				require.NoError(t, repo.WriteFile(internal.DefaultBranchConfigFilename, gbmContent))
 				require.NoError(t, repo.CommitChangesWithForceAdd("Add gbm config"))
 				require.NoError(t, repo.PushBranch("main"))
 				return repo
@@ -91,7 +92,7 @@ func TestSyncCommand_Flags(t *testing.T) {
 			name: "dry-run flag shows changes without applying",
 			args: []string{"sync", "--dry-run"},
 			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
-				// Add more worktrees to .gbm.config.yaml to create missing worktrees scenario
+				// Add more worktrees to gbm.branchconfig.yaml to create missing worktrees scenario
 				gbmContent := `worktrees:
   main:
     branch: main
@@ -103,7 +104,7 @@ func TestSyncCommand_Flags(t *testing.T) {
     branch: feature/auth
     description: "Feature branch"
 `
-				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
+				require.NoError(t, os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644))
 			},
 			validate: func(t *testing.T, repoPath string, output string, err error) {
 				require.NoError(t, err)
@@ -123,13 +124,13 @@ func TestSyncCommand_Flags(t *testing.T) {
 				wd, _ := os.Getwd()
 				createUntrackedWorktree(t, wd, "orphan", "main")
 
-				// Modify .gbm.config.yaml to remove some existing worktrees (making them orphaned)
+				// Modify gbm.branchconfig.yaml to remove some existing worktrees (making them orphaned)
 				gbmContent := `worktrees:
   main:
     branch: main
     description: "Main branch"
 `
-				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
+				require.NoError(t, os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644))
 			},
 			validate: func(t *testing.T, repoPath string, output string, err error) {
 				// This test should fail because confirmation is required
@@ -268,18 +269,18 @@ func TestSyncCommand_SyncScenarios(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create source repo with initial .gbm.config.yaml
+			// Create source repo with initial gbm.branchconfig.yaml
 			sourceRepo := testutils.NewMultiBranchRepo(t)
-			require.NoError(t, sourceRepo.WriteFile(".gbm.config.yaml", tt.initialGBMConfig))
-			require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add initial .gbm.config.yaml"))
+			require.NoError(t, sourceRepo.WriteFile(internal.DefaultBranchConfigFilename, tt.initialGBMConfig))
+			require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add initial gbm.branchconfig.yaml"))
 			require.NoError(t, sourceRepo.PushBranch("main"))
 
 			repoPath := setupClonedRepo(t, sourceRepo)
 
-			// Update .gbm.config.yaml to new configuration
-			require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(tt.updatedGBMConfig), 0644))
+			// Update gbm.branchconfig.yaml to new configuration
+			require.NoError(t, os.WriteFile(internal.DefaultBranchConfigFilename, []byte(tt.updatedGBMConfig), 0644))
 
-			// Run sync with updated .gbm.config.yaml
+			// Run sync with updated gbm.branchconfig.yaml
 			cmd := newRootCommand()
 			cmd.SetArgs([]string{"sync"})
 			err := cmd.Execute()
@@ -404,7 +405,7 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 			var sourceRepo *testutils.GitTestRepo
 
 			if tt.createTrackedWorktrees {
-				// Setup initial .gbm.config.yaml with different branch for feat
+				// Setup initial gbm.branchconfig.yaml with different branch for feat
 				sourceRepo = testutils.NewMultiBranchRepo(t)
 				initialGBMConfig := `worktrees:
   main:
@@ -414,14 +415,14 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
     branch: feature/auth
     description: "Feature branch"
 `
-				require.NoError(t, sourceRepo.WriteFile(".gbm.config.yaml", initialGBMConfig))
-				require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add initial .gbm.config.yaml"))
+				require.NoError(t, sourceRepo.WriteFile(internal.DefaultBranchConfigFilename, initialGBMConfig))
+				require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add initial gbm.branchconfig.yaml"))
 				require.NoError(t, sourceRepo.PushBranch("main"))
 			} else {
 				// Standard setup for other tests
 				sourceRepo = testutils.NewMultiBranchRepo(t)
-				require.NoError(t, sourceRepo.WriteFile(".gbm.config.yaml", tt.gbmConfig))
-				require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add .gbm.config.yaml"))
+				require.NoError(t, sourceRepo.WriteFile(internal.DefaultBranchConfigFilename, tt.gbmConfig))
+				require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml"))
 				require.NoError(t, sourceRepo.PushBranch("main"))
 			}
 
@@ -433,8 +434,8 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 					createUntrackedWorktree(t, repoPath, untrackedName, "main")
 				}
 
-				// Update .gbm.config.yaml to change feat branch
-				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(tt.gbmConfig), 0644))
+				// Update gbm.branchconfig.yaml to change feat branch
+				require.NoError(t, os.WriteFile(internal.DefaultBranchConfigFilename, []byte(tt.gbmConfig), 0644))
 			} else {
 				// Create untracked worktrees for standard tests
 				for _, untrackedName := range tt.untrackedWorktrees {
@@ -505,7 +506,7 @@ func TestSyncCommand_ErrorHandling(t *testing.T) {
 				return repo.GetLocalPath()
 			},
 			args:          []string{"sync"},
-			expectedError: "failed to load .gbm.config.yaml",
+			expectedError: "failed to load gbm.branchconfig.yaml",
 		},
 		{
 			name: "invalid branch reference",
@@ -517,7 +518,7 @@ func TestSyncCommand_ErrorHandling(t *testing.T) {
     branch: nonexistent-branch
     description: "Invalid branch reference"
 `
-				require.NoError(t, sourceRepo.WriteFile(".gbm.config.yaml", gbmContent))
+				require.NoError(t, sourceRepo.WriteFile(internal.DefaultBranchConfigFilename, gbmContent))
 				require.NoError(t, sourceRepo.CommitChangesWithForceAdd("Add invalid gbm config"))
 				require.NoError(t, sourceRepo.PushBranch("main"))
 
@@ -561,7 +562,7 @@ func TestSyncCommand_Integration(t *testing.T) {
 			scenario: func(t *testing.T, repoPath string) {
 				// 1. Initial state created by clone (main, dev, feat, prod from StandardGBMConfigRepo)
 
-				// 2. Modify .gbm.config.yaml to remove some worktrees and add different ones
+				// 2. Modify gbm.branchconfig.yaml to remove some worktrees and add different ones
 				gbmContent := `worktrees:
   main:
     branch: main
@@ -576,7 +577,7 @@ func TestSyncCommand_Integration(t *testing.T) {
     branch: production/v1.0
     description: "New production branch"
 `
-				require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
+				require.NoError(t, os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644))
 
 				// 3. Run sync with --force to remove orphaned worktrees and create new ones
 				err := simulateUserInput("y", func() error {
@@ -663,13 +664,13 @@ func TestSyncCommand_ForceConfirmationDirectManagerTest(t *testing.T) {
 	// Create untracked worktree
 	createUntrackedWorktree(t, repoPath, "orphan", "main")
 
-	// Modify .gbm.config.yaml to remove some existing worktrees (making them orphaned)
+	// Modify gbm.branchconfig.yaml to remove some existing worktrees (making them orphaned)
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main branch"
 `
-	require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
+	require.NoError(t, os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644))
 
 	// Create manager
 	manager, err := createInitializedManagerStrict()
@@ -743,13 +744,13 @@ func TestSyncCommand_ForceConfirmation(t *testing.T) {
 			// Create orphaned worktree
 			createUntrackedWorktree(t, repoPath, "orphan", "main")
 
-			// Modify .gbm.config.yaml to remove some worktrees (making them orphaned)
+			// Modify gbm.branchconfig.yaml to remove some worktrees (making them orphaned)
 			gbmContent := `worktrees:
   main:
     branch: main
     description: "Main branch"
 `
-			require.NoError(t, os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644))
+			require.NoError(t, os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644))
 
 			// Create manager to test confirmation directly
 			manager, err := createInitializedManagerStrict()

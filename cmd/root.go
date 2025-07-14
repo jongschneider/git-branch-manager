@@ -32,7 +32,6 @@ notifications when configurations drift out of sync.`,
 	}
 
 	// Add persistent flags
-	rootCmd.PersistentFlags().String("config", "", "specify custom .gbm.config.yaml path")
 	rootCmd.PersistentFlags().String("worktree-dir", "", "override worktree directory location")
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging to ./gbm.log")
 
@@ -59,14 +58,6 @@ func Execute() error {
 	return newRootCommand().Execute()
 }
 
-func getConfigPath(cmd *cobra.Command) string {
-	configPath, _ := cmd.Flags().GetString("config")
-	if configPath != "" {
-		return configPath
-	}
-	return ".gbm.config.yaml"
-}
-
 func getWorktreeDir(cmd *cobra.Command) string {
 	worktreeDir, _ := cmd.Flags().GetString("worktree-dir")
 	if worktreeDir != "" {
@@ -78,12 +69,6 @@ func getWorktreeDir(cmd *cobra.Command) string {
 func isDebugEnabled(cmd *cobra.Command) bool {
 	debug, _ := cmd.Flags().GetBool("debug")
 	return debug
-}
-
-// Legacy functions for backwards compatibility
-func GetConfigPath() string {
-	// This is kept for backwards compatibility, but should be phased out
-	return ".gbm.config.yaml"
 }
 
 func GetWorktreeDir() string {
@@ -141,13 +126,8 @@ func CloseLogFile() {
 }
 
 // createInitializedManager creates a new manager with git root discovery and gbm config loaded.
-// It gracefully handles missing .gbm.config.yaml files by logging a verbose message.
+// It gracefully handles missing branch config files by logging a verbose message.
 func createInitializedManager() (*internal.Manager, error) {
-	// Legacy function - uses default config path
-	return createInitializedManagerWithCmd(nil)
-}
-
-func createInitializedManagerWithCmd(cmd *cobra.Command) (*internal.Manager, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
@@ -163,26 +143,18 @@ func createInitializedManagerWithCmd(cmd *cobra.Command) (*internal.Manager, err
 		return nil, fmt.Errorf("failed to create manager: %w", err)
 	}
 
-	configPath := GetConfigPath() // Default fallback
-	if cmd != nil {
-		configPath = getConfigPath(cmd)
-	}
+	configPath := internal.DefaultBranchConfigFilename
 
 	if err := manager.LoadGBMConfig(configPath); err != nil {
-		PrintVerbose("No .gbm.config.yaml found or failed to load: %v", err)
+		PrintVerbose("No %s found or failed to load: %v", internal.DefaultBranchConfigFilename, err)
 	}
 
 	return manager, nil
 }
 
-// createInitializedManagerStrict creates a new manager and requires .gbm.config.yaml to exist.
-// It returns an error if .gbm.config.yaml cannot be loaded.
+// createInitializedManagerStrict creates a new manager and requires branch config to exist.
+// It returns an error if branch config cannot be loaded.
 func createInitializedManagerStrict() (*internal.Manager, error) {
-	// Legacy function - uses default config path
-	return createInitializedManagerStrictWithCmd(nil)
-}
-
-func createInitializedManagerStrictWithCmd(cmd *cobra.Command) (*internal.Manager, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
@@ -198,27 +170,19 @@ func createInitializedManagerStrictWithCmd(cmd *cobra.Command) (*internal.Manage
 		return nil, err
 	}
 
-	configPath := GetConfigPath() // Default fallback
-	if cmd != nil {
-		configPath = getConfigPath(cmd)
-	}
+	configPath := internal.DefaultBranchConfigFilename
 
-	PrintVerbose("Loading .gbm.config.yaml configuration from: %s", configPath)
+	PrintVerbose("Loading %s configuration from: %s", internal.DefaultBranchConfigFilename, configPath)
 	if err := manager.LoadGBMConfig(configPath); err != nil {
-		return nil, fmt.Errorf("failed to load .gbm.config.yaml: %w", err)
+		return nil, fmt.Errorf("failed to load %s: %w", internal.DefaultBranchConfigFilename, err)
 	}
 
 	return manager, nil
 }
 
 // createInitializedGitManager creates a new git manager with git root discovery.
-// Used by commands that need direct git operations without .gbm.config.yaml dependency.
+// Used by commands that need direct git operations without branch config dependency.
 func createInitializedGitManager() (*internal.GitManager, error) {
-	// Legacy function - uses default worktree dir
-	return createInitializedGitManagerWithCmd(nil)
-}
-
-func createInitializedGitManagerWithCmd(cmd *cobra.Command) (*internal.GitManager, error) {
 	wd, err := os.Getwd()
 	if err != nil {
 		return nil, fmt.Errorf("failed to get working directory: %w", err)
@@ -229,10 +193,7 @@ func createInitializedGitManagerWithCmd(cmd *cobra.Command) (*internal.GitManage
 		return nil, fmt.Errorf("not in a git repository: %w", err)
 	}
 
-	worktreeDir := internal.DefaultWorktreeDirname // Default fallback
-	if cmd != nil {
-		worktreeDir = getWorktreeDir(cmd)
-	}
+	worktreeDir := internal.DefaultWorktreeDirname
 
 	gitManager, err := internal.NewGitManager(gitRoot, worktreeDir)
 	if err != nil {
@@ -248,10 +209,7 @@ func checkAndDisplayMergeBackAlerts(cmd *cobra.Command) {
 		return
 	}
 
-	configPath := GetConfigPath() // Default fallback
-	if cmd != nil {
-		configPath = getConfigPath(cmd)
-	}
+	configPath := internal.DefaultBranchConfigFilename
 
 	status, err := internal.CheckMergeBackStatus(configPath)
 	if err != nil {

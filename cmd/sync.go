@@ -12,8 +12,8 @@ import (
 func newSyncCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync",
-		Short: "Synchronize all worktrees with current .gbm.config.yaml definitions",
-		Long: `Synchronize all worktrees with current .gbm.config.yaml definitions.
+		Short: "Synchronize all worktrees with current gbm.branchconfig.yaml definitions",
+		Long: `Synchronize all worktrees with current gbm.branchconfig.yaml definitions.
 
 Fetches from remote first, then creates missing worktrees for new worktree configurations,
 updates existing worktrees if branch references have changed, and optionally removes orphaned worktrees.`,

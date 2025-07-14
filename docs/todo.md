@@ -71,7 +71,7 @@ ERROR: Error: exit status 1
 - [x] make output adaptive layout.
     - [x] responsive table design for gbm list - hides PATH column when terminal is narrow (< 100 chars)
 - [x] remove the `clean` verb
-- [x] make .gbm.config.yaml tests actually use yaml for validation instead of string contains.
+- [x] make gbm.branchconfig.yaml tests actually use yaml for validation instead of string contains.
 - [x] what's the point of TestCloneCommand_EmptyRepository?
 - [x] configuration for copying files into new worktrees (.env, anything not tracked by git)
 - [ ] track merge backs... not sure how yet and how to prompt the user.
@@ -86,7 +86,7 @@ ERROR: Error: exit status 1
     * current behavior: input is normalized to uppercase, then fuzzy matched against actual config keys
     * this creates inconsistent behavior between direct matches (uppercase) and fuzzy matches (config case)
     * consider making the matching logic more intuitive and consistent
-- [x] fix .gbm.config.yaml creation (clone.go) and make default branch not be MAIN, but what the default branch is called
+- [x] fix gbm.branchconfig.yaml creation (clone.go) and make default branch not be MAIN, but what the default branch is called
     * don't enforce CAPS for worktree name
 - [x] add confirmation to the `gbm sync --force` because it is destructive.
     * give list of what will be destroyed
@@ -113,7 +113,8 @@ ERROR: Error: exit status 1
   especially important in collaborative environments where branches are frequently updated.
 - [x] add tests for `gbm add`
 - [x] split out state from the .gbm/config.toml into a separate .gbm/state.toml
-- [ ] don't use global state for flags
+- [x] don't use global state for flags
     * will improve testability
-
+- [ ] replace worktreedirnam flag with config.toml
+- [ ] manage branchconfig.toml with go templates (should clean up tests)
 

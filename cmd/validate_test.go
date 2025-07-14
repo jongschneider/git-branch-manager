@@ -6,6 +6,7 @@ import (
 	"strings"
 	"testing"
 
+	"gbm/internal"
 	"gbm/internal/testutils"
 
 	"github.com/stretchr/testify/assert"
@@ -17,10 +18,10 @@ import (
 func setupValidateTest(t *testing.T, repo *testutils.GitTestRepo, gbmMapping map[string]string) {
 	if gbmMapping != nil {
 		err := repo.CreateGBMConfig(gbmMapping)
-		require.NoError(t, err, "Failed to create .gbm.config.yaml")
+		require.NoError(t, err, "Failed to create gbm.branchconfig.yaml")
 
-		err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
-		require.NoError(t, err, "Failed to commit .gbm.config.yaml")
+		err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
+		require.NoError(t, err, "Failed to commit gbm.branchconfig.yaml")
 	}
 }
 
@@ -106,7 +107,7 @@ func assertValidationResults(t *testing.T, output string, expectedResults map[st
 func TestValidateCommand_AllBranchesValid(t *testing.T) {
 	repo := testutils.NewStandardGBMConfigRepo(t)
 
-	setupValidateTest(t, repo, nil) // .gbm.config.yaml already exists in StandardGBMConfigRepo
+	setupValidateTest(t, repo, nil) // gbm.branchconfig.yaml already exists in StandardGBMConfigRepo
 
 	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
 	require.NoError(t, err, "Validate command should succeed when all branches are valid")
@@ -124,7 +125,7 @@ func TestValidateCommand_AllBranchesValid(t *testing.T) {
 func TestValidateCommand_SomeBranchesInvalid(t *testing.T) {
 	repo := testutils.NewMultiBranchRepo(t)
 
-	// Create .gbm.config.yaml with some valid and some invalid branch references
+	// Create gbm.branchconfig.yaml with some valid and some invalid branch references
 	gbmMapping := map[string]string{
 		"main":    "main",               // valid - exists
 		"dev":     "develop",            // valid - exists
@@ -257,28 +258,28 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 func TestValidateCommand_MissingGBMConfig(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Don't create .gbm.config.yaml file - setupValidateTest with nil mapping skips creation
+	// Don't create gbm.branchconfig.yaml file - setupValidateTest with nil mapping skips creation
 	setupValidateTest(t, repo, nil)
 
 	_, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
-	require.Error(t, err, "Validate command should fail when .gbm.config.yaml file is missing")
+	require.Error(t, err, "Validate command should fail when gbm.branchconfig.yaml file is missing")
 
-	// Check that error message mentions missing .gbm.config.yaml
-	assert.ErrorContains(t, err, ".gbm.config.yaml", "Error message should mention .gbm.config.yaml file")
+	// Check that error message mentions missing gbm.branchconfig.yaml
+	assert.ErrorContains(t, err, internal.DefaultBranchConfigFilename, "Error message should mention gbm.branchconfig.yaml file")
 }
 
 func TestValidateCommand_InvalidGBMConfigSyntax(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Create .gbm.config.yaml with invalid syntax (malformed YAML content)
-	err := repo.WriteFile(".gbm.config.yaml", "invalid yaml syntax:\n  - missing quotes\n  bad indentation\nworktrees:\n  main branch: main")
-	require.NoError(t, err, "Failed to create malformed .gbm.config.yaml")
+	// Create gbm.branchconfig.yaml with invalid syntax (malformed YAML content)
+	err := repo.WriteFile(internal.DefaultBranchConfigFilename, "invalid yaml syntax:\n  - missing quotes\n  bad indentation\nworktrees:\n  main branch: main")
+	require.NoError(t, err, "Failed to create malformed gbm.branchconfig.yaml")
 
-	err = repo.CommitChangesWithForceAdd("Add malformed .gbm.config.yaml")
-	require.NoError(t, err, "Failed to commit malformed .gbm.config.yaml")
+	err = repo.CommitChangesWithForceAdd("Add malformed gbm.branchconfig.yaml")
+	require.NoError(t, err, "Failed to commit malformed gbm.branchconfig.yaml")
 
 	_, err = runValidateCommand(t, repo.GetLocalPath(), []string{})
-	require.Error(t, err, "Validate command should fail when .gbm.config.yaml has invalid syntax")
+	require.Error(t, err, "Validate command should fail when gbm.branchconfig.yaml has invalid syntax")
 
 	// The error could be either a parsing error or validation failure
 	// Since the current implementation may still parse some entries, we just verify it fails
@@ -287,33 +288,33 @@ func TestValidateCommand_InvalidGBMConfigSyntax(t *testing.T) {
 func TestValidateCommand_EmptyGBMConfig(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Create empty .gbm.config.yaml file
-	err := repo.WriteFile(".gbm.config.yaml", "")
-	require.NoError(t, err, "Failed to create empty .gbm.config.yaml")
+	// Create empty gbm.branchconfig.yaml file
+	err := repo.WriteFile(internal.DefaultBranchConfigFilename, "")
+	require.NoError(t, err, "Failed to create empty gbm.branchconfig.yaml")
 
-	err = repo.CommitChangesWithForceAdd("Add empty .gbm.config.yaml")
-	require.NoError(t, err, "Failed to commit empty .gbm.config.yaml")
+	err = repo.CommitChangesWithForceAdd("Add empty gbm.branchconfig.yaml")
+	require.NoError(t, err, "Failed to commit empty gbm.branchconfig.yaml")
 
 	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
-	require.NoError(t, err, "Validate command should succeed with empty .gbm.config.yaml")
+	require.NoError(t, err, "Validate command should succeed with empty gbm.branchconfig.yaml")
 
-	// With empty .gbm.config.yaml, there should be no validation results to display
+	// With empty gbm.branchconfig.yaml, there should be no validation results to display
 	results := parseValidationTable(output)
-	assert.Empty(t, results, "Empty .gbm.config.yaml should result in no validation entries")
+	assert.Empty(t, results, "Empty gbm.branchconfig.yaml should result in no validation entries")
 }
 
 func TestValidateCommand_NotInGitRepository(t *testing.T) {
 	// Create a temporary directory that is not a git repository
 	tempDir := t.TempDir()
 
-	// Create .gbm.config.yaml file in non-git directory
-	configPath := tempDir + "/.gbm.config.yaml"
+	// Create gbm.branchconfig.yaml file in non-git directory
+	configPath := tempDir + "/gbm.branchconfig.yaml"
 	configContent := `worktrees:
   main:
     branch: main
     description: "Main branch"`
 	err := os.WriteFile(configPath, []byte(configContent), 0644)
-	require.NoError(t, err, "Failed to create .gbm.config.yaml in non-git directory")
+	require.NoError(t, err, "Failed to create gbm.branchconfig.yaml in non-git directory")
 
 	_, err = runValidateCommand(t, tempDir, []string{})
 	require.Error(t, err, "Validate command should fail when not in a git repository")
@@ -325,7 +326,7 @@ func TestValidateCommand_NotInGitRepository(t *testing.T) {
 func TestValidateCommand_CorruptGitRepository(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Create .gbm.config.yaml file first
+	// Create gbm.branchconfig.yaml file first
 	gbmMapping := map[string]string{
 		"main": "main",
 	}
@@ -346,7 +347,7 @@ func TestValidateCommand_CorruptGitRepository(t *testing.T) {
 func TestValidateCommand_DuplicateWorktrees(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
-	// Create .gbm.config.yaml with duplicate worktree names (invalid YAML)
+	// Create gbm.branchconfig.yaml with duplicate worktree names (invalid YAML)
 	configContent := `worktrees:
   main:
     branch: main
@@ -357,11 +358,11 @@ func TestValidateCommand_DuplicateWorktrees(t *testing.T) {
   test:
     branch: feature/auth
     description: "Test branch"`
-	err := repo.WriteFile(".gbm.config.yaml", configContent)
-	require.NoError(t, err, "Failed to create .gbm.config.yaml with duplicates")
+	err := repo.WriteFile(internal.DefaultBranchConfigFilename, configContent)
+	require.NoError(t, err, "Failed to create gbm.branchconfig.yaml with duplicates")
 
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml with duplicates")
-	require.NoError(t, err, "Failed to commit .gbm.config.yaml")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml with duplicates")
+	require.NoError(t, err, "Failed to commit gbm.branchconfig.yaml")
 
 	_, err = runValidateCommand(t, repo.GetLocalPath(), []string{})
 	require.Error(t, err, "Should fail due to duplicate YAML keys")
@@ -378,7 +379,7 @@ func TestValidateCommand_VeryLongBranchNames(t *testing.T) {
 	err := repo.CreateBranch(longBranchName, "Long branch content")
 	require.NoError(t, err, "Failed to create long branch")
 
-	// Create .gbm.config.yaml with very long branch name and worktree name
+	// Create gbm.branchconfig.yaml with very long branch name and worktree name
 	gbmMapping := map[string]string{
 		"main":                             "main",
 		"very_long_worktree_variable_name": longBranchName,
@@ -398,30 +399,3 @@ func TestValidateCommand_VeryLongBranchNames(t *testing.T) {
 	assert.Contains(t, output, "│", "Table should have column separators")
 }
 
-func TestValidateCommand_CustomGBMConfigPath(t *testing.T) {
-	repo := testutils.NewBasicRepo(t)
-
-	// Create custom .gbm.config.yaml file in different location
-	customPath := "custom-gbm-config.yaml"
-	customContent := `worktrees:
-  main:
-    branch: main
-    description: "Main branch"
-  custom:
-    branch: main
-    description: "Custom branch"`
-	err := repo.WriteFile(customPath, customContent)
-	require.NoError(t, err, "Failed to create custom config file")
-
-	err = repo.CommitChangesWithForceAdd("Add custom config file")
-	require.NoError(t, err, "Failed to commit custom config")
-
-	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{"--config", customPath})
-	require.NoError(t, err, "Should succeed with custom config path")
-
-	// Verify validation used the custom config file
-	results := parseValidationTable(output)
-	assert.Contains(t, results["main"], "VALID")
-	assert.Contains(t, results["custom"], "VALID")
-	assert.Len(t, results, 2, "Should only have entries from custom config file")
-}

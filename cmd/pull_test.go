@@ -53,7 +53,7 @@ func getCurrentCommitHash(t *testing.T, dir string) string {
 
 func TestPullCommand_CurrentWorktree(t *testing.T) {
 
-	// Create source repo with multiple branches and .gbm.config.yaml
+	// Create source repo with multiple branches and gbm.branchconfig.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
@@ -85,7 +85,7 @@ func TestPullCommand_CurrentWorktree(t *testing.T) {
 
 func TestPullCommand_NamedWorktree(t *testing.T) {
 
-	// Create source repo with multiple branches and .gbm.config.yaml
+	// Create source repo with multiple branches and gbm.branchconfig.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
@@ -117,7 +117,7 @@ func TestPullCommand_NamedWorktree(t *testing.T) {
 
 func TestPullCommand_AllWorktrees(t *testing.T) {
 
-	// Create source repo with multiple branches and .gbm.config.yaml
+	// Create source repo with multiple branches and gbm.branchconfig.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)

@@ -41,13 +41,13 @@ worktree-based development.`,
 				return fmt.Errorf("failed to create main worktree: %w", err)
 			}
 
-			PrintInfo("Setting up .gbm.config.yaml configuration...")
+			PrintInfo("Setting up gbm.branchconfig.yaml configuration...")
 			if err := setupGBMConfig(defaultBranch); err != nil {
-				return fmt.Errorf("failed to setup .gbm.config.yaml: %w", err)
+				return fmt.Errorf("failed to setup gbm.branchconfig.yaml: %w", err)
 			}
 
 			PrintInfo("Initializing worktree management...")
-			if err := initializeWorktreeManagementWithCmd(cmd); err != nil {
+			if err := initializeWorktreeManagement(); err != nil {
 				return fmt.Errorf("failed to initialize worktree management: %w", err)
 			}
 
@@ -191,31 +191,31 @@ func createMainWorktree(defaultBranch string) error {
 }
 
 func setupGBMConfig(defaultBranch string) error {
-	worktreeConfigPath := filepath.Join("worktrees", defaultBranch, ".gbm.config.yaml")
-	rootConfigPath := ".gbm.config.yaml"
+	worktreeConfigPath := filepath.Join("worktrees", defaultBranch, internal.DefaultBranchConfigFilename)
+	branchConfigPath := internal.DefaultBranchConfigFilename
 
-	// Check if .gbm.config.yaml exists in the default branch worktree
+	// Check if gbm.branchconfig.yaml exists in the default branch worktree
 	if _, err := os.Stat(worktreeConfigPath); err == nil {
-		PrintInfo("Found .gbm.config.yaml in %s worktree, copying to root...", defaultBranch)
-		if err := copyFile(worktreeConfigPath, rootConfigPath); err != nil {
-			return fmt.Errorf("failed to copy .gbm.config.yaml from worktree: %w", err)
+		PrintInfo("Found gbm.branchconfig.yaml in %s worktree, copying to root...", defaultBranch)
+		if err := copyFile(worktreeConfigPath, branchConfigPath); err != nil {
+			return fmt.Errorf("failed to copy gbm.branchconfig.yaml from worktree: %w", err)
 		}
 	} else if os.IsNotExist(err) {
-		// Check if .gbm.config.yaml already exists in root (from repository contents)
-		if _, err := os.Stat(rootConfigPath); err == nil {
-			PrintInfo("Found .gbm.config.yaml in root, keeping existing configuration...")
-			// Don't overwrite existing .gbm.config.yaml from repository
+		// Check if gbm.branchconfig.yaml already exists in root (from repository contents)
+		if _, err := os.Stat(branchConfigPath); err == nil {
+			PrintInfo("Found gbm.branchconfig.yaml in root, keeping existing configuration...")
+			// Don't overwrite existing gbm.branchconfig.yaml from repository
 			return nil
 		} else if os.IsNotExist(err) {
-			PrintInfo("No .gbm.config.yaml found in %s worktree, creating new one...", defaultBranch)
-			if err := createDefaultGBMConfig(rootConfigPath, defaultBranch); err != nil {
-				return fmt.Errorf("failed to create default .gbm.config.yaml: %w", err)
+			PrintInfo("No gbm.branchconfig.yaml found in %s worktree, creating new one...", defaultBranch)
+			if err := createDefaultGBMConfig(branchConfigPath, defaultBranch); err != nil {
+				return fmt.Errorf("failed to create default gbm.branchconfig.yaml: %w", err)
 			}
 		} else {
-			return fmt.Errorf("failed to check .gbm.config.yaml in root: %w", err)
+			return fmt.Errorf("failed to check gbm.branchconfig.yaml in root: %w", err)
 		}
 	} else {
-		return fmt.Errorf("failed to check .gbm.config.yaml in worktree: %w", err)
+		return fmt.Errorf("failed to check gbm.branchconfig.yaml in worktree: %w", err)
 	}
 
 	return nil
@@ -253,11 +253,6 @@ worktrees:
 }
 
 func initializeWorktreeManagement() error {
-	// Legacy function - uses default config path
-	return initializeWorktreeManagementWithCmd(nil)
-}
-
-func initializeWorktreeManagementWithCmd(cmd *cobra.Command) error {
 	// Get current working directory (repository root)
 	wd, err := os.Getwd()
 	if err != nil {
@@ -270,22 +265,19 @@ func initializeWorktreeManagementWithCmd(cmd *cobra.Command) error {
 		return fmt.Errorf("failed to create manager: %w", err)
 	}
 
-	// Load .gbm.config.yaml configuration
-	configPath := GetConfigPath() // Default fallback
-	if cmd != nil {
-		configPath = getConfigPath(cmd)
+	// Load gbm.branchconfig.yaml configuration
+	branchConfigPath := internal.DefaultBranchConfigFilename
+
+	if err := manager.LoadGBMConfig(branchConfigPath); err != nil {
+		return fmt.Errorf("failed to load %s: %w", internal.DefaultBranchConfigFilename, err)
 	}
 
-	if err := manager.LoadGBMConfig(configPath); err != nil {
-		return fmt.Errorf("failed to load .gbm.config.yaml: %w", err)
-	}
-
-	// Initialize worktree management - create worktrees for each .gbm.config.yaml mapping
+	// Initialize worktree management - create worktrees for each branch config mapping
 	// Use a more permissive sync that doesn't fail on invalid branches during clone
 	if err := manager.Sync(false, false); err != nil {
 		// For clone operations, we want to be more permissive and not fail
-		// if there are invalid branch references in the .gbm.config.yaml file
-		PrintInfo("Warning: some branch references in .gbm.config.yaml may be invalid: %v", err)
+		// if there are invalid branch references in the branch config file
+		PrintInfo("Warning: some branch references in %s may be invalid: %v", internal.DefaultBranchConfigFilename, err)
 		PrintInfo("You can run 'gbm sync' later to resolve any issues")
 	}
 

@@ -34,11 +34,11 @@ func NewGBMConfigRepo(t *testing.T, mapping map[string]string) *GitTestRepo {
 	repo := NewMultiBranchRepo(t)
 
 	if err := repo.CreateGBMConfig(mapping); err != nil {
-		t.Fatalf("Failed to create .gbm.config.yaml: %v", err)
+		t.Fatalf("Failed to create gbm.branchconfig.yaml: %v", err)
 	}
 
-	if err := repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration"); err != nil {
-		t.Fatalf("Failed to commit .gbm.config.yaml: %v", err)
+	if err := repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration"); err != nil {
+		t.Fatalf("Failed to commit gbm.branchconfig.yaml: %v", err)
 	}
 
 	if err := repo.PushBranch("main"); err != nil {

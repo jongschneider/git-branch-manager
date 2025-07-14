@@ -18,7 +18,7 @@ func newListCommand() *cobra.Command {
 Shows environment variable mappings and indicates sync status for each entry.
 Displays which branches are out of sync, lists missing worktrees, and shows orphaned worktrees.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manager, err := createInitializedManagerStrictWithCmd(cmd)
+			manager, err := createInitializedManagerStrict()
 			if err != nil {
 				return err
 			}
@@ -62,7 +62,7 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 					syncStatus = "UNTRACKED"
 				}
 
-				// Check if this is an untracked worktree (not in .gbm.config.yaml)
+				// Check if this is an untracked worktree (not in gbm.branchconfig.yaml)
 				if syncStatus == "" {
 					worktreeMapping, err := manager.GetWorktreeMapping()
 					if err == nil {

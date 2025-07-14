@@ -19,13 +19,13 @@ func TestAddCommand_NewBranchFromRemote(t *testing.T) {
 	repoPath := setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	// Test adding worktree with a new branch name based on a remote branch
@@ -53,13 +53,13 @@ func TestAddCommand_NewBranch(t *testing.T) {
 	repoPath := setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	cmd := newRootCommand()
@@ -88,13 +88,13 @@ func TestAddCommand_NewBranchWithBaseBranch(t *testing.T) {
 	repoPath := setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	cmd := newRootCommand()
@@ -120,13 +120,13 @@ func TestAddCommand_InvalidBaseBranch(t *testing.T) {
 	setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	cmd := newRootCommand()
@@ -142,13 +142,13 @@ func TestAddCommand_JIRAKeyGeneration(t *testing.T) {
 	setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	// Test JIRA key without branch name and no -b flag
@@ -204,13 +204,13 @@ func TestAddCommand_MissingBranchName(t *testing.T) {
 	setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	cmd := newRootCommand()
@@ -226,13 +226,13 @@ func TestAddCommand_NewBranchWithoutFlag(t *testing.T) {
 	setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	cmd := newRootCommand()
@@ -248,13 +248,13 @@ func TestAddCommand_AutoGenerateBranchWithFlag(t *testing.T) {
 	repoPath := setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	cmd := newRootCommand()
@@ -280,13 +280,13 @@ func TestAddCommand_DuplicateWorktreeName(t *testing.T) {
 	setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	// Add first worktree (create new branch to avoid the existing branch issue)
@@ -347,13 +347,13 @@ func TestAddCommand_FromWorktreeDirectory(t *testing.T) {
 	repoPath := setupClonedRepo(t, sourceRepo)
 
 
-	// Create .gbm.config.yaml in the cloned repo
+	// Create gbm.branchconfig.yaml in the cloned repo
 	gbmContent := `worktrees:
   main:
     branch: main
     description: "Main production branch"
 `
-	err := os.WriteFile(".gbm.config.yaml", []byte(gbmContent), 0644)
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
 	require.NoError(t, err)
 
 	// First add a worktree (create new branch to avoid existing branch issues)

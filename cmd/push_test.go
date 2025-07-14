@@ -99,7 +99,7 @@ func checkUpstreamExists(t *testing.T, worktreePath string) bool {
 }
 
 func TestPushCommand_CurrentWorktree(t *testing.T) {
-	// Create source repo with multiple branches and .gbm.config.yaml
+	// Create source repo with multiple branches and gbm.branchconfig.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
@@ -130,7 +130,7 @@ func TestPushCommand_CurrentWorktree(t *testing.T) {
 }
 
 func TestPushCommand_NamedWorktree(t *testing.T) {
-	// Create source repo with multiple branches and .gbm.config.yaml
+	// Create source repo with multiple branches and gbm.branchconfig.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
@@ -161,7 +161,7 @@ func TestPushCommand_NamedWorktree(t *testing.T) {
 }
 
 func TestPushCommand_AllWorktrees(t *testing.T) {
-	// Create source repo with multiple branches and .gbm.config.yaml
+	// Create source repo with multiple branches and gbm.branchconfig.yaml
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)

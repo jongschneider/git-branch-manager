@@ -9,7 +9,10 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-const DefaultWorktreeDirname = "worktrees"
+const (
+	DefaultWorktreeDirname      = "worktrees"
+	DefaultBranchConfigFilename = "gbm.branchconfig.yaml"
+)
 
 type Config struct {
 	Settings ConfigSettings `toml:"settings"`
@@ -77,9 +80,9 @@ func DefaultConfig() *Config {
 			WorktreePrefix:        DefaultWorktreeDirname,
 			AutoFetch:             true,
 			CreateMissingBranches: false,
-			MergeBackAlerts:       false, // Disabled by default
+			MergeBackAlerts:       false,    // Disabled by default
 			HotfixPrefix:          "HOTFIX", // Default hotfix prefix
-			MergebackPrefix:       "MERGE", // Default mergeback prefix
+			MergebackPrefix:       "MERGE",  // Default mergeback prefix
 		},
 		Icons: ConfigIcons{
 			// Status icons
@@ -149,11 +152,11 @@ func (c *Config) Save(gbmDir string) error {
 	return nil
 }
 
-// ParseGBMConfig parses the YAML-based .gbm.config.yaml file
+// ParseGBMConfig parses the YAML-based branch config file
 func ParseGBMConfig(path string) (*GBMConfig, error) {
 	data, err := os.ReadFile(path)
 	if err != nil {
-		return nil, fmt.Errorf("failed to read .gbm.config.yaml file: %w", err)
+		return nil, fmt.Errorf("failed to read %s file: %w", DefaultBranchConfigFilename, err)
 	}
 
 	var config GBMConfig

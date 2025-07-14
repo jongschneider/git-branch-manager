@@ -43,7 +43,7 @@ Tab Completion:
 		var jiraTicket string
 
 		// Create manager
-		manager, err := createInitializedManagerWithCmd(cmd)
+		manager, err := createInitializedManager()
 		if err != nil {
 			return err
 		}
@@ -132,12 +132,12 @@ func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string
 		return "", "", fmt.Errorf("failed to find git root: %w", err)
 	}
 
-	// Look for .gbm.config.yaml file
-	configPath := filepath.Join(repoRoot, ".gbm.config.yaml")
+	// Look for gbm.branchconfig.yaml file
+	configPath := filepath.Join(repoRoot, internal.DefaultBranchConfigFilename)
 	config, err := internal.ParseGBMConfig(configPath)
 	if err != nil {
 		// If no config file, fall back to default branch
-		PrintVerbose("No .gbm.config.yaml found, using default branch as merge target")
+		PrintVerbose("No gbm.branchconfig.yaml found, using default branch as merge target")
 		defaultBranch, err := manager.GetGitManager().GetDefaultBranch()
 		if err != nil {
 			return "", "", err
@@ -385,11 +385,11 @@ func isActivityRelevantForMergeback(activity internal.RecentActivity, manager *i
 		return true // Assume relevant if we can't check
 	}
 
-	// Look for .gbm.config.yaml file to get merge targets
-	configPath := filepath.Join(repoRoot, ".gbm.config.yaml")
+	// Look for gbm.branchconfig.yaml file to get merge targets
+	configPath := filepath.Join(repoRoot, internal.DefaultBranchConfigFilename)
 	config, err := internal.ParseGBMConfig(configPath)
 	if err != nil {
-		PrintVerbose("No .gbm.config.yaml found, assuming activity is relevant")
+		PrintVerbose("No gbm.branchconfig.yaml found, assuming activity is relevant")
 		return true // If no config, assume relevant
 	}
 

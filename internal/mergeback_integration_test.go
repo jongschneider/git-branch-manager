@@ -22,7 +22,7 @@ func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
 		testutils.WithUser("Test User", "test@example.com"),
 	)
 
-	// Create .gbm.config.yaml on main branch first
+	// Create gbm.branchconfig.yaml on main branch first
 	err := repo.CreateGBMConfig(map[string]string{
 		"main":    mainBranch,
 		"preview": previewBranch,
@@ -30,7 +30,7 @@ func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized branches from main
@@ -60,7 +60,7 @@ func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -94,7 +94,7 @@ func TestMergeBackDetection_MultipleCommits(t *testing.T) {
 		testutils.WithUser("Alice", "alice@example.com"),
 	)
 
-	// Create .gbm.config.yaml on main first
+	// Create gbm.branchconfig.yaml on main first
 	err := repo.CreateGBMConfig(map[string]string{
 		"main":    mainBranch,
 		"preview": previewBranch,
@@ -102,7 +102,7 @@ func TestMergeBackDetection_MultipleCommits(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized branches
@@ -146,7 +146,7 @@ func TestMergeBackDetection_MultipleCommits(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -183,7 +183,7 @@ func TestMergeBackDetection_CascadingMergebacks(t *testing.T) {
 		testutils.WithUser("Developer", "dev@example.com"),
 	)
 
-	// Create .gbm.config.yaml on main first
+	// Create gbm.branchconfig.yaml on main first
 	err := repo.CreateGBMConfig(map[string]string{
 		"main":    "main",
 		"preview": "preview",
@@ -191,10 +191,10 @@ func TestMergeBackDetection_CascadingMergebacks(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
 	require.NoError(t, err)
 
-	// Create synchronized branches after .gbm.config.yaml is committed
+	// Create synchronized branches after gbm.branchconfig.yaml is committed
 	err = repo.CreateSynchronizedBranch("preview")
 	require.NoError(t, err)
 
@@ -236,7 +236,7 @@ func TestMergeBackDetection_CascadingMergebacks(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -278,7 +278,7 @@ func TestMergeBackDetection_NoMergeBacksNeeded(t *testing.T) {
 		testutils.WithUser("Developer", "dev@example.com"),
 	)
 
-	// Create .gbm.config.yaml on main first
+	// Create gbm.branchconfig.yaml on main first
 	err := repo.CreateGBMConfig(map[string]string{
 		"main":    "main",
 		"preview": "preview",
@@ -286,7 +286,7 @@ func TestMergeBackDetection_NoMergeBacksNeeded(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized branches with no additional commits
@@ -305,7 +305,7 @@ func TestMergeBackDetection_NoMergeBacksNeeded(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -320,13 +320,13 @@ func TestMergeBackDetection_NoMergeBacksNeeded(t *testing.T) {
 }
 
 func TestMergeBackDetection_NonExistentBranches(t *testing.T) {
-	// Test scenario with .gbm.config.yaml referencing branches that don't exist
+	// Test scenario with gbm.branchconfig.yaml referencing branches that don't exist
 	repo := testutils.NewGitTestRepo(t,
 		testutils.WithDefaultBranch("main"),
 		testutils.WithUser("Developer", "dev@example.com"),
 	)
 
-	// Create .gbm.config.yaml with non-existent branches
+	// Create gbm.branchconfig.yaml with non-existent branches
 	err := repo.CreateGBMConfig(map[string]string{
 		"main":    "main",
 		"preview": "nonexistent-preview",
@@ -335,12 +335,12 @@ func TestMergeBackDetection_NonExistentBranches(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
 	require.NoError(t, err)
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -361,7 +361,7 @@ func TestMergeBackDetection_DynamicHierarchy(t *testing.T) {
 		testutils.WithUser("DevOps", "devops@example.com"),
 	)
 
-	// Create .gbm.config.yaml first on main
+	// Create gbm.branchconfig.yaml first on main
 	err := repo.CreateGBMConfig(map[string]string{
 		"main":    "main",
 		"staging": "staging",
@@ -371,7 +371,7 @@ func TestMergeBackDetection_DynamicHierarchy(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
 	require.NoError(t, err)
 
 	// Create a five-tier hierarchy with synchronized branches
@@ -415,7 +415,7 @@ func TestMergeBackDetection_DynamicHierarchy(t *testing.T) {
 
 	// Test merge-back detection
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)
@@ -442,7 +442,7 @@ func TestMergeBackAlertFormatting_RealScenario(t *testing.T) {
 		testutils.WithUser("Engineer", "engineer@company.com"),
 	)
 
-	// Create .gbm.config.yaml on main first
+	// Create gbm.branchconfig.yaml on main first
 	err := repo.CreateGBMConfig(map[string]string{
 		"main":    "main",
 		"preview": "preview",
@@ -450,7 +450,7 @@ func TestMergeBackAlertFormatting_RealScenario(t *testing.T) {
 	})
 	require.NoError(t, err)
 
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml configuration")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
 	require.NoError(t, err)
 
 	// Create synchronized branches
@@ -479,7 +479,7 @@ func TestMergeBackAlertFormatting_RealScenario(t *testing.T) {
 
 	// Test merge-back detection and alert formatting
 	err = repo.InLocalRepo(func() error {
-		configPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
 		require.NotNil(t, status)

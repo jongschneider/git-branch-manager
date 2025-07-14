@@ -1,6 +1,6 @@
 # Git Branch Manager (gbm)
 
-A command-line tool that manages Git repository branches and worktrees based on configurations defined in a `.gbm.config.yaml` file. The tool provides automated worktree management, JIRA integration, and intelligent file copying between worktrees.
+A command-line tool that manages Git repository branches and worktrees based on configurations defined in a `gbm.branchconfig.yaml` file. The tool provides automated worktree management, JIRA integration, and intelligent file copying between worktrees.
 
 ## Installation
 
@@ -23,7 +23,7 @@ For enhanced JIRA integration features, install the official JIRA CLI from [anki
 gbm clone <repository-url>
 ```
 
-2. Or configure an existing repository by creating `.gbm.config.yaml`:
+2. Or configure an existing repository by creating `gbm.branchconfig.yaml`:
 ```yaml
 worktrees:
   main:
@@ -54,7 +54,7 @@ gbm list
   - `gbm add feature-work --interactive` - Interactive branch selection
 
 - `gbm list` - List all managed worktrees with sync status
-- `gbm sync` - Synchronize worktrees with `.gbm.config.yaml` definitions
+- `gbm sync` - Synchronize worktrees with `gbm.branchconfig.yaml` definitions
 - `gbm remove <worktree-name>` - Remove worktrees with safety checks
 - `gbm switch [worktree-name]` - Switch between worktrees with fuzzy matching
 
@@ -67,7 +67,7 @@ gbm list
 
 ### Validation and Utilities
 
-- `gbm validate` - Validate `.gbm.config.yaml` syntax and branch references
+- `gbm validate` - Validate `gbm.branchconfig.yaml` syntax and branch references
 
 ### JIRA Integration
 
@@ -140,7 +140,7 @@ This provides functions like `gcd <worktree-name>` for quick navigation.
 
 ## Configuration
 
-### Primary Configuration: `.gbm.config.yaml`
+### Primary Configuration: `gbm.branchconfig.yaml`
 
 Define tracked worktrees and their branch mappings:
 
@@ -180,7 +180,7 @@ files = [".env", "config/local.json", "scripts/"]
 
 ### File Copying for Ad-Hoc Worktrees
 
-Configure automatic file copying when creating new **ad-hoc worktrees** (created with `gbm add`, not tracked in `.gbm.config.yaml`):
+Configure automatic file copying when creating new **ad-hoc worktrees** (created with `gbm add`, not tracked in `gbm.branchconfig.yaml`):
 
 ```toml
 [file_copy]
@@ -201,7 +201,7 @@ files = [".env.local", "config/development.json", "scripts/"]
 
 **File Copy Rules:**
 - Files are copied **only** when creating new ad-hoc worktrees with `gbm add`
-- Tracked worktrees (defined in `.gbm.config.yaml`) do **not** get file copying
+- Tracked worktrees (defined in `gbm.branchconfig.yaml`) do **not** get file copying
 - If the source worktree doesn't exist, the rule is skipped with a warning
 - If a specific file doesn't exist in the source worktree, that file is skipped with a warning
 - If a file already exists in the target worktree, it is skipped
@@ -218,9 +218,10 @@ files = [".env.local", "config/development.json", "scripts/"]
 ```
 project-root/
 ├── .git/           # Bare repository (after gbm clone)
-├── .gbm.config.yaml
+├── gbm.branchconfig.yaml
 ├── .gbm/
-│   └── config.toml
+│   ├── config.toml # User settings (icons, prefixes, file copy rules)
+│   └── state.toml  # Runtime state (current worktree, last sync, etc.)
 ├── worktrees/
 │   ├── main/           # Contains main branch
 │   ├── staging/        # Contains feature/staging-env branch
@@ -230,7 +231,6 @@ project-root/
 
 ## Global Flags
 
-- `--config, -c`: Specify custom `.gbm.config.yaml` path
 - `--worktree-dir, -w`: Override worktree directory location
 - `--verbose, -v`: Enable verbose output
 - `--quiet, -q`: Suppress non-error output

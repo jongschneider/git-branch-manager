@@ -9,6 +9,7 @@ import (
 	"strings"
 	"testing"
 
+	"gbm/internal"
 	"gbm/internal/testutils"
 
 	"github.com/stretchr/testify/assert"
@@ -71,8 +72,8 @@ func TestListCommand_EmptyRepository(t *testing.T) {
 
 	os.Chdir(repo.GetLocalPath())
 
-	repo.WriteFile(".gbm.config.yaml", "# Empty .gbm.config.yaml")
-	repo.CommitChanges("Add empty .gbm.config.yaml")
+	assert.NoError(t, repo.WriteFile(internal.DefaultBranchConfigFilename, "# Empty gbm.branchconfig.yaml"))
+	assert.NoError(t, repo.CommitChanges("Add empty gbm.branchconfig.yaml"))
 
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
@@ -117,10 +118,10 @@ func TestListCommand_UntrackedWorktrees(t *testing.T) {
 	// Create a repository with branches
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 
-	// Clone the repository (no sync needed since NewMultiBranchRepo doesn't have .gbm.config.yaml)
+	// Clone the repository (no sync needed since NewMultiBranchRepo doesn't have gbm.branchconfig.yaml)
 	setupClonedRepo(t, sourceRepo)
 
-	// Create an additional worktree that's not in .gbm.config.yaml (untracked)
+	// Create an additional worktree that's not in gbm.branchconfig.yaml (untracked)
 	addCmd := newRootCommand()
 	addCmd.SetArgs([]string{"add", "--new-branch", "UNTRACKED", "develop"})
 	err := addCmd.Execute()
@@ -169,8 +170,8 @@ func TestListCommand_OrphanedWorktrees(t *testing.T) {
 	// Clone the repository and sync worktrees
 	setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	// Remove DEV from .gbm.config.yaml to make it orphaned
-	err := os.WriteFile(".gbm.config.yaml", []byte("worktrees:\n  main:\n    branch: main\n"), 0644)
+	// Remove DEV from gbm.branchconfig.yaml to make it orphaned
+	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte("worktrees:\n  main:\n    branch: main\n"), 0o644)
 	require.NoError(t, err)
 
 	// Now test the list command
@@ -209,12 +210,12 @@ func TestListCommand_GitStatus(t *testing.T) {
 	// Create a repository with branches
 	sourceRepo := testutils.NewMultiBranchRepo(t)
 
-	// Clone the repository (no sync needed since NewMultiBranchRepo doesn't have .gbm.config.yaml)
+	// Clone the repository (no sync needed since NewMultiBranchRepo doesn't have gbm.branchconfig.yaml)
 	repoPath := setupClonedRepo(t, sourceRepo)
 
 	// Create a file in the main worktree to create git status
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
-	err := os.WriteFile(filepath.Join(mainWorktreePath, "test.txt"), []byte("test content"), 0644)
+	err := os.WriteFile(filepath.Join(mainWorktreePath, "test.txt"), []byte("test content"), 0o644)
 	require.NoError(t, err)
 
 	// Now test the list command
@@ -351,7 +352,7 @@ func TestListCommand_SortedOutput(t *testing.T) {
 	require.True(t, found, "adhoc worktree should be present")
 	assert.Equal(t, "production/v1.0", adhocWorktree.Branch)
 
-	// Verify sorting: .gbm.config.yaml worktrees (main, dev, feat) should come before ad-hoc (adhoc)
+	// Verify sorting: gbm.branchconfig.yaml worktrees (main, dev, feat) should come before ad-hoc (adhoc)
 	// The order in the rows slice should reflect the display order
 	worktreeNames := make([]string, len(rows))
 	for i, row := range rows {
@@ -376,7 +377,7 @@ func TestListCommand_SortedOutput(t *testing.T) {
 		}
 	}
 
-	// .gbm.config.yaml worktrees should come before ad-hoc worktrees
+	// gbm.branchconfig.yaml worktrees should come before ad-hoc worktrees
 	assert.True(t, mainPos < adhocPos, "main should come before adhoc")
 	assert.True(t, devPos < adhocPos, "dev should come before adhoc")
 	assert.True(t, featPos < adhocPos, "feat should come before adhoc")
@@ -411,7 +412,7 @@ func TestListCommand_NoGBMConfigFile(t *testing.T) {
 
 	os.Chdir(repo.GetLocalPath())
 
-	gbmConfigPath := filepath.Join(repo.GetLocalPath(), ".gbm.config.yaml")
+	gbmConfigPath := filepath.Join(repo.GetLocalPath(), internal.DefaultBranchConfigFilename)
 	if _, err := os.Stat(gbmConfigPath); err == nil {
 		os.Remove(gbmConfigPath)
 	}
@@ -421,5 +422,5 @@ func TestListCommand_NoGBMConfigFile(t *testing.T) {
 
 	err := cmd.Execute()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to load .gbm.config.yaml")
+	assert.Contains(t, err.Error(), "failed to load gbm.branchconfig.yaml")
 }

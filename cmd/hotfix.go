@@ -36,7 +36,7 @@ Examples:
 		worktreeName := args[0]
 
 		// Create manager
-		manager, err := createInitializedManagerWithCmd(cmd)
+		manager, err := createInitializedManager()
 		if err != nil {
 			return err
 		}
@@ -127,12 +127,12 @@ func findProductionBranch(manager *internal.Manager) (string, error) {
 		return "", fmt.Errorf("failed to find git root: %w", err)
 	}
 
-	// Look for .gbm.config.yaml file
-	configPath := filepath.Join(repoRoot, ".gbm.config.yaml")
+	// Look for gbm.branchconfig.yaml file
+	configPath := filepath.Join(repoRoot, internal.DefaultBranchConfigFilename)
 	config, err := internal.ParseGBMConfig(configPath)
 	if err != nil {
 		// If no config file, fall back to default branch
-		PrintVerbose("No .gbm.config.yaml found, using default branch as production")
+		PrintVerbose("No gbm.branchconfig.yaml found, using default branch as production")
 		return manager.GetGitManager().GetDefaultBranch()
 	}
 

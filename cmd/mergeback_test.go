@@ -380,7 +380,7 @@ func TestFindMergeTargetBranchAndWorktree(t *testing.T) {
 		err := os.Chdir(repo.GetLocalPath())
 		require.NoError(t, err)
 
-		// Create manager without .gbm.config.yaml (should handle gracefully)
+		// Create manager without gbm.branchconfig.yaml (should handle gracefully)
 		manager, err := createInitializedManager()
 		require.NoError(t, err)
 
@@ -410,7 +410,7 @@ func TestMergebackIntegration(t *testing.T) {
 	err = repo.CreateBranch("production", "Production content")
 	require.NoError(t, err)
 
-	// Create .gbm.config.yaml
+	// Create gbm.branchconfig.yaml
 	gbmConfig := map[string]string{
 		"main":       "main",
 		"preview":    "preview",
@@ -418,7 +418,7 @@ func TestMergebackIntegration(t *testing.T) {
 	}
 	err = repo.CreateGBMConfig(gbmConfig)
 	require.NoError(t, err)
-	err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml")
+	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml")
 	require.NoError(t, err)
 
 	// Create hotfix activity on production
@@ -501,13 +501,13 @@ func TestMergebackWorktreeNaming(t *testing.T) {
 		repo := testutils.NewGitTestRepo(t, testutils.WithDefaultBranch("main"))
 		defer repo.Cleanup()
 
-		// Create .gbm.config.yaml with empty mergeback prefix
+		// Create gbm.branchconfig.yaml with empty mergeback prefix
 		gbmConfig := map[string]string{
 			"main": "main",
 		}
 		err := repo.CreateGBMConfig(gbmConfig)
 		require.NoError(t, err)
-		err = repo.CommitChangesWithForceAdd("Add .gbm.config.yaml")
+		err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml")
 		require.NoError(t, err)
 
 		// Change to the repo directory

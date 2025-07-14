@@ -1,6 +1,6 @@
-# Test Status Report - Refactor to .gbm.config.yaml
+# Test Status Report - Refactor to gbm.branchconfig.yaml
 
-This document tracks the status of all tests after refactoring from `.envrc` to `.gbm.config.yaml` format.
+This document tracks the status of all tests after refactoring from `.envrc` to `gbm.branchconfig.yaml` format.
 
 ## Summary
 
@@ -23,7 +23,7 @@ This document tracks the status of all tests after refactoring from `.envrc` to 
 | TestCloneCommand_EmptyRepository | ✅ PASS | |
 | TestExtractRepoName | ✅ PASS | (multiple subtests) |
 | TestCreateDefaultGBMConfig | ✅ PASS | |
-| TestListCommand_EmptyRepository | ✅ PASS | **FIXED** - Updated to use .gbm.config.yaml |
+| TestListCommand_EmptyRepository | ✅ PASS | **FIXED** - Updated to use gbm.branchconfig.yaml |
 | TestListCommand_WithEnvrcWorktrees | ✅ PASS | **FIXED** - Updated to use NewGBMConfigRepo |
 | TestListCommand_UntrackedWorktrees | ✅ PASS | **FIXED** - Updated expectations |
 | TestListCommand_OrphanedWorktrees | ✅ PASS | **FIXED** - Updated YAML format |
@@ -122,7 +122,7 @@ This document tracks the status of all tests after refactoring from `.envrc` to 
 ### ✅ TestListCommand* Tests (COMPLETED)
 - Updated all tests to use `NewGBMConfigRepo` instead of `NewEnvrcRepo`
 - Fixed YAML format expectations
-- Updated error message expectations from `.envrc` to `.gbm.config.yaml`
+- Updated error message expectations from `.envrc` to `gbm.branchconfig.yaml`
 - Handled main worktree naming conventions (MAIN vs main)
 
 ### ✅ TestRemoveCommand* Tests (COMPLETED)
@@ -162,7 +162,7 @@ The following 1 Switch command test needs to be updated:
    - `NewStandardEnvrcRepo` → `NewStandardGBMConfigRepo`
 
 2. **Configuration Format**:
-   - `.envrc` → `.gbm.config.yaml`
+   - `.envrc` → `gbm.branchconfig.yaml`
    - Environment variable format → YAML structure
 
 3. **Worktree Naming**:
@@ -170,14 +170,14 @@ The following 1 Switch command test needs to be updated:
    - Directory names remain uppercase for git worktree compatibility
 
 4. **Error Message Updates**:
-   - "failed to load .envrc" → "failed to load .gbm.config.yaml"
+   - "failed to load .envrc" → "failed to load gbm.branchconfig.yaml"
 
 ## Next Steps
 
 1. Fix the remaining 14 failing tests (Pull, Push, and Switch commands)
 2. Follow the same patterns used for List and Remove commands
 3. Update any hardcoded references to `.envrc` or environment variables
-4. Ensure all tests use the new `.gbm.config.yaml` format
+4. Ensure all tests use the new `gbm.branchconfig.yaml` format
 
 ---
 

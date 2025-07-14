@@ -12,7 +12,7 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-// parseGBMConfig reads and unmarshals a .gbm.config.yaml file
+// parseGBMConfig reads and unmarshals a gbm.branchconfig.yaml file
 func parseGBMConfig(t *testing.T, path string) *internal.GBMConfig {
 	t.Helper()
 
@@ -44,9 +44,9 @@ func TestCloneCommand_Basic(t *testing.T) {
 	assert.DirExists(t, filepath.Join(repoPath, ".git"))
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees"))
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
-	assert.FileExists(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+	assert.FileExists(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 
-	config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+	config := parseGBMConfig(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 	expected := &internal.GBMConfig{
 		Worktrees: map[string]internal.WorktreeConfig{
 			"main": {
@@ -80,9 +80,9 @@ func TestCloneCommand_WithExistingGBMConfig(t *testing.T) {
 	repoName := sourceRepo.GetRepoName()
 	repoPath := filepath.Join(targetDir, repoName)
 
-	assert.FileExists(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+	assert.FileExists(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 
-	config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+	config := parseGBMConfig(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 	expected := &internal.GBMConfig{
 		Worktrees: map[string]internal.WorktreeConfig{
 			"main": {
@@ -122,9 +122,9 @@ func TestCloneCommand_WithoutGBMConfig(t *testing.T) {
 	repoName := sourceRepo.GetRepoName()
 	repoPath := filepath.Join(targetDir, repoName)
 
-	assert.FileExists(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+	assert.FileExists(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 
-	config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+	config := parseGBMConfig(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 	expected := &internal.GBMConfig{
 		Worktrees: map[string]internal.WorktreeConfig{
 			"main": {
@@ -170,7 +170,7 @@ func TestCloneCommand_DifferentDefaultBranches(t *testing.T) {
 
 			assert.DirExists(t, filepath.Join(repoPath, "worktrees", tt.defaultBranch))
 
-			config := parseGBMConfig(t, filepath.Join(repoPath, ".gbm.config.yaml"))
+			config := parseGBMConfig(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 			expected := &internal.GBMConfig{
 				Worktrees: map[string]internal.WorktreeConfig{
 					tt.defaultBranch: {
@@ -213,7 +213,7 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 	}
 
 	expectedFiles := []string{
-		".gbm.config.yaml",
+		internal.DefaultBranchConfigFilename,
 		"worktrees/main/README.md",
 	}
 
@@ -263,7 +263,7 @@ func TestExtractRepoName(t *testing.T) {
 
 func TestCreateDefaultGBMConfig(t *testing.T) {
 	tempDir := t.TempDir()
-	configPath := filepath.Join(tempDir, ".gbm.config.yaml")
+	configPath := filepath.Join(tempDir, internal.DefaultBranchConfigFilename)
 
 	err := createDefaultGBMConfig(configPath, "main")
 	require.NoError(t, err)

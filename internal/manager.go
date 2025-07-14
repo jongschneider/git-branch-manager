@@ -73,7 +73,7 @@ func NewManager(repoPath string) (*Manager, error) {
 
 func (m *Manager) LoadGBMConfig(configPath string) error {
 	if configPath == "" {
-		configPath = filepath.Join(m.repoPath, ".gbm.config.yaml")
+		configPath = filepath.Join(m.repoPath, DefaultBranchConfigFilename)
 	}
 
 	if !filepath.IsAbs(configPath) {
@@ -91,7 +91,7 @@ func (m *Manager) LoadGBMConfig(configPath string) error {
 
 func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 	if m.gbmConfig == nil {
-		return nil, fmt.Errorf("no .gbm.config.yaml loaded")
+		return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
 	}
 
 	status := &SyncStatus{
@@ -229,7 +229,7 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 
 func (m *Manager) ValidateConfig() error {
 	if m.gbmConfig == nil {
-		return fmt.Errorf("no .gbm.config.yaml loaded")
+		return fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
 	}
 
 	for worktreeName, worktreeConfig := range m.gbmConfig.Worktrees {
@@ -247,7 +247,7 @@ func (m *Manager) ValidateConfig() error {
 
 func (m *Manager) GetWorktreeMapping() (map[string]string, error) {
 	if m.gbmConfig == nil {
-		return nil, fmt.Errorf("no .gbm.config.yaml loaded")
+		return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
 	}
 
 	mapping := make(map[string]string)
@@ -263,7 +263,7 @@ func (m *Manager) BranchExists(branchName string) (bool, error) {
 
 func (m *Manager) GetWorktreeList() (map[string]*WorktreeListInfo, error) {
 	if m.gbmConfig == nil {
-		return nil, fmt.Errorf("no .gbm.config.yaml loaded")
+		return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
 	}
 
 	result := make(map[string]*WorktreeListInfo)
@@ -335,7 +335,7 @@ func (m *Manager) GetAllWorktrees() (map[string]*WorktreeListInfo, error) {
 				CurrentBranch: wt.Branch,
 			}
 
-			// Set expected branch if it's tracked in .gbm.config.yaml
+			// Set expected branch if it's tracked in gbm.branchconfig.yaml
 			if m.gbmConfig != nil {
 				if worktreeConfig, exists := m.gbmConfig.Worktrees[worktreeName]; exists {
 					info.ExpectedBranch = worktreeConfig.Branch
@@ -364,7 +364,7 @@ func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool
 		return err
 	}
 
-	// Check if this is an ad-hoc worktree (not tracked in .gbm.config.yaml)
+	// Check if this is an ad-hoc worktree (not tracked in gbm.branchconfig.yaml)
 	isAdHoc := true
 	if m.gbmConfig != nil {
 		if _, exists := m.gbmConfig.Worktrees[worktreeName]; exists {
@@ -379,7 +379,7 @@ func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool
 		}
 	}
 
-	// Track this worktree as ad hoc if it's not in .gbm.config.yaml
+	// Track this worktree as ad hoc if it's not in gbm.branchconfig.yaml
 	if m.gbmConfig != nil {
 		if _, exists := m.gbmConfig.Worktrees[worktreeName]; !exists {
 			// Add to ad hoc worktrees list if not already there
@@ -657,7 +657,7 @@ func (m *Manager) GetSortedWorktreeNames(worktrees map[string]*WorktreeListInfo)
 	var trackedNames []string
 	var adHocNames []string
 
-	// Get .gbm.config.yaml mapping if available
+	// Get gbm.branchconfig.yaml mapping if available
 	trackedWorktrees := make(map[string]string)
 	if m.gbmConfig != nil {
 		for name, config := range m.gbmConfig.Worktrees {
