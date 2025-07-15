@@ -28,15 +28,24 @@ type WorktreeListInfo struct {
 }
 
 type SyncStatus struct {
-	InSync            bool
-	MissingWorktrees  []string
-	OrphanedWorktrees []string
-	BranchChanges     map[string]BranchChange
+	InSync               bool
+	MissingWorktrees     []string
+	OrphanedWorktrees    []string
+	BranchChanges        map[string]BranchChange
+	WorktreePromotions   []WorktreePromotion
 }
 
 type BranchChange struct {
 	OldBranch string
 	NewBranch string
+}
+
+type WorktreePromotion struct {
+	SourceWorktree string
+	TargetWorktree string
+	Branch         string
+	SourceBranch   string
+	TargetBranch   string
 }
 
 type ConfirmationFunc func(message string) bool
@@ -95,10 +104,11 @@ func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 	}
 
 	status := &SyncStatus{
-		InSync:            true,
-		MissingWorktrees:  []string{},
-		OrphanedWorktrees: []string{},
-		BranchChanges:     make(map[string]BranchChange),
+		InSync:               true,
+		MissingWorktrees:     []string{},
+		OrphanedWorktrees:    []string{},
+		BranchChanges:        make(map[string]BranchChange),
+		WorktreePromotions:   []WorktreePromotion{},
 	}
 
 	worktrees, err := m.gitManager.GetWorktrees()
@@ -134,7 +144,39 @@ func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 		status.InSync = false
 	}
 
+	// Detect worktree promotions: when a branch moves from one worktree to another
+	status.WorktreePromotions = m.detectWorktreePromotions(status.BranchChanges, worktrees)
+	
 	return status, nil
+}
+
+func (m *Manager) detectWorktreePromotions(branchChanges map[string]BranchChange, allWorktrees []*WorktreeInfo) []WorktreePromotion {
+	var promotions []WorktreePromotion
+	
+	// Create a map of branch -> worktree for existing worktrees
+	branchToWorktree := make(map[string]string)
+	for _, wt := range allWorktrees {
+		if strings.HasPrefix(wt.Path, filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)) {
+			branchToWorktree[wt.Branch] = wt.Name
+		}
+	}
+	
+	// Check each branch change to see if the new branch is currently checked out elsewhere
+	for targetWorktree, change := range branchChanges {
+		if sourceWorktree, exists := branchToWorktree[change.NewBranch]; exists {
+			// This is a promotion: the new branch is currently in another worktree
+			promotion := WorktreePromotion{
+				SourceWorktree: sourceWorktree,
+				TargetWorktree: targetWorktree,
+				Branch:         change.NewBranch,
+				SourceBranch:   change.NewBranch,
+				TargetBranch:   change.OldBranch,
+			}
+			promotions = append(promotions, promotion)
+		}
+	}
+	
+	return promotions
 }
 
 func (m *Manager) Sync(dryRun, force bool) error {
@@ -207,6 +249,38 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 			return fmt.Errorf("failed to create worktree for %s: %w", worktreeName, err)
 		}
 
+	}
+
+	// Handle worktree promotions with confirmation (always required for destructive operations)
+	if len(status.WorktreePromotions) > 0 {
+		if confirmFunc != nil {
+			for _, promotion := range status.WorktreePromotions {
+				message := fmt.Sprintf("Worktree %s (%s) will be promoted to %s.\nThis is a destructive action:\n  1. Worktree %s (%s) will be removed.\n  2. Worktree %s (%s) will be moved to %s.\nContinue?", 
+					promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree,
+					promotion.TargetWorktree, promotion.TargetBranch,
+					promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree)
+				
+				if !confirmFunc(message) {
+					return fmt.Errorf("worktree promotion cancelled by user")
+				}
+			}
+		} else {
+			return fmt.Errorf("worktree promotions require confirmation, but no confirmation function provided")
+		}
+	}
+
+	// Process worktree promotions first
+	for _, promotion := range status.WorktreePromotions {
+		sourceWorktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, promotion.SourceWorktree)
+		targetWorktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, promotion.TargetWorktree)
+		
+		err := m.gitManager.PromoteWorktree(sourceWorktreePath, targetWorktreePath)
+		if err != nil {
+			return fmt.Errorf("failed to promote worktree %s to %s: %w", promotion.SourceWorktree, promotion.TargetWorktree, err)
+		}
+		
+		// Remove the promotion from regular branch changes since it's already handled
+		delete(status.BranchChanges, promotion.TargetWorktree)
 	}
 
 	for worktreeName, change := range status.BranchChanges {

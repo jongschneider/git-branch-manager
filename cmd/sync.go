@@ -55,6 +55,16 @@ updates existing worktrees if branch references have changed, and optionally rem
 					}
 				}
 
+				if len(status.WorktreePromotions) > 0 {
+					iconManager := internal.GetGlobalIconManager()
+					PrintInfo("%s", internal.FormatStatusIcon(iconManager.Changes(), "Worktree promotions (destructive):"))
+					for _, promotion := range status.WorktreePromotions {
+						PrintInfo("  • %s (%s) will be promoted to %s", promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree)
+						PrintInfo("    1. Worktree %s (%s) will be removed", promotion.TargetWorktree, promotion.TargetBranch)
+						PrintInfo("    2. Worktree %s (%s) will be moved to %s", promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree)
+					}
+				}
+
 				if len(status.OrphanedWorktrees) > 0 {
 					iconManager := internal.GetGlobalIconManager()
 					PrintInfo("%s", internal.FormatStatusIcon(iconManager.Orphaned(), "Orphaned worktrees (use --force to remove):"))
@@ -69,15 +79,12 @@ updates existing worktrees if branch references have changed, and optionally rem
 			PrintVerbose("Synchronizing worktrees (force=%v)", syncForce)
 
 			// Create confirmation function for destructive operations
-			// Only prompt when force is used (to confirm destructive actions)
-			var confirmFunc internal.ConfirmationFunc
-			if syncForce {
-				confirmFunc = func(message string) bool {
-					fmt.Print(message + " [y/N]: ")
-					var response string
-					fmt.Scanln(&response)
-					return strings.ToLower(response) == "y" || strings.ToLower(response) == "yes"
-				}
+			// Always provide confirmation for promotions; only for orphaned worktrees when force is used
+			confirmFunc := func(message string) bool {
+				fmt.Print(message + " [y/N]: ")
+				var response string
+				fmt.Scanln(&response)
+				return strings.ToLower(response) == "y" || strings.ToLower(response) == "yes"
 			}
 
 			if err := manager.SyncWithConfirmation(syncDryRun, syncForce, confirmFunc); err != nil {
