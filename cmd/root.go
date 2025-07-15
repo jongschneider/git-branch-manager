@@ -224,10 +224,66 @@ func checkAndDisplayMergeBackAlerts(cmd *cobra.Command) {
 	alert := internal.FormatMergeBackAlert(status)
 	if alert != "" {
 		fmt.Fprint(os.Stderr, alert)
+		
+		// Update the LastMergebackCheck timestamp since we showed an alert
+		updateLastMergebackCheck()
 	}
 }
 
-// shouldShowMergeBackAlerts checks configuration to determine
+// updateLastMergebackCheck updates the LastMergebackCheck timestamp in state
+func updateLastMergebackCheck() {
+	wd, err := os.Getwd()
+	if err != nil {
+		PrintVerbose("Failed to get working directory when updating mergeback timestamp: %v", err)
+		return
+	}
+
+	repoRoot, err := internal.FindGitRoot(wd)
+	if err != nil {
+		PrintVerbose("Not in a git repository when updating mergeback timestamp: %v", err)
+		return
+	}
+
+	gbmDir := internal.GetGBMDir(repoRoot)
+	state, err := internal.LoadState(gbmDir)
+	if err != nil {
+		PrintVerbose("Failed to load state when updating mergeback timestamp: %v", err)
+		return
+	}
+
+	state.LastMergebackCheck = time.Now()
+	if err := state.Save(gbmDir); err != nil {
+		PrintVerbose("Failed to save state after updating mergeback timestamp: %v", err)
+	}
+}
+
+// updateLastMergebackCheckWithError is a version that returns errors for testing
+func updateLastMergebackCheckWithError() error {
+	wd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get working directory: %w", err)
+	}
+
+	repoRoot, err := internal.FindGitRoot(wd)
+	if err != nil {
+		return fmt.Errorf("not in a git repository: %w", err)
+	}
+
+	gbmDir := internal.GetGBMDir(repoRoot)
+	state, err := internal.LoadState(gbmDir)
+	if err != nil {
+		return fmt.Errorf("failed to load state: %w", err)
+	}
+
+	state.LastMergebackCheck = time.Now()
+	if err := state.Save(gbmDir); err != nil {
+		return fmt.Errorf("failed to save state: %w", err)
+	}
+	
+	return nil
+}
+
+// shouldShowMergeBackAlerts checks configuration and timestamp to determine
 // if merge-back alerts should be displayed
 func shouldShowMergeBackAlerts() bool {
 	// Check configuration file
@@ -250,5 +306,42 @@ func shouldShowMergeBackAlerts() bool {
 		return false // Default to disabled
 	}
 
-	return config.Settings.MergeBackAlerts
+	// If merge back alerts are disabled, don't show them (early short-circuit)
+	if !config.Settings.MergeBackAlerts {
+		return false
+	}
+
+	// Load state to check timestamp
+	state, err := internal.LoadState(gbmDir)
+	if err != nil {
+		PrintVerbose("Failed to load state: %v", err)
+		return true // Default to showing alerts if we can't load state
+	}
+
+	// Check if enough time has passed since last check
+	timeSinceLastCheck := time.Since(state.LastMergebackCheck)
+
+	// Quick check if we need to determine user commits first
+	configPath := internal.DefaultBranchConfigFilename
+	status, err := internal.CheckMergeBackStatus(configPath)
+	if err != nil {
+		PrintVerbose("Failed to check merge-back status for timestamp logic: %v", err)
+		// Use the normal interval if we can't determine user commits
+		return timeSinceLastCheck >= config.Settings.MergeBackCheckInterval
+	}
+
+	// If no mergebacks needed, don't show alerts regardless of timing
+	if status == nil || len(status.MergeBacksNeeded) == 0 {
+		return false
+	}
+
+	// Use appropriate interval based on whether user has commits
+	var interval time.Duration
+	if status.HasUserCommits {
+		interval = config.Settings.MergeBackUserCommitInterval
+	} else {
+		interval = config.Settings.MergeBackCheckInterval
+	}
+
+	return timeSinceLastCheck >= interval
 }

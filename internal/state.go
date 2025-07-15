@@ -21,21 +21,23 @@ type ConfigState struct {
 // State represents the runtime state data that is frequently modified
 // This will be stored in a separate .gbm/state.toml file
 type State struct {
-	LastSync         time.Time `toml:"last_sync"`
-	TrackedVars      []string  `toml:"tracked_vars"`
-	AdHocWorktrees   []string  `toml:"ad_hoc_worktrees"`
-	CurrentWorktree  string    `toml:"current_worktree"`
-	PreviousWorktree string    `toml:"previous_worktree"`
+	LastSync            time.Time `toml:"last_sync"`
+	TrackedVars         []string  `toml:"tracked_vars"`
+	AdHocWorktrees      []string  `toml:"ad_hoc_worktrees"`
+	CurrentWorktree     string    `toml:"current_worktree"`
+	PreviousWorktree    string    `toml:"previous_worktree"`
+	LastMergebackCheck  time.Time `toml:"last_mergeback_check"`
 }
 
 // DefaultState returns a new State with default values
 func DefaultState() *State {
 	return &State{
-		LastSync:         time.Time{},
-		TrackedVars:      []string{},
-		AdHocWorktrees:   []string{},
-		CurrentWorktree:  "",
-		PreviousWorktree: "",
+		LastSync:           time.Time{},
+		TrackedVars:        []string{},
+		AdHocWorktrees:     []string{},
+		CurrentWorktree:    "",
+		PreviousWorktree:   "",
+		LastMergebackCheck: time.Time{},
 	}
 }
 
