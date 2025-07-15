@@ -265,6 +265,15 @@ func initializeWorktreeManagement() error {
 		return fmt.Errorf("failed to create manager: %w", err)
 	}
 
+	// Save default config and state to create .gbm directory
+	if err := manager.SaveConfig(); err != nil {
+		return fmt.Errorf("failed to initialize .gbm/config.toml: %w", err)
+	}
+
+	if err := manager.SaveState(); err != nil {
+		return fmt.Errorf("failed to initialize .gbm/state.toml: %w", err)
+	}
+
 	// Load gbm.branchconfig.yaml configuration
 	branchConfigPath := internal.DefaultBranchConfigFilename
 

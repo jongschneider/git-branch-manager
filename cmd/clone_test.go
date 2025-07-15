@@ -45,6 +45,11 @@ func TestCloneCommand_Basic(t *testing.T) {
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees"))
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
 	assert.FileExists(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
+	
+	// Verify .gbm directory and files are created
+	assert.DirExists(t, filepath.Join(repoPath, ".gbm"))
+	assert.FileExists(t, filepath.Join(repoPath, ".gbm", "config.toml"))
+	assert.FileExists(t, filepath.Join(repoPath, ".gbm", "state.toml"))
 
 	config := parseGBMConfig(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 	expected := &internal.GBMConfig{
@@ -81,6 +86,11 @@ func TestCloneCommand_WithExistingGBMConfig(t *testing.T) {
 	repoPath := filepath.Join(targetDir, repoName)
 
 	assert.FileExists(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
+	
+	// Verify .gbm directory and files are created
+	assert.DirExists(t, filepath.Join(repoPath, ".gbm"))
+	assert.FileExists(t, filepath.Join(repoPath, ".gbm", "config.toml"))
+	assert.FileExists(t, filepath.Join(repoPath, ".gbm", "state.toml"))
 
 	config := parseGBMConfig(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 	expected := &internal.GBMConfig{
@@ -123,6 +133,11 @@ func TestCloneCommand_WithoutGBMConfig(t *testing.T) {
 	repoPath := filepath.Join(targetDir, repoName)
 
 	assert.FileExists(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
+	
+	// Verify .gbm directory and files are created
+	assert.DirExists(t, filepath.Join(repoPath, ".gbm"))
+	assert.FileExists(t, filepath.Join(repoPath, ".gbm", "config.toml"))
+	assert.FileExists(t, filepath.Join(repoPath, ".gbm", "state.toml"))
 
 	config := parseGBMConfig(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
 	expected := &internal.GBMConfig{
@@ -204,6 +219,7 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 
 	expectedDirs := []string{
 		".git",
+		".gbm",
 		"worktrees",
 		"worktrees/main",
 	}
@@ -214,6 +230,8 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 
 	expectedFiles := []string{
 		internal.DefaultBranchConfigFilename,
+		".gbm/config.toml",
+		".gbm/state.toml",
 		"worktrees/main/README.md",
 	}
 
