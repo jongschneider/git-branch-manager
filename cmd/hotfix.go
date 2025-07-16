@@ -51,7 +51,7 @@ Examples:
 
 			// Generate hotfix branch name
 			var branchName string
-			
+
 			if len(args) > 1 {
 				// If second argument is provided, check if it's already a branch name or a JIRA ticket
 				secondArg := args[1]
@@ -160,8 +160,8 @@ Examples:
 	return cmd
 }
 
-// findProductionBranch finds the branch at the bottom of the mergeback chain
-// This is the branch that has no merge_into target configured
+// findProductionBranch finds the actual production deployment branch for hotfixes
+// This is the branch that has a merge_into target but nothing merges into it (start of chain)
 func findProductionBranch(manager *internal.Manager) (string, error) {
 	// Get current working directory and find git root
 	wd, err := os.Getwd()
@@ -183,24 +183,42 @@ func findProductionBranch(manager *internal.Manager) (string, error) {
 		return manager.GetGitManager().GetDefaultBranch()
 	}
 
-	// Find the branch with no merge_into target (bottom of chain)
+	// Find the branch that has a merge_into target but no other branch merges into it
 	var productionWorktree string
 	var productionBranch string
 
 	for worktreeName, worktreeConfig := range config.Worktrees {
+		// Skip branches that don't merge into anything (these are root branches)
 		if worktreeConfig.MergeInto == "" {
-			// This is a root branch (no merge target)
-			if productionWorktree != "" {
-				// Multiple root branches found, need to determine which is production
-				PrintVerbose("Multiple root branches found: %s and %s", productionWorktree, worktreeName)
-				// Use heuristics: look for common production names
-				if isProductionBranchName(worktreeConfig.Branch) {
-					productionWorktree = worktreeName
-					productionBranch = worktreeConfig.Branch
-				}
-			} else {
+			continue
+		}
+
+		// Check if any other branch merges into this one
+		hasIncomingMerge := false
+		for _, otherConfig := range config.Worktrees {
+			if otherConfig.MergeInto == worktreeConfig.Branch {
+				hasIncomingMerge = true
+				break
+			}
+		}
+
+		// If this branch merges into something but nothing merges into it, it's the production branch
+		if !hasIncomingMerge {
+			productionWorktree = worktreeName
+			productionBranch = worktreeConfig.Branch
+			PrintVerbose("Found production branch (start of chain): %s -> %s", worktreeName, productionBranch)
+			break
+		}
+	}
+
+	// Fallback to the branch with no merge_into target if no production branch found
+	if productionBranch == "" {
+		for worktreeName, worktreeConfig := range config.Worktrees {
+			if worktreeConfig.MergeInto == "" {
 				productionWorktree = worktreeName
 				productionBranch = worktreeConfig.Branch
+				PrintVerbose("Using root branch as production fallback: %s -> %s", worktreeName, productionBranch)
+				break
 			}
 		}
 	}
@@ -212,6 +230,7 @@ func findProductionBranch(manager *internal.Manager) (string, error) {
 	PrintVerbose("Found production branch: %s (worktree: %s)", productionBranch, productionWorktree)
 	return productionBranch, nil
 }
+
 
 // isProductionBranchName returns true if the branch name suggests it's a production branch
 func isProductionBranchName(branchName string) bool {
@@ -310,7 +329,7 @@ func buildMergeChain(baseBranch string, config *internal.GBMConfig) []string {
 		if nextBranch == "" {
 			break
 		}
-		
+
 		chain = append(chain, nextBranch)
 		currentBranch = nextBranch
 	}
