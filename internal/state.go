@@ -45,7 +45,7 @@ func DefaultState() *State {
 
 // LoadState loads the state from .gbm/state.toml
 func LoadState(gbmDir string) (*State, error) {
-	statePath := filepath.Join(gbmDir, "state.toml")
+	statePath := filepath.Join(gbmDir, DefaultStateFilename)
 
 	// If state.toml exists, load it directly
 	if _, err := os.Stat(statePath); err == nil {
@@ -70,7 +70,7 @@ func (s *State) Save(gbmDir string) error {
 		return fmt.Errorf("failed to create .gbm directory: %w", err)
 	}
 
-	statePath := filepath.Join(gbmDir, "state.toml")
+	statePath := filepath.Join(gbmDir, DefaultStateFilename)
 	file, err := os.Create(statePath)
 	if err != nil {
 		return fmt.Errorf("failed to create state file: %w", err)

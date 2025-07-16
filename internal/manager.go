@@ -51,7 +51,7 @@ type WorktreePromotion struct {
 type ConfirmationFunc func(message string) bool
 
 func NewManager(repoPath string) (*Manager, error) {
-	gbmDir := filepath.Join(repoPath, ".gbm")
+	gbmDir := filepath.Join(repoPath, DefaultConfigDirname)
 	config, err := LoadConfig(gbmDir)
 	if err != nil {
 		return nil, fmt.Errorf("failed to load config: %w", err)

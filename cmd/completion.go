@@ -17,10 +17,9 @@ Bash:
   source <(gbm completion bash)
 
   # To load completions for each session, execute once:
-  # Linux:
-  gbm completion bash > /etc/bash_completion.d/gbm
-  # macOS:
-  gbm completion bash > /usr/local/etc/bash_completion.d/gbm
+  # Find your system's completion directory and save the completion file:
+  # Common locations: /etc/bash_completion.d/, /usr/local/etc/bash_completion.d/
+  gbm completion bash > <completion_directory>/gbm
 
 Zsh:
   # If shell completion is not already enabled in your environment,
@@ -28,6 +27,7 @@ Zsh:
   echo "autoload -U compinit; compinit" >> ~/.zshrc
 
   # To load completions for each session, execute once:
+  # Save to a directory in your $fpath, such as:
   gbm completion zsh > "${fpath[1]}/_gbm"
 
   # You will need to start a new shell for this setup to take effect.
@@ -36,6 +36,7 @@ fish:
   gbm completion fish | source
 
   # To load completions for each session, execute once:
+  # Save to your fish completions directory (usually ~/.config/fish/completions/):
   gbm completion fish > ~/.config/fish/completions/gbm.fish
 
 PowerShell:

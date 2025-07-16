@@ -11,8 +11,12 @@ import (
 )
 
 const (
+	// Directory and file names
 	DefaultWorktreeDirname      = "worktrees"
 	DefaultBranchConfigFilename = "gbm.branchconfig.yaml"
+	DefaultConfigDirname        = ".gbm"
+	DefaultConfigFilename       = "config.toml"
+	DefaultStateFilename        = "state.toml"
 )
 
 type Config struct {
@@ -31,6 +35,7 @@ type ConfigSettings struct {
 	MergebackPrefix              string        `toml:"mergeback_prefix"`
 	MergeBackCheckInterval       time.Duration `toml:"merge_back_check_interval"`
 	MergeBackUserCommitInterval  time.Duration `toml:"merge_back_user_commit_interval"`
+	CandidateBranches            []string      `toml:"candidate_branches"`
 }
 
 type FileCopyRule struct {
@@ -60,6 +65,11 @@ type ConfigIcons struct {
 	GitBehind   string `toml:"git_behind"`
 	GitDiverged string `toml:"git_diverged"`
 	GitUnknown  string `toml:"git_unknown"`
+
+	// Section header icons
+	WorktreeHeader string `toml:"worktree_header"`
+	JiraHeader     string `toml:"jira_header"`
+	GitHeader      string `toml:"git_header"`
 }
 
 type ConfigJira struct {
@@ -88,6 +98,7 @@ func DefaultConfig() *Config {
 			MergebackPrefix:             "MERGE",               // Default mergeback prefix
 			MergeBackCheckInterval:      6 * time.Hour,        // Check every 6 hours by default
 			MergeBackUserCommitInterval: 30 * time.Minute,     // Alert every 30 minutes when user has commits
+			CandidateBranches:           []string{"main", "master", "develop", "dev"}, // Default candidate branches
 		},
 		Icons: ConfigIcons{
 			// Status icons
@@ -107,6 +118,11 @@ func DefaultConfig() *Config {
 			GitBehind:   "↓",
 			GitDiverged: "⇕",
 			GitUnknown:  "?",
+
+			// Section header icons
+			WorktreeHeader: "📁",
+			JiraHeader:     "🎫",
+			GitHeader:      "🌿",
 		},
 		Jira: ConfigJira{
 			Me: "", // Will be populated when first used
@@ -118,7 +134,7 @@ func DefaultConfig() *Config {
 }
 
 func LoadConfig(gbmDir string) (*Config, error) {
-	configPath := filepath.Join(gbmDir, "config.toml")
+	configPath := filepath.Join(gbmDir, DefaultConfigFilename)
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
 		return DefaultConfig(), nil
@@ -142,7 +158,7 @@ func (c *Config) Save(gbmDir string) error {
 		return fmt.Errorf("failed to create .gbm directory: %w", err)
 	}
 
-	configPath := filepath.Join(gbmDir, "config.toml")
+	configPath := filepath.Join(gbmDir, DefaultConfigFilename)
 	file, err := os.Create(configPath)
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)

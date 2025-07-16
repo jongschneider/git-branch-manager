@@ -21,9 +21,10 @@ type InfoRenderer struct {
 	commitStyle    lipgloss.Style
 	fileStyle      lipgloss.Style
 	jiraStyle      lipgloss.Style
+	config         *Config
 }
 
-func NewInfoRenderer() *InfoRenderer {
+func NewInfoRenderer(config *Config) *InfoRenderer {
 	// Define adaptive colors for better light/dark theme support
 	primaryColor := lipgloss.AdaptiveColor{Light: "#7D56F4", Dark: "#A78BFA"}
 	secondaryColor := lipgloss.AdaptiveColor{Light: "#3B82F6", Dark: "#60A5FA"}
@@ -87,6 +88,8 @@ func NewInfoRenderer() *InfoRenderer {
 
 		jiraStyle: lipgloss.NewStyle().
 			Foreground(secondaryColor),
+
+		config: config,
 	}
 }
 
@@ -119,7 +122,7 @@ func (r *InfoRenderer) RenderWorktreeInfo(data *WorktreeInfoData) string {
 func (r *InfoRenderer) renderWorktreeSection(data *WorktreeInfoData) string {
 	var content strings.Builder
 
-	content.WriteString("📁 WORKTREE\n")
+	content.WriteString(fmt.Sprintf("%s WORKTREE\n", r.config.Icons.WorktreeHeader))
 	content.WriteString(r.renderKeyValue("Name", data.Name))
 	content.WriteString(r.renderKeyValue("Path", data.Path))
 	content.WriteString(r.renderKeyValue("Branch", data.Branch))
@@ -143,7 +146,7 @@ func (r *InfoRenderer) renderWorktreeSection(data *WorktreeInfoData) string {
 func (r *InfoRenderer) renderJiraSection(jira *JiraTicketDetails) string {
 	var content strings.Builder
 
-	content.WriteString("🎫 JIRA TICKET\n")
+	content.WriteString(fmt.Sprintf("%s JIRA TICKET\n", r.config.Icons.JiraHeader))
 	content.WriteString(r.renderKeyValue("Key", jira.Key))
 
 	if jira.Summary != "" {
@@ -213,7 +216,7 @@ func (r *InfoRenderer) renderJiraSection(jira *JiraTicketDetails) string {
 func (r *InfoRenderer) renderGitSection(data *WorktreeInfoData) string {
 	var content strings.Builder
 
-	content.WriteString("🌿 GIT STATUS\n")
+	content.WriteString(fmt.Sprintf("%s GIT STATUS\n", r.config.Icons.GitHeader))
 
 	if data.BaseInfo != nil {
 		if data.BaseInfo.Name != "" {
