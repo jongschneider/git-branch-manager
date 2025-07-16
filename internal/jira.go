@@ -101,66 +101,54 @@ func GetJiraIssues(manager *Manager) ([]JiraIssue, error) {
 
 // GetJiraIssue fetches detailed information for a specific JIRA issue
 func GetJiraIssue(key string, manager *Manager) (*JiraIssue, error) {
-	user, err := getJiraUser(manager)
-	if err != nil {
-		return nil, err
-	}
-
-	// Get the issue from the list command
-	cmd := exec.Command("jira", "issue", "list", "-a"+user, "--plain")
+	// For individual issue lookup, use jira issue view to get complete details without truncation
+	cmd := exec.Command("jira", "issue", "view", key, "--plain")
 	output, err := cmd.Output()
 	if err != nil {
-		return nil, fmt.Errorf("failed to fetch JIRA issues: %w", err)
+		return nil, fmt.Errorf("failed to fetch JIRA issue %s: %w", key, err)
 	}
 
-	// Parse the list output to find our specific issue
+	// Parse the view output to extract issue details
 	lines := strings.Split(string(output), "\n")
-	for _, line := range lines[1:] { // Skip header
-		if line = strings.TrimSpace(line); line != "" {
-			fields := strings.Split(line, "\t")
-			if len(fields) >= 3 {
-				// Find the JIRA key in this line
-				var issueKey, issueType, summary, status string
-				keyIndex := -1
-
-				for i, field := range fields {
-					trimmedField := strings.TrimSpace(field)
-					if IsJiraKey(trimmedField) {
-						issueKey = trimmedField
-						keyIndex = i
-						break
-					}
-				}
-
-				if issueKey == key {
-					// Type is usually the first field
-					issueType = strings.TrimSpace(fields[0])
-
-					// Summary is usually the field after the key
-					if keyIndex+1 < len(fields) {
-						summary = strings.TrimSpace(fields[keyIndex+1])
-					}
-
-					// Status is the last non-empty field
-					for i := len(fields) - 1; i >= 0; i-- {
-						if trimmed := strings.TrimSpace(fields[i]); trimmed != "" {
-							status = trimmed
-							break
-						}
-					}
-
-					return &JiraIssue{
-						Type:    issueType,
-						Key:     issueKey,
-						Summary: summary,
-						Status:  status,
-					}, nil
-				}
+	var issueType, summary, status string
+	
+	for _, line := range lines {
+		line = strings.TrimSpace(line)
+		
+		// Parse the header line with emojis to get status
+		if strings.Contains(line, "🐞") && strings.Contains(line, key) {
+			if strings.Contains(line, "🐞") {
+				issueType = "Bug"
 			}
+			if strings.Contains(line, "🚧 Open") {
+				status = "Open"
+			}
+		}
+		
+		// Parse the title line starting with # - this is the summary
+		if strings.HasPrefix(line, "# ") {
+			summary = strings.TrimSpace(strings.TrimPrefix(line, "# "))
+			break // Found the summary, no need to continue
 		}
 	}
 
-	return nil, fmt.Errorf("JIRA issue %s not found in your assigned issues", key)
+	
+	// Validate that we got the essential fields
+	if summary == "" {
+		return nil, fmt.Errorf("failed to parse JIRA issue %s: summary not found", key)
+	}
+	
+	// Default issueType to "Bug" if not found
+	if issueType == "" {
+		issueType = "Bug"
+	}
+
+	return &JiraIssue{
+		Type:    issueType,
+		Key:     key,
+		Summary: summary,
+		Status:  status,
+	}, nil
 }
 
 // ParseJiraList parses the output of 'jira issue list' command
@@ -231,7 +219,8 @@ func (j *JiraIssue) BranchName() string {
 		issueType = "feature"
 	}
 
-	return fmt.Sprintf("%s/%s_%s", issueType, j.Key, summary)
+	branchName := fmt.Sprintf("%s/%s_%s", issueType, j.Key, summary)
+	return branchName
 }
 
 // GenerateBranchFromJira fetches a JIRA issue and generates a branch name

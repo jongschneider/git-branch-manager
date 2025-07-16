@@ -64,6 +64,12 @@ func runInfoCommand(_ *cobra.Command, args []string) error {
 }
 
 func getWorktreeInfo(gitManager *internal.GitManager, worktreeName string) (*internal.WorktreeInfoData, error) {
+	// Create manager to access state
+	manager, err := createInitializedManager()
+	if err != nil {
+		PrintVerbose("Failed to create manager for base branch lookup: %v", err)
+		manager = nil
+	}
 	// Get all worktrees
 	worktrees, err := gitManager.GetWorktrees()
 	if err != nil {
@@ -109,7 +115,7 @@ func getWorktreeInfo(gitManager *internal.GitManager, worktreeName string) (*int
 	}
 
 	// Get base branch info
-	baseInfo, err := getBaseBranchInfo(targetWorktree.Path)
+	baseInfo, err := getBaseBranchInfo(targetWorktree.Path, worktreeName, manager)
 	if err != nil {
 		PrintVerbose("Failed to get base branch info for worktree %s: %v", worktreeName, err)
 	}
@@ -279,7 +285,7 @@ func getModifiedFiles(worktreePath string) ([]internal.FileChange, error) {
 	return files, nil
 }
 
-func getBaseBranchInfo(worktreePath string) (*internal.BranchInfo, error) {
+func getBaseBranchInfo(worktreePath, worktreeName string, manager *internal.Manager) (*internal.BranchInfo, error) {
 	// Get current branch (not used for base branch detection anymore)
 	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
 	cmd.Dir = worktreePath
@@ -311,20 +317,29 @@ func getBaseBranchInfo(worktreePath string) (*internal.BranchInfo, error) {
 		}
 	}
 
-	// Try to determine actual base branch using git merge-base
+	// Try to determine actual base branch - first check stored information
 	baseBranch := ""
-	// Try common base branches in order of preference
-	candidateBranches := []string{"main", "master", "develop", "dev"}
-	for _, candidate := range candidateBranches {
-		cmd = exec.Command("git", "rev-parse", "--verify", candidate)
-		cmd.Dir = worktreePath
-		if _, err := cmd.Output(); err == nil {
-			// Branch exists, check if it's actually a base
-			cmd = exec.Command("git", "merge-base", "--is-ancestor", candidate, "HEAD")
+	if manager != nil {
+		if storedBaseBranch, exists := manager.GetState().GetWorktreeBaseBranch(worktreeName); exists {
+			baseBranch = storedBaseBranch
+		}
+	}
+	
+	// If no stored information, fall back to git merge-base detection
+	if baseBranch == "" {
+		// Try common base branches in order of preference
+		candidateBranches := []string{"main", "master", "develop", "dev"}
+		for _, candidate := range candidateBranches {
+			cmd = exec.Command("git", "rev-parse", "--verify", candidate)
 			cmd.Dir = worktreePath
-			if err := cmd.Run(); err == nil {
-				baseBranch = candidate
-				break
+			if _, err := cmd.Output(); err == nil {
+				// Branch exists, check if it's actually a base
+				cmd = exec.Command("git", "merge-base", "--is-ancestor", candidate, "HEAD")
+				cmd.Dir = worktreePath
+				if err := cmd.Run(); err == nil {
+					baseBranch = candidate
+					break
+				}
 			}
 		}
 	}

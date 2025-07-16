@@ -87,14 +87,14 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 				table.AddRow([]string{worktreeName, branchDisplay, gitStatusIcon, syncStatus, info.Path})
 			}
 
-			fmt.Fprint(cmd.OutOrStdout(), table.String())
-			fmt.Fprintln(cmd.OutOrStdout())
+			_, _ = fmt.Fprint(cmd.OutOrStdout(), table.String())
+			_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
 			// Only show sync hint if there are actual sync issues with existing worktrees
 			hasExistingSyncIssues := len(status.BranchChanges) > 0 || len(status.OrphanedWorktrees) > 0
 			if hasExistingSyncIssues {
-				fmt.Fprintln(cmd.OutOrStdout())
-				fmt.Fprint(cmd.OutOrStdout(), internal.FormatInfo("Run 'gbm sync' to synchronize changes"))
+				_, _ = fmt.Fprintln(cmd.OutOrStdout())
+				_, _ = fmt.Fprint(cmd.OutOrStdout(), internal.FormatInfo("Run 'gbm sync' to synchronize changes"))
 			}
 
 			return nil

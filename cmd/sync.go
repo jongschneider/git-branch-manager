@@ -83,7 +83,7 @@ updates existing worktrees if branch references have changed, and optionally rem
 			confirmFunc := func(message string) bool {
 				fmt.Print(message + " [y/N]: ")
 				var response string
-				fmt.Scanln(&response)
+				_, _ = fmt.Scanln(&response)
 				return strings.ToLower(response) == "y" || strings.ToLower(response) == "yes"
 			}
 

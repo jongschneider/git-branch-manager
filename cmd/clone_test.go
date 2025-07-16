@@ -27,9 +27,9 @@ func TestCloneCommand_Basic(t *testing.T) {
 
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(targetDir)
+	_ = os.Chdir(targetDir)
 
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
@@ -72,9 +72,9 @@ func TestCloneCommand_WithExistingGBMConfig(t *testing.T) {
 
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(targetDir)
+	_ = os.Chdir(targetDir)
 
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
@@ -119,9 +119,9 @@ func TestCloneCommand_WithoutGBMConfig(t *testing.T) {
 
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(targetDir)
+	_ = os.Chdir(targetDir)
 
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
@@ -170,9 +170,9 @@ func TestCloneCommand_DifferentDefaultBranches(t *testing.T) {
 
 			targetDir := t.TempDir()
 			originalDir, _ := os.Getwd()
-			t.Cleanup(func() { os.Chdir(originalDir) })
+			t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-			os.Chdir(targetDir)
+			_ = os.Chdir(targetDir)
 
 			cmd := newRootCommand()
 			cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
@@ -204,9 +204,9 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(targetDir)
+	_ = os.Chdir(targetDir)
 
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", sourceRepo.GetRemotePath()})
@@ -243,9 +243,9 @@ func TestCloneCommand_DirectoryStructure(t *testing.T) {
 func TestCloneCommand_InvalidRepository(t *testing.T) {
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(targetDir)
+	_ = os.Chdir(targetDir)
 
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"clone", "/nonexistent/repo"})

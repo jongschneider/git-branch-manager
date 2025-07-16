@@ -76,8 +76,8 @@ func simulateUserInput(input string, fn func() error) error {
 
 	// Write the input
 	go func() {
-		defer w.Close()
-		w.Write([]byte(input + "\n"))
+		defer func() { _ = w.Close() }()
+		_, _ = w.Write([]byte(input + "\n"))
 	}()
 
 	// Execute the function
@@ -85,7 +85,7 @@ func simulateUserInput(input string, fn func() error) error {
 
 	// Restore stdin
 	os.Stdin = oldStdin
-	r.Close()
+	_ = r.Close()
 
 	return err
 }
@@ -98,11 +98,11 @@ func captureOutput(fn func() error) (string, error) {
 
 	err := fn()
 
-	w.Close()
+	_ = w.Close()
 	os.Stdout = old
 
 	var buf bytes.Buffer
-	io.Copy(&buf, r)
+	_, _ = io.Copy(&buf, r)
 	return buf.String(), err
 }
 

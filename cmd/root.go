@@ -58,13 +58,6 @@ func Execute() error {
 	return newRootCommand().Execute()
 }
 
-func getWorktreeDir(cmd *cobra.Command) string {
-	worktreeDir, _ := cmd.Flags().GetString("worktree-dir")
-	if worktreeDir != "" {
-		return worktreeDir
-	}
-	return "worktrees"
-}
 
 func isDebugEnabled(cmd *cobra.Command) bool {
 	debug, _ := cmd.Flags().GetBool("debug")
@@ -92,7 +85,7 @@ func PrintInfo(format string, args ...interface{}) {
 	if logFile != nil {
 		_, file, line, _ := runtime.Caller(1)
 		timestamp := time.Now().Format("2006-01-02T15:04:05.000")
-		fmt.Fprintf(logFile, "%s [INFO] %s:%d %s\n", timestamp, file, line, msg)
+		_, _ = fmt.Fprintf(logFile, "%s [INFO] %s:%d %s\n", timestamp, file, line, msg)
 	}
 }
 
@@ -105,7 +98,7 @@ func PrintVerbose(format string, args ...interface{}) {
 	if logFile != nil {
 		_, file, line, _ := runtime.Caller(1)
 		timestamp := time.Now().Format("2006-01-02T15:04:05.000")
-		fmt.Fprintf(logFile, "%s [DEBUG] %s:%d %s\n", timestamp, file, line, msg)
+		_, _ = fmt.Fprintf(logFile, "%s [DEBUG] %s:%d %s\n", timestamp, file, line, msg)
 	}
 }
 
@@ -115,13 +108,13 @@ func PrintError(format string, args ...interface{}) {
 	if logFile != nil {
 		_, file, line, _ := runtime.Caller(1)
 		timestamp := time.Now().Format("2006-01-02T15:04:05.000")
-		fmt.Fprintf(logFile, "%s [ERROR] %s:%d %s\n", timestamp, file, line, msg)
+		_, _ = fmt.Fprintf(logFile, "%s [ERROR] %s:%d %s\n", timestamp, file, line, msg)
 	}
 }
 
 func CloseLogFile() {
 	if logFile != nil {
-		logFile.Close()
+		_ = logFile.Close()
 	}
 }
 

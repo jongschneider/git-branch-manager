@@ -60,7 +60,7 @@ func TestPullCommand_CurrentWorktree(t *testing.T) {
 
 	// Navigate into the dev worktree
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Get initial commit hash
 	initialHash := getCurrentCommitHash(t, devWorktreePath)
@@ -91,7 +91,7 @@ func TestPullCommand_NamedWorktree(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root (not in a worktree)
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Get initial commit hash of feat worktree
 	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
@@ -123,7 +123,7 @@ func TestPullCommand_AllWorktrees(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Get initial commit hashes for all worktrees
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
@@ -169,7 +169,7 @@ func TestPullCommand_NotInWorktree(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root (not in a worktree)
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 
 	// Try to pull without specifying worktree name
@@ -188,7 +188,7 @@ func TestPullCommand_NonexistentWorktree(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 
 	// Try to pull nonexistent worktree
@@ -204,9 +204,9 @@ func TestPullCommand_NotInGitRepo(t *testing.T) {
 	// Create empty temp directory (not a git repo)
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 
 	// Try to pull in non-git directory
@@ -227,7 +227,7 @@ func TestPullCommand_FastForward(t *testing.T) {
 
 	// Navigate into dev worktree
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Get initial commit hash
 	initialHash := getCurrentCommitHash(t, devWorktreePath)
@@ -259,7 +259,7 @@ func TestPullCommand_UpToDate(t *testing.T) {
 
 	// Navigate into dev worktree
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Get initial commit hash
 	initialHash := getCurrentCommitHash(t, devWorktreePath)
@@ -285,7 +285,7 @@ func TestPullCommand_WithLocalChanges(t *testing.T) {
 
 	// Navigate into dev worktree
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Make local uncommitted changes
 	localFilePath := filepath.Join(devWorktreePath, "local_changes.txt")

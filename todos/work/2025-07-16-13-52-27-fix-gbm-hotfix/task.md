@@ -1,0 +1,47 @@
+# Fix gbm hotfix
+
+**Status:** AwaitingCommit
+**Agent PID:** 84014
+
+## Original Todo
+- fix `gbm hotfix`
+    * the Jira integration autocompletion is not quite correct:
+        - First argument autocompletion is correct and results in filling out just the JIRA ticket number
+        - Second argument autocompletion pops the same jira values - which is wrong. It should operate the same way as `gbm add` and the second argument should complete with the JIRA summary.
+        - The resulting branch is messed up (note branch name below - should be hotfix/INGSVC-5638_EMAIL_Invalid_Date_7_16_2025_13_00_00
+        ```sh
+󰀵 jschneider  ~/code/scratch/email_ingester   master
+  gbm hf INGSVC-5638 INGSVC-5638
+💡 Using production branch 'master' as base for hotfix
+💡 Creating hotfix worktree 'HOTFIX_INGSVC-5638' on branch 'hotfix/bug/INGSVC-5638_EMAIL_Invalid_Date_7_16_2025_13_00_00'
+💡 Hotfix worktree 'HOTFIX_INGSVC-5638' added successfully
+💡 Remember to merge back through the deployment chain: master → preview → main
+
+󰀵 jschneider  ~/code/scratch/email_ingester   master
+  gbm list
+┌────────────────────┬──────────────────────────────────────────────────────────────┬────────────┬─────────────┬────────────────────────────────────────────────────────────────────────────┐
+│      WORKTREE      │                            BRANCH                            │ GIT STATUS │ SYNC STATUS │                                    PATH                                    │
+├────────────────────┼──────────────────────────────────────────────────────────────┼────────────┼─────────────┼────────────────────────────────────────────────────────────────────────────┤
+│ master             │ master                                                       │ ✓          │ ✅ IN_SYNC  │ /Users/jschneider/code/scratch/email_ingester/worktrees/master             │
+│ production         │ production-2025-07-1                                         │ ✓          │ ✅ IN_SYNC  │ /Users/jschneider/code/scratch/email_ingester/worktrees/production         │
+│ HOTFIX_INGSVC-5638 │ hotfix/bug/INGSVC-5638_EMAIL_Invalid_Date_7_16_2025_13_00_00 │ ✓          │ UNTRACKED   │ /Users/jschneider/code/scratch/email_ingester/worktrees/HOTFIX_INGSVC-5638 │
+└────────────────────┴──────────────────────────────────────────────────────────────┴────────────┴─────────────┴────────────────────────────────────────────────────────────────────────────┘
+
+💡 Run 'gbm sync' to synchronize changes%
+```
+
+## Description
+Fix the `gbm hotfix` command's JIRA integration to match `gbm add` behavior. The second argument should autocomplete with the JIRA summary of the ticket selected as the first argument, and branch names should have correct `hotfix/` prefix without extra path components.
+
+## Implementation Plan
+- [x] Fix hotfix command autocompletion logic in `cmd/hotfix.go:89-111` to match `gbm add` pattern
+- [x] Fix branch name prefix replacement in `generateHotfixBranchName()` at `cmd/hotfix.go:183-217` 
+- [x] Test autocompletion behavior with JIRA tickets
+- [x] Test branch naming generates correct `hotfix/` prefix
+- [x] Verify hotfix command works same as add command for JIRA integration
+- [x] Fix linter errors in cmd package
+- [x] Store and retrieve actual base branch information for hotfix worktrees in info command
+- [x] Fix Branch field in info command to show full JIRA branch name instead of truncated version
+
+## Notes
+[Implementation notes]

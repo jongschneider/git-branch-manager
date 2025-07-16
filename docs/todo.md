@@ -117,4 +117,8 @@ ERROR: Error: exit status 1
     * will improve testability
 - [ ] replace worktreedirname flag with config.toml
 - [ ] manage branchconfig.toml with go templates (should clean up tests)
-
+- [ ] add `config` verb
+    - [ ] `copy` subcommand that pops a filepicker and adds copy rule
+- [ ] add worktree description throughout app
+    - maybe column in `list`, `info`
+    - use it in the messaging in `sync`

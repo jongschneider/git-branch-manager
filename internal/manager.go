@@ -453,19 +453,23 @@ func (m *Manager) AddWorktree(worktreeName, branchName string, createBranch bool
 		}
 	}
 
+	// Store the base branch information for this worktree
+	m.state.SetWorktreeBaseBranch(worktreeName, baseBranch)
+
 	// Track this worktree as ad hoc if it's not in gbm.branchconfig.yaml
 	if m.gbmConfig != nil {
 		if _, exists := m.gbmConfig.Worktrees[worktreeName]; !exists {
 			// Add to ad hoc worktrees list if not already there
 			if !contains(m.state.AdHocWorktrees, worktreeName) {
 				m.state.AdHocWorktrees = append(m.state.AdHocWorktrees, worktreeName)
-				// Save the updated state
-				if saveErr := m.SaveState(); saveErr != nil {
-					// Log warning but don't fail the operation
-					fmt.Printf("Warning: failed to save state: %v\n", saveErr)
-				}
 			}
 		}
+	}
+
+	// Save the updated state
+	if saveErr := m.SaveState(); saveErr != nil {
+		// Log warning but don't fail the operation
+		fmt.Printf("Warning: failed to save state: %v\n", saveErr)
 	}
 
 	return nil
@@ -680,6 +684,9 @@ func (m *Manager) RemoveWorktree(worktreeName string) error {
 			break
 		}
 	}
+
+	// Remove base branch information
+	m.state.RemoveWorktreeBaseBranch(worktreeName)
 
 	// Save the updated state
 	if err := m.SaveState(); err != nil {

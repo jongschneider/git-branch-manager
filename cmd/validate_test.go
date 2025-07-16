@@ -50,12 +50,12 @@ func runValidateCommand(t *testing.T, workDir string, args []string) (string, er
 	err = cmd.Execute()
 
 	// Restore stdout
-	w.Close()
+	_ = w.Close()
 	os.Stdout = originalStdout
 
 	// Read captured output
 	var capturedOutput bytes.Buffer
-	capturedOutput.ReadFrom(r)
+	_, _ = capturedOutput.ReadFrom(r)
 
 	// Combine both outputs
 	combined := buf.String() + capturedOutput.String()

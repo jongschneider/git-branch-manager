@@ -106,7 +106,7 @@ func TestPushCommand_CurrentWorktree(t *testing.T) {
 
 	// Navigate into the dev worktree
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Get initial remote commit hash
 	initialHash := getRemoteCommitHash(t, sourceRepo, "develop")
@@ -136,7 +136,7 @@ func TestPushCommand_NamedWorktree(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root (not in a worktree)
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Get initial remote commit hash for feature/auth branch
 	initialHash := getRemoteCommitHash(t, sourceRepo, "feature/auth")
@@ -167,7 +167,7 @@ func TestPushCommand_AllWorktrees(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Get initial remote commit hashes for all branches
 	initialMainHash := getRemoteCommitHash(t, sourceRepo, "main")
@@ -213,7 +213,7 @@ func TestPushCommand_WithExistingUpstream(t *testing.T) {
 
 	// Navigate into dev worktree
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Verify upstream exists (should be set during sync)
 	assert.True(t, checkUpstreamExists(t, devWorktreePath), "Upstream should be configured")
@@ -240,7 +240,7 @@ func TestPushCommand_WithoutUpstream(t *testing.T) {
 
 	// Create a new branch in one of the worktrees without upstream
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Create and switch to new branch
 	gitCmd := exec.Command("git", "checkout", "-b", "new-feature")
@@ -272,7 +272,7 @@ func TestPushCommand_NotInWorktree(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root (not in a worktree)
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Try to push without specifying worktree name
 	cmd := newRootCommand()
@@ -290,7 +290,7 @@ func TestPushCommand_NonexistentWorktree(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Try to push nonexistent worktree
 	cmd := newRootCommand()
@@ -305,9 +305,9 @@ func TestPushCommand_NotInGitRepo(t *testing.T) {
 	// Create empty temp directory (not a git repo)
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 	// Try to push in non-git directory
 	cmd := newRootCommand()
@@ -326,7 +326,7 @@ func TestPushCommand_WithLocalCommits(t *testing.T) {
 
 	// Navigate into dev worktree
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Get initial remote commit hash
 	initialHash := getRemoteCommitHash(t, sourceRepo, "develop")
@@ -361,7 +361,7 @@ func TestPushCommand_UpToDate(t *testing.T) {
 
 	// Navigate into dev worktree
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Get initial remote commit hash
 	initialHash := getRemoteCommitHash(t, sourceRepo, "develop")
@@ -384,7 +384,7 @@ func TestPushCommand_EmptyWorktreeList(t *testing.T) {
 
 	targetDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 
 	os.Chdir(targetDir)
 
@@ -397,7 +397,7 @@ func TestPushCommand_EmptyWorktreeList(t *testing.T) {
 	// Navigate to cloned repo
 	repoName := sourceRepo.GetRepoName()
 	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Try to push all worktrees when none exist
 	cmd := newRootCommand()

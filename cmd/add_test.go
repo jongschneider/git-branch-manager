@@ -364,7 +364,7 @@ func TestAddCommand_FromWorktreeDirectory(t *testing.T) {
 
 	// Change to the worktree directory
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 
 	worktreeDir := filepath.Join(repoPath, "worktrees", "DEV")
 	err = os.Chdir(worktreeDir)

@@ -76,9 +76,6 @@ Examples:
 	return cmd
 }
 
-func switchToWorktree(manager *internal.Manager, worktreeName string) error {
-	return switchToWorktreeWithFlag(manager, worktreeName, false)
-}
 
 func switchToWorktreeWithFlag(manager *internal.Manager, worktreeName string, printPath bool) error {
 	PrintVerbose("Switching to worktree: %s", worktreeName)

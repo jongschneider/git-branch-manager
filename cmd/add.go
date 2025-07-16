@@ -162,13 +162,6 @@ type interactiveResult struct {
 	newBranch  bool
 }
 
-func handleInteractive(manager *internal.Manager) (string, error) {
-	result, err := handleInteractiveWithParams(manager)
-	if err != nil {
-		return "", err
-	}
-	return result.branchName, nil
-}
 
 func handleInteractiveWithParams(manager *internal.Manager) (*interactiveResult, error) {
 	// Get available branches

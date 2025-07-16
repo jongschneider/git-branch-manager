@@ -61,7 +61,7 @@ func TestMergebackCommand(t *testing.T) {
 
 			// Change to the repo directory for the test
 			originalDir, _ := os.Getwd()
-			defer os.Chdir(originalDir)
+			defer func() { _ = os.Chdir(originalDir) }()
 
 			err = os.Chdir(repo.GetLocalPath())
 			require.NoError(t, err)
@@ -376,7 +376,7 @@ func TestFindMergeTargetBranchAndWorktree(t *testing.T) {
 
 		// Change to repo directory
 		originalDir, _ := os.Getwd()
-		defer os.Chdir(originalDir)
+		defer func() { _ = os.Chdir(originalDir) }()
 		err := os.Chdir(repo.GetLocalPath())
 		require.NoError(t, err)
 
@@ -431,7 +431,7 @@ func TestMergebackIntegration(t *testing.T) {
 
 	// Change to the repo directory
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 	err = os.Chdir(repo.GetLocalPath())
 	require.NoError(t, err)
 
@@ -512,7 +512,7 @@ func TestMergebackWorktreeNaming(t *testing.T) {
 
 		// Change to the repo directory
 		originalDir, _ := os.Getwd()
-		defer os.Chdir(originalDir)
+		defer func() { _ = os.Chdir(originalDir) }()
 		err = os.Chdir(repo.GetLocalPath())
 		require.NoError(t, err)
 

@@ -251,7 +251,7 @@ func TestCompletionIntegration(t *testing.T) {
 
 	// Change to repo directory for testing
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 	err = os.Chdir(repo.GetLocalPath())
 	require.NoError(t, err)
 

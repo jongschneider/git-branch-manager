@@ -68,9 +68,9 @@ func TestListCommand_EmptyRepository(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
 	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(repo.GetLocalPath())
+	_ = os.Chdir(repo.GetLocalPath())
 
 	assert.NoError(t, repo.WriteFile(internal.DefaultBranchConfigFilename, "# Empty gbm.branchconfig.yaml"))
 	assert.NoError(t, repo.CommitChanges("Add empty gbm.branchconfig.yaml"))
@@ -96,9 +96,9 @@ func TestListCommand_WithGBMConfigWorktrees(t *testing.T) {
 	})
 
 	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(repo.GetLocalPath())
+	_ = os.Chdir(repo.GetLocalPath())
 
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
@@ -257,7 +257,7 @@ func TestListCommand_ExpectedBranchDisplay(t *testing.T) {
 
 	// Change DEV worktree to a different branch to test expected branch display
 	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
-	os.Chdir(devWorktreePath)
+	_ = os.Chdir(devWorktreePath)
 
 	// Switch to feature/auth branch instead of develop to create branch mismatch
 	gitOutput, err := exec.Command("git", "checkout", "feature/auth").CombinedOutput()
@@ -267,7 +267,7 @@ func TestListCommand_ExpectedBranchDisplay(t *testing.T) {
 	require.NoError(t, err)
 
 	// Change back to repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Now test the list command
 	cmd := newRootCommand()
@@ -392,9 +392,9 @@ func TestListCommand_SortedOutput(t *testing.T) {
 func TestListCommand_NoGitRepository(t *testing.T) {
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"list"})
@@ -408,13 +408,13 @@ func TestListCommand_NoGBMConfigFile(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
 	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(repo.GetLocalPath())
+	_ = os.Chdir(repo.GetLocalPath())
 
 	gbmConfigPath := filepath.Join(repo.GetLocalPath(), internal.DefaultBranchConfigFilename)
 	if _, err := os.Stat(gbmConfigPath); err == nil {
-		os.Remove(gbmConfigPath)
+		_ = os.Remove(gbmConfigPath)
 	}
 
 	cmd := newRootCommand()

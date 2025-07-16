@@ -52,7 +52,7 @@ Examples:
 			if !force {
 				fmt.Printf("Are you sure you want to remove worktree '%s'? [y/N]: ", worktreeName)
 				var response string
-				fmt.Scanln(&response)
+				_, _ = fmt.Scanln(&response)
 				if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
 					PrintInfo("Removal cancelled")
 					return nil
