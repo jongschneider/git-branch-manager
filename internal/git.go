@@ -91,7 +91,7 @@ func enhanceGitError(err error, operation string, args ...string) error {
 	// Extract exit code from error
 	if exitError, ok := err.(*exec.ExitError); ok {
 		stderr := string(exitError.Stderr)
-		
+
 		switch exitError.ExitCode() {
 		case 128:
 			if strings.Contains(stderr, "already checked out") {
@@ -116,7 +116,7 @@ func enhanceGitError(err error, operation string, args ...string) error {
 			return fmt.Errorf("git %s failed (exit %d): %s", operation, exitError.ExitCode(), stderr)
 		}
 	}
-	
+
 	return fmt.Errorf("git %s failed: %w", operation, err)
 }
 
@@ -587,7 +587,27 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 		}
 
 		if branchExists {
-			// Branch exists, create worktree on existing branch
+			// Branch exists, check if it's based on the correct base branch
+			if baseBranch != "" {
+				// Get the merge base between the existing branch and the base branch
+				mergeBase, err := ExecGitCommand(gm.repoPath, "merge-base", branchName, baseBranch)
+				if err != nil {
+					return fmt.Errorf("failed to get merge base: %w", err)
+				}
+
+				// Get the commit hash of the base branch
+				baseCommit, err := ExecGitCommand(gm.repoPath, "rev-parse", baseBranch)
+				if err != nil {
+					return fmt.Errorf("failed to get base branch commit: %w", err)
+				}
+
+				// Check if the existing branch is based on the correct base branch
+				if strings.TrimSpace(string(mergeBase)) != strings.TrimSpace(string(baseCommit)) {
+					return fmt.Errorf("branch '%s' exists but is not based on '%s'. Please delete the branch and try again, or use a different branch name", branchName, baseBranch)
+				}
+			}
+
+			// Branch exists and is based on correct base (or no base specified), create worktree on existing branch
 			cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
 		} else {
 			// Create new branch and worktree with base branch
