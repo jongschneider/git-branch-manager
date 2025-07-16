@@ -306,7 +306,7 @@ func buildMergeChain(baseBranch string, config *internal.GBMConfig) []string {
 
 	const maxIterations = 10 // Prevent infinite loops
 	for i := 0; i < maxIterations; i++ {
-		nextBranch := findBranchThatMergesInto(currentBranch, config)
+		nextBranch := findMergeIntoTarget(currentBranch, config)
 		if nextBranch == "" {
 			break
 		}
@@ -318,12 +318,13 @@ func buildMergeChain(baseBranch string, config *internal.GBMConfig) []string {
 	return chain
 }
 
-// findBranchThatMergesInto finds the branch that merges into the given target branch
-func findBranchThatMergesInto(targetBranch string, config *internal.GBMConfig) string {
+// findMergeIntoTarget finds where the given branch merges into
+func findMergeIntoTarget(sourceBranch string, config *internal.GBMConfig) string {
 	for _, worktreeConfig := range config.Worktrees {
-		if worktreeConfig.MergeInto == targetBranch {
-			return worktreeConfig.Branch
+		if worktreeConfig.Branch == sourceBranch {
+			return worktreeConfig.MergeInto
 		}
 	}
 	return ""
 }
+

@@ -1,6 +1,9 @@
 last_sync = 0001-01-01T00:00:00Z
 tracked_vars = []
-ad_hoc_worktrees = []
+ad_hoc_worktrees = ["HOTFIX_test-hotfix"]
 current_worktree = "INGSVC-5544"
 previous_worktree = ""
 last_mergeback_check = 0001-01-01T00:00:00Z
+
+[worktree_base_branch]
+  HOTFIX_test-hotfix = "main"
