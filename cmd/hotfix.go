@@ -102,7 +102,9 @@ Examples:
 			}
 
 			PrintInfo("Hotfix worktree '%s' added successfully", hotfixWorktreeName)
-			PrintInfo("Remember to merge back through the deployment chain: %s → preview → main", baseBranch)
+			// Build the deployment chain message
+		deploymentChain := buildDeploymentChain(baseBranch, manager)
+		PrintInfo("Remember to merge back through the deployment chain: %s", deploymentChain)
 
 			return nil
 		},
@@ -259,4 +261,69 @@ func generateHotfixBranchName(worktreeName, jiraTicket string, manager *internal
 	}
 
 	return branchName, nil
+}
+
+// buildDeploymentChain builds the complete deployment chain from base branch to final target
+func buildDeploymentChain(baseBranch string, manager *internal.Manager) string {
+	config := loadGBMConfig()
+	if config == nil {
+		return baseBranch
+	}
+
+	chain := buildMergeChain(baseBranch, config)
+	if len(chain) <= 1 {
+		return baseBranch
+	}
+
+	return strings.Join(chain, " → ")
+}
+
+// loadGBMConfig loads the gbm.branchconfig.yaml file, returning nil if not found
+func loadGBMConfig() *internal.GBMConfig {
+	wd, err := os.Getwd()
+	if err != nil {
+		return nil
+	}
+
+	repoRoot, err := internal.FindGitRoot(wd)
+	if err != nil {
+		return nil
+	}
+
+	configPath := filepath.Join(repoRoot, internal.DefaultBranchConfigFilename)
+	config, err := internal.ParseGBMConfig(configPath)
+	if err != nil {
+		return nil
+	}
+
+	return config
+}
+
+// buildMergeChain traverses the merge configuration to build the complete chain
+func buildMergeChain(baseBranch string, config *internal.GBMConfig) []string {
+	chain := []string{baseBranch}
+	currentBranch := baseBranch
+
+	const maxIterations = 10 // Prevent infinite loops
+	for i := 0; i < maxIterations; i++ {
+		nextBranch := findBranchThatMergesInto(currentBranch, config)
+		if nextBranch == "" {
+			break
+		}
+		
+		chain = append(chain, nextBranch)
+		currentBranch = nextBranch
+	}
+
+	return chain
+}
+
+// findBranchThatMergesInto finds the branch that merges into the given target branch
+func findBranchThatMergesInto(targetBranch string, config *internal.GBMConfig) string {
+	for _, worktreeConfig := range config.Worktrees {
+		if worktreeConfig.MergeInto == targetBranch {
+			return worktreeConfig.Branch
+		}
+	}
+	return ""
 }
