@@ -245,42 +245,6 @@ func isProductionBranchName(branchName string) bool {
 	return false
 }
 
-// generateHotfixBranchName creates a hotfix branch name with proper formatting
-func generateHotfixBranchName(worktreeName, jiraTicket string, manager *internal.Manager) (string, error) {
-	var branchName string
-
-	if jiraTicket != "" && internal.IsJiraKey(jiraTicket) {
-		// Generate branch name from JIRA ticket
-		if manager != nil {
-			jiraBranchName, err := internal.GenerateBranchFromJira(jiraTicket, manager)
-			if err != nil {
-				PrintVerbose("Failed to generate branch name from JIRA issue %s: %v", jiraTicket, err)
-				// Fallback to simple format
-				branchName = fmt.Sprintf("hotfix/%s", strings.ToUpper(jiraTicket))
-			} else {
-				// Replace any prefix with hotfix/
-				parts := strings.Split(jiraBranchName, "/")
-				if len(parts) > 1 {
-					parts[0] = "hotfix"
-					branchName = strings.Join(parts, "/")
-				} else {
-					branchName = "hotfix/" + jiraBranchName
-				}
-			}
-		} else {
-			// No manager available, use simple format
-			branchName = fmt.Sprintf("hotfix/%s", strings.ToUpper(jiraTicket))
-		}
-	} else {
-		// Generate from worktree name
-		cleanName := strings.ReplaceAll(worktreeName, " ", "-")
-		cleanName = strings.ReplaceAll(cleanName, "_", "-")
-		cleanName = strings.ToLower(cleanName)
-		branchName = "hotfix/" + cleanName
-	}
-
-	return branchName, nil
-}
 
 // buildDeploymentChain builds the complete deployment chain from base branch to final target
 func buildDeploymentChain(baseBranch string, manager *internal.Manager) string {
@@ -345,5 +309,12 @@ func findMergeIntoTarget(sourceBranch string, config *internal.GBMConfig) string
 		}
 	}
 	return ""
+}
+
+
+// generateHotfixBranchName creates a hotfix branch name with proper formatting
+var generateHotfixBranchName = func(worktreeName, jiraTicket string, manager *internal.Manager) (string, error) {
+	generator := createBranchNameGenerator("hotfix")
+	return generator(worktreeName, jiraTicket, "", manager)
 }
 

@@ -93,7 +93,7 @@ func DefaultConfig() *Config {
 			WorktreePrefix:              DefaultWorktreeDirname,
 			AutoFetch:                   true,
 			CreateMissingBranches:       false,
-			MergeBackAlerts:             false,                 // Disabled by default
+			MergeBackAlerts:             true,                  // Enabled by default
 			HotfixPrefix:                "HOTFIX",              // Default hotfix prefix
 			MergebackPrefix:             "MERGE",               // Default mergeback prefix
 			MergeBackCheckInterval:      6 * time.Hour,        // Check every 6 hours by default
