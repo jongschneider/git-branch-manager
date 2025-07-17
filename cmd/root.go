@@ -216,7 +216,7 @@ func checkAndDisplayMergeBackAlerts(cmd *cobra.Command) {
 
 	alert := internal.FormatMergeBackAlert(status)
 	if alert != "" {
-		fmt.Fprint(os.Stderr, alert)
+		fmt.Fprintln(os.Stderr, alert)
 		
 		// Update the LastMergebackCheck timestamp since we showed an alert
 		updateLastMergebackCheck()

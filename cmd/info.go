@@ -152,7 +152,7 @@ func displayWorktreeInfo(data *internal.WorktreeInfoData, manager *internal.Mana
 	}
 	renderer := internal.NewInfoRenderer(config)
 	output := renderer.RenderWorktreeInfo(data)
-	fmt.Print(output)
+	fmt.Println(output)
 }
 
 func getWorktreeCreationTime(worktreePath string) (time.Time, error) {

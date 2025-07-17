@@ -94,7 +94,7 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 			hasExistingSyncIssues := len(status.BranchChanges) > 0 || len(status.OrphanedWorktrees) > 0
 			if hasExistingSyncIssues {
 				_, _ = fmt.Fprintln(cmd.OutOrStdout())
-				_, _ = fmt.Fprint(cmd.OutOrStdout(), internal.FormatInfo("Run 'gbm sync' to synchronize changes"))
+				_, _ = fmt.Fprintln(cmd.OutOrStdout(), internal.FormatInfo("Run 'gbm sync' to synchronize changes"))
 			}
 
 			return nil

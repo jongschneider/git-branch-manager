@@ -116,7 +116,7 @@ func (r *InfoRenderer) RenderWorktreeInfo(data *WorktreeInfoData) string {
 
 	// Use lipgloss.JoinVertical with compact spacing
 	result := lipgloss.JoinVertical(lipgloss.Left, sections...)
-	return result + "\n"
+	return result
 }
 
 func (r *InfoRenderer) renderWorktreeSection(data *WorktreeInfoData) string {
