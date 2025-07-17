@@ -120,12 +120,13 @@ func getWorktreeInfo(gitManager *internal.GitManager, worktreeName string) (*int
 		PrintVerbose("Failed to get base branch info for worktree %s: %v", worktreeName, err)
 	}
 
-	// Try to get JIRA ticket details if the worktree name matches a JIRA key
+	// Try to get JIRA ticket details if the worktree name contains a JIRA key
 	var jiraTicket *internal.JiraTicketDetails
-	if internal.IsJiraKey(worktreeName) {
-		jiraTicket, err = getJiraTicketDetails(worktreeName)
+	jiraKey := internal.ExtractJiraKey(worktreeName)
+	if jiraKey != "" {
+		jiraTicket, err = getJiraTicketDetails(jiraKey)
 		if err != nil {
-			PrintVerbose("Failed to get JIRA ticket details for %s: %v", worktreeName, err)
+			PrintVerbose("Failed to get JIRA ticket details for %s: %v", jiraKey, err)
 		}
 	}
 

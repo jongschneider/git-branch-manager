@@ -21,6 +21,14 @@ func IsJiraKey(s string) bool {
 	return matched
 }
 
+// ExtractJiraKey extracts a JIRA key from a string, handling prefixed worktree names
+// For example: "HOTFIX_INGSVC-5638" returns "INGSVC-5638"
+func ExtractJiraKey(s string) string {
+	re := regexp.MustCompile(`[A-Z]+-\d+`)
+	match := re.FindString(s)
+	return match
+}
+
 // getJiraUser gets the current JIRA user, using cached value if available
 func getJiraUser(manager *Manager) (string, error) {
 	config := manager.GetConfig()
