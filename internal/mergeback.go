@@ -86,9 +86,9 @@ func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 			continue // Skip if target worktree doesn't exist in config
 		}
 
-		// Check if both branches exist
-		fromExists, _ := gitManager.BranchExists(worktreeConfig.Branch)
-		toExists, _ := gitManager.BranchExists(targetConfig.Branch)
+		// Check if both branches exist (local or remote)
+		fromExists, _ := gitManager.BranchExistsLocalOrRemote(worktreeConfig.Branch)
+		toExists, _ := gitManager.BranchExistsLocalOrRemote(targetConfig.Branch)
 		if !fromExists || !toExists {
 			continue
 		}
@@ -96,6 +96,8 @@ func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 		// Get commits that need to be merged back
 		commits, err := getCommitsNeedingMergeBack(gitRoot, targetConfig.Branch, worktreeConfig.Branch)
 		if err != nil {
+			// Log configuration error but continue processing other branches
+			fmt.Println("⚠️  Warning:", err)
 			continue
 		}
 
@@ -164,9 +166,17 @@ func getUserInfo(repoPath string) (string, string, error) {
 }
 
 func getCommitsNeedingMergeBack(repoPath, targetBranch, sourceBranch string) ([]MergeBackCommitInfo, error) {
-	output, err := ExecGitCommand(repoPath, "log", targetBranch+".."+sourceBranch, "--format=%H|%s|%an|%ae|%ct")
+	// First, try to fetch to ensure we have the latest remote state
+	ExecGitCommand(repoPath, "fetch", "--quiet")
+	
+	// Use remote branches for mergeback detection
+	remoteTargetBranch := Remote(targetBranch)
+	remoteSourceBranch := Remote(sourceBranch)
+	
+	output, err := ExecGitCommand(repoPath, "log", remoteTargetBranch+".."+remoteSourceBranch, "--format=%H|%s|%an|%ae|%ct")
 	if err != nil {
-		return nil, err
+		// If remote branch doesn't exist, this indicates a configuration error
+		return nil, fmt.Errorf("remote branch '%s' or '%s' does not exist - check your gbm.branchconfig.yaml configuration", remoteTargetBranch, remoteSourceBranch)
 	}
 
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")

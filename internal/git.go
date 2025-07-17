@@ -292,6 +292,25 @@ func (gm *GitManager) BranchExists(branchName string) (bool, error) {
 	return found, nil
 }
 
+// Remote returns the remote branch name for a given branch (e.g., "main" -> "origin/main")
+func Remote(branchName string) string {
+	return fmt.Sprintf("origin/%s", branchName)
+}
+
+// BranchExistsLocalOrRemote checks if a branch exists either locally or remotely
+func (gm *GitManager) BranchExistsLocalOrRemote(branchName string) (bool, error) {
+	// Check if local branch exists
+	_, err := ExecGitCommand(gm.repoPath, "rev-parse", "--verify", branchName)
+	if err == nil {
+		return true, nil
+	}
+	
+	// Check if remote branch exists
+	remoteBranch := Remote(branchName)
+	_, err = ExecGitCommand(gm.repoPath, "rev-parse", "--verify", remoteBranch)
+	return err == nil, nil
+}
+
 func (gm *GitManager) IsBranchAvailable(branchName string) (bool, error) {
 	// First check if branch exists
 	exists, err := gm.BranchExists(branchName)
@@ -376,7 +395,7 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 	}
 
 	// Check if remote tracking branch exists
-	remoteBranch := fmt.Sprintf("origin/%s", branchName)
+	remoteBranch := Remote(branchName)
 	_, err = ExecGitCommand(gm.repoPath, "rev-parse", "--verify", remoteBranch)
 
 	if err == nil {
@@ -630,7 +649,7 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 		}
 
 		// Check if remote tracking branch exists
-		remoteBranch := fmt.Sprintf("origin/%s", branchName)
+		remoteBranch := Remote(branchName)
 		checkCmd := exec.Command("git", "rev-parse", "--verify", remoteBranch)
 		checkCmd.Dir = gm.repoPath
 		_, err = execCommand(checkCmd)
@@ -763,7 +782,7 @@ func (gm *GitManager) PullWorktree(worktreePath string) error {
 
 	if err != nil {
 		// No upstream set, try to set it and pull
-		remoteBranch := fmt.Sprintf("origin/%s", currentBranch)
+		remoteBranch := Remote(currentBranch)
 
 		// Check if remote branch exists
 		cmd = exec.Command("git", "rev-parse", "--verify", remoteBranch)

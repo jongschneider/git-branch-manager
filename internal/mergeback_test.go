@@ -372,3 +372,68 @@ func TestMergeBackStructures(t *testing.T) {
 		assert.True(t, commit.IsUser)
 	})
 }
+
+func TestRemoteBranchResolution(t *testing.T) {
+	// Create a test repository with proper git environment
+	repo := testutils.NewGitTestRepo(t, testutils.WithDefaultBranch("main"))
+	defer repo.Cleanup()
+
+	// Change to repo directory for testing
+	originalDir, _ := os.Getwd()
+	defer os.Chdir(originalDir)
+	err := os.Chdir(repo.GetLocalPath())
+	require.NoError(t, err)
+
+	t.Run("getCommitsNeedingMergeBack - uses remote branches", func(t *testing.T) {
+		// Create a branch with a commit
+		err := repo.CreateSynchronizedBranch("feature-branch")
+		require.NoError(t, err)
+
+		err = repo.WriteFile("feature.txt", "Feature content")
+		require.NoError(t, err)
+		err = repo.CommitChanges("Add feature")
+		require.NoError(t, err)
+
+		err = repo.PushBranch("feature-branch")
+		require.NoError(t, err)
+
+		// Test that getCommitsNeedingMergeBack finds the commit when comparing main to feature-branch
+		commits, err := getCommitsNeedingMergeBack(repo.GetLocalPath(), "main", "feature-branch")
+		require.NoError(t, err)
+		assert.Len(t, commits, 1, "Should find the feature commit that needs merging back")
+		assert.Equal(t, "Add feature", commits[0].Message)
+	})
+
+	t.Run("getCommitsNeedingMergeBack - returns error for non-existent remote branch", func(t *testing.T) {
+		// Test with non-existent branch - should return configuration error
+		commits, err := getCommitsNeedingMergeBack(repo.GetLocalPath(), "main", "non-existent-branch")
+		require.Error(t, err)
+		assert.Nil(t, commits)
+		assert.Contains(t, err.Error(), "remote branch 'origin/main' or 'origin/non-existent-branch' does not exist")
+		assert.Contains(t, err.Error(), "check your gbm.branchconfig.yaml configuration")
+	})
+
+	t.Run("Remote - formats remote branch names", func(t *testing.T) {
+		assert.Equal(t, "origin/main", Remote("main"))
+		assert.Equal(t, "origin/feature-branch", Remote("feature-branch"))
+		assert.Equal(t, "origin/production-2025-07-1", Remote("production-2025-07-1"))
+	})
+
+	t.Run("BranchExistsLocalOrRemote - checks both local and remote", func(t *testing.T) {
+		// Create a GitManager instance for testing
+		gitManager := &GitManager{repoPath: repo.GetLocalPath()}
+		
+		// Test with local branch
+		err := repo.CreateSynchronizedBranch("local-test-branch")
+		require.NoError(t, err)
+
+		exists, err := gitManager.BranchExistsLocalOrRemote("local-test-branch")
+		require.NoError(t, err)
+		assert.True(t, exists)
+
+		// Test with non-existent branch
+		exists, err = gitManager.BranchExistsLocalOrRemote("non-existent-branch")
+		require.NoError(t, err)
+		assert.False(t, exists)
+	})
+}
