@@ -2,6 +2,7 @@ package cmd
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -26,16 +27,14 @@ func newInfoCommand() *cobra.Command {
 - Recent commits and modified files`,
 		Args: cobra.ExactArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			return runInfoCommand(cmd, args)
+			return runInfoCommand(args[0])
 		},
 	}
 
 	return cmd
 }
 
-func runInfoCommand(_ *cobra.Command, args []string) error {
-	worktreeName := args[0]
-
+func runInfoCommand(worktreeName string) error {
 	// Handle current directory reference
 	if worktreeName == "." {
 		currentPath, err := os.Getwd()
@@ -45,31 +44,29 @@ func runInfoCommand(_ *cobra.Command, args []string) error {
 		worktreeName = filepath.Base(currentPath)
 	}
 
-	// Initialize git manager
-	gitManager, err := createInitializedGitManager()
+	manager, err := createInitializedManager()
 	if err != nil {
-		return err
+		if !errors.Is(err, ErrLoadGBMConfig) {
+			return err
+		}
+
+		PrintVerbose("%v", err)
 	}
 
 	// Get worktree information
-	worktreeInfo, manager, err := getWorktreeInfo(gitManager, worktreeName)
+	worktreeInfo, manager, err := getWorktreeInfo(manager, worktreeName)
 	if err != nil {
 		return fmt.Errorf("failed to get worktree info: %w", err)
 	}
 
 	// Display the information
-	displayWorktreeInfo(worktreeInfo, manager)
+	displayWorktreeInfo(worktreeInfo, manager.GetConfig())
 
 	return nil
 }
 
-func getWorktreeInfo(gitManager *internal.GitManager, worktreeName string) (*internal.WorktreeInfoData, *internal.Manager, error) {
-	// Create manager to access state
-	manager, err := createInitializedManager()
-	if err != nil {
-		PrintVerbose("Failed to create manager for base branch lookup: %v", err)
-		manager = nil
-	}
+func getWorktreeInfo(manager *internal.Manager, worktreeName string) (*internal.WorktreeInfoData, *internal.Manager, error) {
+	gitManager := manager.GetGitManager()
 	// Get all worktrees
 	worktrees, err := gitManager.GetWorktrees()
 	if err != nil {
@@ -143,11 +140,8 @@ func getWorktreeInfo(gitManager *internal.GitManager, worktreeName string) (*int
 	}, manager, nil
 }
 
-func displayWorktreeInfo(data *internal.WorktreeInfoData, manager *internal.Manager) {
-	var config *internal.Config
-	if manager != nil {
-		config = manager.GetConfig()
-	} else {
+func displayWorktreeInfo(data *internal.WorktreeInfoData, config *internal.Config) {
+	if config == nil {
 		config = internal.DefaultConfig()
 	}
 	renderer := internal.NewInfoRenderer(config)
@@ -172,8 +166,8 @@ func getRecentCommits(worktreePath string, count int) ([]internal.CommitInfo, er
 	}
 
 	var commits []internal.CommitInfo
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(string(output)), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}
@@ -331,7 +325,7 @@ func getBaseBranchInfo(worktreePath, worktreeName string, manager *internal.Mana
 			baseBranch = storedBaseBranch
 		}
 	}
-	
+
 	// If no stored information, fall back to git merge-base detection
 	if baseBranch == "" {
 		// Try configured candidate branches in order of preference

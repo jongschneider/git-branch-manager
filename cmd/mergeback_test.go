@@ -10,6 +10,8 @@ import (
 	"gbm/internal"
 	"gbm/internal/testutils"
 
+	"slices"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -382,7 +384,8 @@ func TestFindMergeTargetBranchAndWorktree(t *testing.T) {
 
 		// Create manager without gbm.branchconfig.yaml (should handle gracefully)
 		manager, err := createInitializedManager()
-		require.NoError(t, err)
+		require.Error(t, err)
+		require.NotNil(t, manager, "Manager should not be nil even if config is missing")
 
 		// Test that the function doesn't panic and returns something reasonable
 		branch, worktree, err := findMergeTargetBranchAndWorktree(manager)
@@ -469,7 +472,7 @@ func TestMergebackIntegration(t *testing.T) {
 
 		// Parse local branches
 		localBranches := []string{}
-		for _, line := range strings.Split(string(output), "\n") {
+		for line := range strings.SplitSeq(string(output), "\n") {
 			line = strings.TrimSpace(line)
 			if line != "" {
 				// Remove leading *, +, spaces and any git branch indicators
@@ -485,12 +488,9 @@ func TestMergebackIntegration(t *testing.T) {
 		found := false
 		expectedBranches := []string{"merge/SHOP-456", "merge/SHOP-456_main"}
 		for _, expectedBranch := range expectedBranches {
-			for _, branch := range localBranches {
-				if branch == expectedBranch {
-					found = true
-					t.Logf("Found expected branch: %s", expectedBranch)
-					break
-				}
+			if slices.Contains(localBranches, expectedBranch) {
+				found = true
+				t.Logf("Found expected branch: %s", expectedBranch)
 			}
 			if found {
 				break
@@ -498,19 +498,4 @@ func TestMergebackIntegration(t *testing.T) {
 		}
 		assert.True(t, found, "Expected merge branch with JIRA ticket not found. Local branches: %v", localBranches)
 	})
-}
-
-// Benchmark tests for performance-critical functions
-func BenchmarkExtractJiraTicket(b *testing.B) {
-	message := "hotfix: SHOP-456 Fix authentication timeout issue with oauth"
-	for i := 0; i < b.N; i++ {
-		internal.ExtractJiraTicket(message)
-	}
-}
-
-func BenchmarkExtractWorktreeNameFromBranch(b *testing.B) {
-	branchName := "hotfix/SHOP-456_fix_authentication_timeout_issue"
-	for i := 0; i < b.N; i++ {
-		internal.ExtractWorktreeNameFromBranch(branchName)
-	}
 }

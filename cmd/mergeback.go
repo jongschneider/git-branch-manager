@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"os/exec"
@@ -46,7 +47,11 @@ Tab Completion:
 			// Create manager
 			manager, err := createInitializedManager()
 			if err != nil {
-				return err
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return err
+				}
+
+				PrintVerbose("%v", err)
 			}
 
 			// Handle auto-detection if no worktree name provided
@@ -152,11 +157,10 @@ func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string
 	}
 
 	// Check each deepest leaf node (production branch) to see if it needs mergeback
-	gitManager := manager.GetGitManager()
 	for _, leaf := range deepestLeaves {
 		// Check if this leaf has commits that need to be merged into its parent
 		if leaf.Parent != nil {
-			hasCommits, err := hasCommitsBetweenBranches(gitManager, leaf.Parent.Config.Branch, leaf.Config.Branch)
+			hasCommits, err := hasCommitsBetweenBranches(leaf.Parent.Config.Branch, leaf.Config.Branch)
 			if err != nil {
 				PrintVerbose("Error checking commits between %s and %s: %v", leaf.Parent.Config.Branch, leaf.Config.Branch, err)
 				continue
@@ -170,11 +174,11 @@ func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string
 	}
 
 	// If no deepest leaves need mergeback, check their parents recursively
-	return findNextMergeTargetInChain(config.Tree, deepestLeaves, gitManager)
+	return findNextMergeTargetInChain(deepestLeaves)
 }
 
 // hasCommitsBetweenBranches checks if source has commits that target doesn't have
-func hasCommitsBetweenBranches(gitManager *internal.GitManager, targetBranch, sourceBranch string) (bool, error) {
+func hasCommitsBetweenBranches(targetBranch, sourceBranch string) (bool, error) {
 	// First try with origin/ prefix
 	cmd := exec.Command("git", "log", fmt.Sprintf("origin/%s..origin/%s", targetBranch, sourceBranch), "--oneline")
 	output, err := cmd.Output()
@@ -192,7 +196,7 @@ func hasCommitsBetweenBranches(gitManager *internal.GitManager, targetBranch, so
 }
 
 // findNextMergeTargetInChain recursively checks parent branches for merge opportunities
-func findNextMergeTargetInChain(tree *internal.WorktreeManager, leaves []*internal.WorktreeNode, gitManager *internal.GitManager) (string, string, error) {
+func findNextMergeTargetInChain(leaves []*internal.WorktreeNode) (string, string, error) {
 	// Check parent branches of the leaves
 	checkedBranches := make(map[string]bool)
 
@@ -202,7 +206,7 @@ func findNextMergeTargetInChain(tree *internal.WorktreeManager, leaves []*intern
 
 			// Check if parent needs mergeback to its parent
 			if leaf.Parent.Parent != nil {
-				hasCommits, err := hasCommitsBetweenBranches(gitManager, leaf.Parent.Parent.Config.Branch, leaf.Parent.Config.Branch)
+				hasCommits, err := hasCommitsBetweenBranches(leaf.Parent.Parent.Config.Branch, leaf.Parent.Config.Branch)
 				if err != nil {
 					PrintVerbose("Error checking commits between %s and %s: %v", leaf.Parent.Parent.Config.Branch, leaf.Parent.Config.Branch, err)
 					continue
@@ -444,10 +448,13 @@ func getSmartMergebackCompletions() []string {
 	var completions []string
 
 	// Try to get smart detection results
-	manager, err := createInitializedManager() // Legacy call in helper function
+	manager, err := createInitializedManager()
 	if err != nil {
-		// Fallback to JIRA completions if manager fails
-		return getJiraCompletions()
+		if !errors.Is(err, ErrLoadGBMConfig) {
+			return getJiraCompletions()
+		}
+
+		PrintVerbose("%v", err)
 	}
 
 	// Get recent mergeable activity (same logic as auto-detection)
@@ -502,9 +509,13 @@ func getJiraCompletions() []string {
 	var completions []string
 
 	// Try to get config for JIRA completion
-	manager, err := createInitializedManager() // Legacy call in helper function
+	manager, err := createInitializedManager()
 	if err != nil {
-		return completions
+		if !errors.Is(err, ErrLoadGBMConfig) {
+			return completions
+		}
+
+		PrintVerbose("%v", err)
 	}
 
 	// Complete JIRA keys with summaries for context

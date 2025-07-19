@@ -151,10 +151,7 @@ func (r *InfoRenderer) renderJiraSection(jira *JiraTicketDetails) string {
 
 	if jira.Summary != "" {
 		termWidth := GetTerminalWidth()
-		summaryWidth := termWidth - 25 // Account for borders, padding, and key label
-		if summaryWidth < 30 {
-			summaryWidth = 30 // minimum width
-		}
+		summaryWidth := max(termWidth-25, 30)
 		wrappedSummary := r.wrapText(jira.Summary, summaryWidth)
 		content.WriteString(r.renderKeyValue("Summary", wrappedSummary))
 	}
@@ -199,12 +196,9 @@ func (r *InfoRenderer) renderJiraSection(jira *JiraTicketDetails) string {
 
 		// Wrap the comment text to fit within borders
 		termWidth := GetTerminalWidth()
-		commentWidth := termWidth - 30 // Account for borders, padding, and indentation
-		if commentWidth < 40 {
-			commentWidth = 40 // minimum width
-		}
+		commentWidth := max(termWidth-30, 40)
 		wrappedComment := r.wrapText(jira.LatestComment.Content, commentWidth)
-		for _, line := range strings.Split(wrappedComment, "\n") {
+		for line := range strings.SplitSeq(wrappedComment, "\n") {
 			content.WriteString(fmt.Sprintf("    %s\n", line))
 		}
 		content.WriteString(fmt.Sprintf("    - %s", jira.LatestComment.Author))
@@ -237,10 +231,7 @@ func (r *InfoRenderer) renderGitSection(data *WorktreeInfoData) string {
 		latest := data.Commits[0]
 		timeAgo := time.Since(latest.Timestamp)
 		termWidth := GetTerminalWidth()
-		commitWidth := termWidth - 25 // Account for borders, padding, and key label
-		if commitWidth < 30 {
-			commitWidth = 30
-		}
+		commitWidth := max(termWidth-25, 30)
 		wrappedMessage := r.wrapText(latest.Message, commitWidth-20) // Reserve space for hash and time
 		lastCommit := fmt.Sprintf("%s (%s) - %s ago",
 			wrappedMessage,
@@ -254,10 +245,7 @@ func (r *InfoRenderer) renderGitSection(data *WorktreeInfoData) string {
 	if len(data.ModifiedFiles) > 0 {
 		content.WriteString("Modified Files:\n")
 		termWidth := GetTerminalWidth()
-		filePathWidth := termWidth - 40 // Account for borders, status, and changes
-		if filePathWidth < 20 {
-			filePathWidth = 20
-		}
+		filePathWidth := max(termWidth-40, 20)
 
 		for _, file := range data.ModifiedFiles {
 			statusIcon := r.getStatusIcon(file.Status)

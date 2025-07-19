@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -30,7 +31,11 @@ Usage:
 
 			manager, err := createInitializedManager()
 			if err != nil {
-				return err
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return err
+				}
+
+				PrintVerbose("%v", err)
 			}
 
 			if pullAll {
@@ -92,3 +97,4 @@ func handlePullNamed(manager *internal.Manager, worktreeName string) error {
 	PrintInfo("Pulling worktree '%s'...", worktreeName)
 	return manager.PullWorktree(worktreeName)
 }
+

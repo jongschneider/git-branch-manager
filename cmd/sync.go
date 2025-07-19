@@ -21,7 +21,7 @@ updates existing worktrees if branch references have changed, and optionally rem
 			syncDryRun, _ := cmd.Flags().GetBool("dry-run")
 			syncForce, _ := cmd.Flags().GetBool("force")
 
-			manager, err := createInitializedManagerStrict()
+			manager, err := createInitializedManager()
 			if err != nil {
 				return err
 			}

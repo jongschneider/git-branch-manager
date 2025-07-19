@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -33,7 +34,11 @@ This matches the behavior of 'git worktree add'.`,
 			// Create manager
 			manager, err := createInitializedManager()
 			if err != nil {
-				return err
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return err
+				}
+
+				PrintVerbose("%v", err)
 			}
 
 			var branchName string
@@ -113,7 +118,12 @@ This matches the behavior of 'git worktree add'.`,
 			// Try to get config for JIRA completion, but don't fail if it's not available
 			manager, err := createInitializedManager()
 			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return nil, cobra.ShellCompDirectiveNoFileComp
+
+				}
+
+				PrintVerbose("%v", err)
 			}
 
 			// Complete JIRA keys with summaries for context
@@ -161,7 +171,6 @@ type interactiveResult struct {
 	branchName string
 	newBranch  bool
 }
-
 
 func handleInteractiveWithParams(manager *internal.Manager) (*interactiveResult, error) {
 	// Get available branches
@@ -234,4 +243,3 @@ func generateBranchName(worktreeName string, manager *internal.Manager) string {
 
 	return branchName
 }
-

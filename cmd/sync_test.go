@@ -11,11 +11,11 @@ import (
 	"gbm/internal"
 	"gbm/internal/testutils"
 
+	"slices"
+
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
-
-
 
 func TestSyncCommand_BasicOperations(t *testing.T) {
 	tests := []struct {
@@ -164,11 +164,11 @@ func TestSyncCommand_Flags(t *testing.T) {
 
 func TestSyncCommand_SyncScenarios(t *testing.T) {
 	tests := []struct {
-		name            string
+		name             string
 		initialGBMConfig string
 		updatedGBMConfig string
-		expectChanges   bool
-		validateResult  func(t *testing.T, repoPath string)
+		expectChanges    bool
+		validateResult   func(t *testing.T, repoPath string)
 	}{
 		{
 			name: "branch reference changed",
@@ -449,13 +449,7 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 			var output string
 
 			// Check if this test uses --force and needs confirmation
-			usesForce := false
-			for _, arg := range tt.syncArgs {
-				if arg == "--force" {
-					usesForce = true
-					break
-				}
-			}
+			usesForce := slices.Contains(tt.syncArgs, "--force")
 
 			if usesForce {
 				// Use simulateUserInput for tests that use --force
@@ -673,7 +667,7 @@ func TestSyncCommand_ForceConfirmationDirectManagerTest(t *testing.T) {
 	require.NoError(t, os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644))
 
 	// Create manager
-	manager, err := createInitializedManagerStrict()
+	manager, err := createInitializedManager()
 	require.NoError(t, err)
 
 	// Create confirmation function that accepts
@@ -753,7 +747,7 @@ func TestSyncCommand_ForceConfirmation(t *testing.T) {
 			require.NoError(t, os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644))
 
 			// Create manager to test confirmation directly
-			manager, err := createInitializedManagerStrict()
+			manager, err := createInitializedManager()
 			require.NoError(t, err)
 
 			// Create mock confirmation function
@@ -790,12 +784,12 @@ func TestSyncCommand_ForceConfirmation(t *testing.T) {
 
 func TestSyncCommand_WorktreePromotion(t *testing.T) {
 	// Test that verifies our fix for the "exit status 128" bug
-	// The original bug occurred when trying to create a worktree for a branch 
+	// The original bug occurred when trying to create a worktree for a branch
 	// that was already checked out in another worktree during promotion scenarios
-	
+
 	// Create source repository with branches like the working tests do
 	sourceRepo := testutils.NewMultiBranchRepo(t)
-	
+
 	// Create the specific branches mentioned in the original bug report
 	require.NoError(t, sourceRepo.CreateBranch("production-2025-05-1", "main"))
 	require.NoError(t, sourceRepo.CreateBranch("production-2025-07-1", "main"))
@@ -823,7 +817,7 @@ func TestSyncCommand_WorktreePromotion(t *testing.T) {
 	// Clone to create proper bare repo setup like working tests
 	repoPath := setupClonedRepo(t, sourceRepo)
 
-	// Initial sync to create worktrees  
+	// Initial sync to create worktrees
 	syncCmd := newRootCommand()
 	syncCmd.SetArgs([]string{"sync"})
 	err := syncCmd.Execute()
@@ -853,29 +847,28 @@ func TestSyncCommand_WorktreePromotion(t *testing.T) {
 		cmd.SetArgs([]string{"sync"})
 		return cmd.Execute()
 	})
-	
+
 	// The key assertion: sync should succeed when user confirms the promotion
 	require.NoError(t, err, "Sync should succeed when user confirms worktree promotion")
-	
+
 	// Validate that "main" and "production" worktrees exist and they have the correct branches
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "production"))
-	
+
 	// Check main worktree is on main branch
 	mainCmd := exec.Command("git", "branch", "--show-current")
 	mainCmd.Dir = filepath.Join(repoPath, "worktrees", "main")
 	mainOutput, err := mainCmd.Output()
 	require.NoError(t, err)
 	assert.Equal(t, "main", strings.TrimSpace(string(mainOutput)), "main worktree should be on main branch")
-	
+
 	// Check production worktree is on production-2025-07-1 branch (promoted from preview)
 	prodCmd := exec.Command("git", "branch", "--show-current")
 	prodCmd.Dir = filepath.Join(repoPath, "worktrees", "production")
 	prodOutput, err := prodCmd.Output()
 	require.NoError(t, err)
 	assert.Equal(t, "production-2025-07-1", strings.TrimSpace(string(prodOutput)), "production worktree should be on production-2025-07-1 branch")
-	
+
 	// Validate that "preview" worktree no longer exists
 	assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "preview"), "preview worktree should no longer exist")
 }
-

@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 
@@ -27,7 +28,11 @@ Examples:
 			// Create manager
 			manager, err := createInitializedManager()
 			if err != nil {
-				return err
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return err
+				}
+
+				PrintVerbose("%v", err)
 			}
 
 			// Check if worktree exists
@@ -77,7 +82,11 @@ Examples:
 			// Create manager
 			manager, err := createInitializedManager()
 			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return nil, cobra.ShellCompDirectiveNoFileComp
+				}
+
+				PrintVerbose("%v", err)
 			}
 
 			// Get all worktrees
@@ -97,4 +106,3 @@ Examples:
 
 	return cmd
 }
-

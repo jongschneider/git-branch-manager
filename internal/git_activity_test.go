@@ -10,26 +10,26 @@ import (
 
 func TestParseTimestamp(t *testing.T) {
 	tests := []struct {
-		name          string
-		timestampStr  string
-		expectError   bool
-		expectedTime  time.Time
+		name         string
+		timestampStr string
+		expectError  bool
+		expectedTime time.Time
 	}{
 		{
-			name:          "valid unix timestamp string",
-			timestampStr:  "1672531200", // 2023-01-01 00:00:00 UTC
-			expectError:   false,
-			expectedTime:  time.Unix(1672531200, 0),
+			name:         "valid unix timestamp string",
+			timestampStr: "1672531200", // 2023-01-01 00:00:00 UTC
+			expectError:  false,
+			expectedTime: time.Unix(1672531200, 0),
 		},
 		{
-			name:          "invalid timestamp",
-			timestampStr:  "invalid",
-			expectError:   true,
+			name:         "invalid timestamp",
+			timestampStr: "invalid",
+			expectError:  true,
 		},
 		{
-			name:          "empty timestamp",
-			timestampStr:  "",
-			expectError:   true,
+			name:         "empty timestamp",
+			timestampStr: "",
+			expectError:  true,
 		},
 	}
 
@@ -291,27 +291,6 @@ func TestExtractBranchFromRef(t *testing.T) {
 	}
 }
 
-func TestRecentActivityStruct(t *testing.T) {
-	// Test that RecentActivity struct can be created and used properly
-	activity := RecentActivity{
-		Type:          "hotfix",
-		WorktreeName:  "SHOP-456",
-		BranchName:    "hotfix/SHOP-456_fix_auth",
-		SourceBranch:  "hotfix/SHOP-456_fix_auth",
-		TargetBranch:  "production",
-		CommitHash:    "abc123",
-		CommitMessage: "hotfix: SHOP-456 Fix authentication timeout",
-		Author:        "john.doe",
-		Timestamp:     time.Now(),
-		JiraTicket:    "SHOP-456",
-	}
-
-	assert.Equal(t, "hotfix", activity.Type)
-	assert.Equal(t, "SHOP-456", activity.WorktreeName)
-	assert.Equal(t, "SHOP-456", activity.JiraTicket)
-	assert.NotZero(t, activity.Timestamp)
-}
-
 func TestGitMergePatternRegex(t *testing.T) {
 	// Test the regex pattern used in extractMergeBranches
 	mergePattern := `Merge branch '([^']+)' into (.+)`
@@ -426,24 +405,3 @@ func TestMockRecentActivity(t *testing.T) {
 	assert.True(t, hotfixAndMerge[0].Timestamp.After(hotfixAndMerge[1].Timestamp))
 }
 
-// Benchmark tests for performance
-func BenchmarkExtractJiraTicket(b *testing.B) {
-	message := "hotfix: SHOP-456 Fix authentication timeout issue with oauth redirect"
-	for i := 0; i < b.N; i++ {
-		ExtractJiraTicket(message)
-	}
-}
-
-func BenchmarkExtractWorktreeNameFromBranch(b *testing.B) {
-	branchName := "hotfix/SHOP-456_fix_authentication_timeout_issue_with_oauth"
-	for i := 0; i < b.N; i++ {
-		ExtractWorktreeNameFromBranch(branchName)
-	}
-}
-
-func BenchmarkExtractWorktreeNameFromMessage(b *testing.B) {
-	message := "hotfix: SHOP-456 Fix critical authentication timeout issue"
-	for i := 0; i < b.N; i++ {
-		ExtractWorktreeNameFromMessage(message)
-	}
-}

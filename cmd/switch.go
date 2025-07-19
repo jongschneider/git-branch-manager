@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -40,7 +41,11 @@ Examples:
 
 			manager, err := createInitializedManager()
 			if err != nil {
-				return err
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return err
+				}
+
+				PrintVerbose("%v", err)
 			}
 
 			if len(args) == 0 {
@@ -75,7 +80,6 @@ Examples:
 
 	return cmd
 }
-
 
 func switchToWorktreeWithFlag(manager *internal.Manager, worktreeName string, printPath bool) error {
 	PrintVerbose("Switching to worktree: %s", worktreeName)
@@ -195,11 +199,14 @@ func listWorktrees(manager *internal.Manager) error {
 	return nil
 }
 
-
 func getWorktreeNames() []string {
 	manager, err := createInitializedManager()
 	if err != nil {
-		return nil
+		if !errors.Is(err, ErrLoadGBMConfig) {
+			return nil
+		}
+
+		PrintVerbose("%v", err)
 	}
 
 	worktrees, err := manager.GetAllWorktrees()

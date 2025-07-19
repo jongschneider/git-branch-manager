@@ -83,7 +83,7 @@ func ExecGitCommandCombined(dir string, args ...string) ([]byte, error) {
 }
 
 // enhanceGitError provides more specific error messages for common git failures
-func enhanceGitError(err error, operation string, args ...string) error {
+func enhanceGitError(err error, operation string) error {
 	if err == nil {
 		return nil
 	}
@@ -401,7 +401,7 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 	if err == nil {
 		// Remote tracking branch exists, create worktree and set up tracking
 		if err := ExecGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
-			return enhanceGitError(err, "worktree add", "worktree", "add", worktreePath, branchName)
+			return enhanceGitError(err, "worktree add")
 		}
 
 		// Set up tracking for the remote branch
@@ -413,7 +413,7 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 	} else {
 		// No remote tracking branch, create worktree normally
 		if err := ExecGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
-			return enhanceGitError(err, "worktree add", "worktree", "add", worktreePath, branchName)
+			return enhanceGitError(err, "worktree add")
 		}
 	}
 
@@ -422,7 +422,7 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 
 func (gm *GitManager) RemoveWorktree(worktreePath string) error {
 	if err := ExecGitCommandRun(gm.repoPath, "worktree", "remove", worktreePath, "--force"); err != nil {
-		return enhanceGitError(err, "worktree remove", "worktree", "remove", worktreePath, "--force")
+		return enhanceGitError(err, "worktree remove")
 	}
 
 	return nil
@@ -430,7 +430,7 @@ func (gm *GitManager) RemoveWorktree(worktreePath string) error {
 
 func (gm *GitManager) MoveWorktree(sourceWorktreePath, targetWorktreePath string) error {
 	if err := ExecGitCommandRun(gm.repoPath, "worktree", "move", sourceWorktreePath, targetWorktreePath); err != nil {
-		return enhanceGitError(err, "worktree move", "worktree", "move", sourceWorktreePath, targetWorktreePath)
+		return enhanceGitError(err, "worktree move")
 	}
 
 	return nil
@@ -489,8 +489,8 @@ func (gm *GitManager) GetWorktreeStatus(worktreePath string) (*GitStatus, error)
 		return nil, fmt.Errorf("failed to get git status: %w", err)
 	}
 
-	statusLines := strings.Split(string(output), "\n")
-	for _, line := range statusLines {
+	statusLines := strings.SplitSeq(string(output), "\n")
+	for line := range statusLines {
 		line = strings.TrimSpace(line)
 		if line == "" {
 			continue
@@ -711,8 +711,8 @@ func (gm *GitManager) GetRemoteBranches() ([]string, error) {
 	}
 
 	var branches []string
-	lines := strings.Split(string(output), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(string(output), "\n")
+	for line := range lines {
 		line = strings.TrimSpace(line)
 		if line == "" || strings.Contains(line, "HEAD") {
 			continue
@@ -951,8 +951,8 @@ func (gm *GitManager) getRecentMergeCommits(since string) ([]RecentActivity, err
 		return activities, err
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(string(output)), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}
@@ -1009,8 +1009,8 @@ func (gm *GitManager) getRecentHotfixActivity(since string) ([]RecentActivity, e
 		return activities, err
 	}
 
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
+	lines := strings.SplitSeq(strings.TrimSpace(string(output)), "\n")
+	for line := range lines {
 		if line == "" {
 			continue
 		}
@@ -1050,7 +1050,7 @@ func (gm *GitManager) getRecentHotfixActivity(since string) ([]RecentActivity, e
 
 		// Extract branch name from refs
 		if refs != "" {
-			for _, ref := range strings.Split(refs, ", ") {
+			for ref := range strings.SplitSeq(refs, ", ") {
 				if strings.Contains(ref, "hotfix/") {
 					activity.BranchName = extractBranchFromRef(ref)
 					activity.WorktreeName = ExtractWorktreeNameFromBranch(activity.BranchName)

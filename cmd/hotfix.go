@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -38,7 +39,12 @@ Examples:
 			// Create manager
 			manager, err := createInitializedManager()
 			if err != nil {
-				return err
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return err
+				}
+
+				PrintVerbose("%v", err)
+
 			}
 
 			// Find the production branch (last in mergeback chain)
@@ -103,8 +109,8 @@ Examples:
 
 			PrintInfo("Hotfix worktree '%s' added successfully", hotfixWorktreeName)
 			// Build the deployment chain message
-		deploymentChain := buildDeploymentChain(baseBranch, manager)
-		PrintInfo("Remember to merge back through the deployment chain: %s", deploymentChain)
+			deploymentChain := buildDeploymentChain(baseBranch, manager.GetGBMConfig())
+			PrintInfo("Remember to merge back through the deployment chain: %s", deploymentChain)
 
 			return nil
 		},
@@ -114,9 +120,13 @@ Examples:
 	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
 			// First argument: JIRA keys with summaries for context
-			manager, err := createInitializedManager() // Legacy call in completion function
+			manager, err := createInitializedManager()
 			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return nil, cobra.ShellCompDirectiveNoFileComp
+				}
+
+				PrintVerbose("%v", err)
 			}
 
 			// Complete JIRA keys with summaries for context
@@ -231,7 +241,6 @@ func findProductionBranch(manager *internal.Manager) (string, error) {
 	return productionBranch, nil
 }
 
-
 // isProductionBranchName returns true if the branch name suggests it's a production branch
 func isProductionBranchName(branchName string) bool {
 	prodNames := []string{"prod", "production", "master", "main", "release"}
@@ -245,10 +254,8 @@ func isProductionBranchName(branchName string) bool {
 	return false
 }
 
-
 // buildDeploymentChain builds the complete deployment chain from base branch to final target
-func buildDeploymentChain(baseBranch string, manager *internal.Manager) string {
-	config := loadGBMConfig()
+func buildDeploymentChain(baseBranch string, config *internal.GBMConfig) string {
 	if config == nil {
 		return baseBranch
 	}
@@ -261,34 +268,13 @@ func buildDeploymentChain(baseBranch string, manager *internal.Manager) string {
 	return strings.Join(chain, " → ")
 }
 
-// loadGBMConfig loads the gbm.branchconfig.yaml file, returning nil if not found
-func loadGBMConfig() *internal.GBMConfig {
-	wd, err := os.Getwd()
-	if err != nil {
-		return nil
-	}
-
-	repoRoot, err := internal.FindGitRoot(wd)
-	if err != nil {
-		return nil
-	}
-
-	configPath := filepath.Join(repoRoot, internal.DefaultBranchConfigFilename)
-	config, err := internal.ParseGBMConfig(configPath)
-	if err != nil {
-		return nil
-	}
-
-	return config
-}
-
 // buildMergeChain traverses the merge configuration to build the complete chain
 func buildMergeChain(baseBranch string, config *internal.GBMConfig) []string {
 	chain := []string{baseBranch}
 	currentBranch := baseBranch
 
 	const maxIterations = 10 // Prevent infinite loops
-	for i := 0; i < maxIterations; i++ {
+	for range maxIterations {
 		nextBranch := findMergeIntoTarget(currentBranch, config)
 		if nextBranch == "" {
 			break
@@ -311,10 +297,8 @@ func findMergeIntoTarget(sourceBranch string, config *internal.GBMConfig) string
 	return ""
 }
 
-
 // generateHotfixBranchName creates a hotfix branch name with proper formatting
 var generateHotfixBranchName = func(worktreeName, jiraTicket string, manager *internal.Manager) (string, error) {
 	generator := createBranchNameGenerator("hotfix")
 	return generator(worktreeName, jiraTicket, "", manager)
 }
-

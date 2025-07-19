@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 
@@ -8,7 +9,6 @@ import (
 
 	"github.com/spf13/cobra"
 )
-
 
 func newPushCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -33,7 +33,11 @@ The command will automatically set upstream (-u) if not already set.`,
 
 			manager, err := createInitializedManager()
 			if err != nil {
-				return err
+				if !errors.Is(err, ErrLoadGBMConfig) {
+					return err
+				}
+
+				PrintVerbose("%v", err)
 			}
 
 			if pushAll {
@@ -95,4 +99,3 @@ func handlePushNamed(manager *internal.Manager, worktreeName string) error {
 	PrintInfo("Pushing worktree '%s'...", worktreeName)
 	return manager.PushWorktree(worktreeName)
 }
-

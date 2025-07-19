@@ -19,7 +19,7 @@ func newListCommand() *cobra.Command {
 Shows environment variable mappings and indicates sync status for each entry.
 Displays which branches are out of sync, lists missing worktrees, and shows orphaned worktrees.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
-			manager, err := createInitializedManagerStrict()
+			manager, err := createInitializedManager()
 			if err != nil {
 				if !errors.Is(err, internal.ErrNoRootNodesFound) {
 					return err

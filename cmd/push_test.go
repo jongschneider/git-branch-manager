@@ -92,6 +92,7 @@ func getRemoteCommitHash(t *testing.T, repo *testutils.GitTestRepo, branch strin
 
 // Helper function to check if upstream is configured
 func checkUpstreamExists(t *testing.T, worktreePath string) bool {
+	t.Helper()
 	gitCmd := exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
 	gitCmd.Dir = worktreePath
 	err := gitCmd.Run()

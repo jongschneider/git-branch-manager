@@ -6,6 +6,7 @@ import (
 	"io"
 	"os"
 	"path/filepath"
+	"slices"
 	"sort"
 	"strings"
 	"time"
@@ -28,11 +29,11 @@ type WorktreeListInfo struct {
 }
 
 type SyncStatus struct {
-	InSync               bool
-	MissingWorktrees     []string
-	OrphanedWorktrees    []string
-	BranchChanges        map[string]BranchChange
-	WorktreePromotions   []WorktreePromotion
+	InSync             bool
+	MissingWorktrees   []string
+	OrphanedWorktrees  []string
+	BranchChanges      map[string]BranchChange
+	WorktreePromotions []WorktreePromotion
 }
 
 type BranchChange struct {
@@ -104,11 +105,11 @@ func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 	}
 
 	status := &SyncStatus{
-		InSync:               true,
-		MissingWorktrees:     []string{},
-		OrphanedWorktrees:    []string{},
-		BranchChanges:        make(map[string]BranchChange),
-		WorktreePromotions:   []WorktreePromotion{},
+		InSync:             true,
+		MissingWorktrees:   []string{},
+		OrphanedWorktrees:  []string{},
+		BranchChanges:      make(map[string]BranchChange),
+		WorktreePromotions: []WorktreePromotion{},
 	}
 
 	worktrees, err := m.gitManager.GetWorktrees()
@@ -146,13 +147,13 @@ func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 
 	// Detect worktree promotions: when a branch moves from one worktree to another
 	status.WorktreePromotions = m.detectWorktreePromotions(status.BranchChanges, worktrees)
-	
+
 	return status, nil
 }
 
 func (m *Manager) detectWorktreePromotions(branchChanges map[string]BranchChange, allWorktrees []*WorktreeInfo) []WorktreePromotion {
 	var promotions []WorktreePromotion
-	
+
 	// Create a map of branch -> worktree for existing worktrees
 	branchToWorktree := make(map[string]string)
 	for _, wt := range allWorktrees {
@@ -160,7 +161,7 @@ func (m *Manager) detectWorktreePromotions(branchChanges map[string]BranchChange
 			branchToWorktree[wt.Branch] = wt.Name
 		}
 	}
-	
+
 	// Check each branch change to see if the new branch is currently checked out elsewhere
 	for targetWorktree, change := range branchChanges {
 		if sourceWorktree, exists := branchToWorktree[change.NewBranch]; exists {
@@ -175,7 +176,7 @@ func (m *Manager) detectWorktreePromotions(branchChanges map[string]BranchChange
 			promotions = append(promotions, promotion)
 		}
 	}
-	
+
 	return promotions
 }
 
@@ -255,11 +256,11 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 	if len(status.WorktreePromotions) > 0 {
 		if confirmFunc != nil {
 			for _, promotion := range status.WorktreePromotions {
-				message := fmt.Sprintf("Worktree %s (%s) will be promoted to %s.\nThis is a destructive action:\n  1. Worktree %s (%s) will be removed.\n  2. Worktree %s (%s) will be moved to %s.\nContinue?", 
+				message := fmt.Sprintf("Worktree %s (%s) will be promoted to %s.\nThis is a destructive action:\n  1. Worktree %s (%s) will be removed.\n  2. Worktree %s (%s) will be moved to %s.\nContinue?",
 					promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree,
 					promotion.TargetWorktree, promotion.TargetBranch,
 					promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree)
-				
+
 				if !confirmFunc(message) {
 					return fmt.Errorf("worktree promotion cancelled by user")
 				}
@@ -273,12 +274,12 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 	for _, promotion := range status.WorktreePromotions {
 		sourceWorktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, promotion.SourceWorktree)
 		targetWorktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, promotion.TargetWorktree)
-		
+
 		err := m.gitManager.PromoteWorktree(sourceWorktreePath, targetWorktreePath)
 		if err != nil {
 			return fmt.Errorf("failed to promote worktree %s to %s: %w", promotion.SourceWorktree, promotion.TargetWorktree, err)
 		}
-		
+
 		// Remove the promotion from regular branch changes since it's already handled
 		delete(status.BranchChanges, promotion.TargetWorktree)
 	}
@@ -599,12 +600,7 @@ func (m *Manager) copyDirectory(sourcePath, targetPath string) error {
 
 // Helper function to check if a slice contains a string
 func contains(slice []string, item string) bool {
-	for _, s := range slice {
-		if s == item {
-			return true
-		}
-	}
-	return false
+	return slices.Contains(slice, item)
 }
 
 func (m *Manager) GetRemoteBranches() ([]string, error) {
@@ -617,6 +613,10 @@ func (m *Manager) GetCurrentBranch() (string, error) {
 
 func (m *Manager) GetGitManager() *GitManager {
 	return m.gitManager
+}
+
+func (m *Manager) GetGBMConfig() *GBMConfig {
+	return m.gbmConfig
 }
 
 func (m *Manager) PushWorktree(worktreeName string) error {
@@ -680,7 +680,7 @@ func (m *Manager) RemoveWorktree(worktreeName string) error {
 	// Remove from ad hoc worktrees list if it exists there
 	for i, name := range m.state.AdHocWorktrees {
 		if name == worktreeName {
-			m.state.AdHocWorktrees = append(m.state.AdHocWorktrees[:i], m.state.AdHocWorktrees[i+1:]...)
+			m.state.AdHocWorktrees = slices.Delete(m.state.AdHocWorktrees, i, i+1)
 			break
 		}
 	}
