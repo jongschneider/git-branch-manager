@@ -29,10 +29,10 @@ type RepoConfig struct {
 
 // YAML-based configuration structures for GBM config generation
 type gbmConfig struct {
-	Worktrees map[string]worktreeConfig `yaml:"worktrees"`
+	Worktrees map[string]WorktreeConfig `yaml:"worktrees"`
 }
 
-type worktreeConfig struct {
+type WorktreeConfig struct {
 	Branch      string `yaml:"branch"`
 	MergeInto   string `yaml:"merge_into,omitempty"`
 	Description string `yaml:"description,omitempty"`
@@ -262,107 +262,9 @@ func (r *GitTestRepo) WriteFile(path, content string) error {
 	return nil
 }
 
-func (r *GitTestRepo) CreateEnvrc(mapping map[string]string) error {
-	// Create deterministic ordered content to avoid flaky tests
-	// Order: MAIN, PREVIEW, PROD, then any others alphabetically
-	var content string
-
-	// Standard order that tests expect
-	orderedKeys := []string{"MAIN", "PREVIEW", "PROD"}
-
-	// Add the standard keys in order if they exist
-	for _, key := range orderedKeys {
-		if value, exists := mapping[key]; exists {
-			content += fmt.Sprintf("%s=%s\n", key, value)
-		}
-	}
-
-	// Add any remaining keys alphabetically
-	var remainingKeys []string
-	for key := range mapping {
-		found := false
-		for _, standardKey := range orderedKeys {
-			if key == standardKey {
-				found = true
-				break
-			}
-		}
-		if !found {
-			remainingKeys = append(remainingKeys, key)
-		}
-	}
-
-	// Sort remaining keys for determinism
-	for i := 0; i < len(remainingKeys); i++ {
-		for j := i + 1; j < len(remainingKeys); j++ {
-			if remainingKeys[i] > remainingKeys[j] {
-				remainingKeys[i], remainingKeys[j] = remainingKeys[j], remainingKeys[i]
-			}
-		}
-	}
-
-	for _, key := range remainingKeys {
-		content += fmt.Sprintf("%s=%s\n", key, mapping[key])
-	}
-
-	return r.WriteFile(".envrc", content)
-}
-
-func (r *GitTestRepo) CreateGBMConfig(mapping map[string]string) error {
+func (r *GitTestRepo) CreateGBMConfig(worktrees map[string]WorktreeConfig) error {
 	config := &gbmConfig{
-		Worktrees: make(map[string]worktreeConfig),
-	}
-
-	// Standard order that tests expect - matches the original .envrc order
-	orderedKeys := []string{"main", "preview", "staging", "dev", "feat", "prod", "hotfix"}
-
-	// Find keys that exist in the mapping
-	var existingKeys []string
-	for _, key := range orderedKeys {
-		if _, exists := mapping[key]; exists {
-			existingKeys = append(existingKeys, key)
-		}
-	}
-
-	// Add any remaining keys alphabetically
-	var remainingKeys []string
-	for key := range mapping {
-		found := false
-		for _, standardKey := range orderedKeys {
-			if key == standardKey {
-				found = true
-				break
-			}
-		}
-		if !found {
-			remainingKeys = append(remainingKeys, key)
-		}
-	}
-
-	// Sort remaining keys for determinism
-	for i := 0; i < len(remainingKeys); i++ {
-		for j := i + 1; j < len(remainingKeys); j++ {
-			if remainingKeys[i] > remainingKeys[j] {
-				remainingKeys[i], remainingKeys[j] = remainingKeys[j], remainingKeys[i]
-			}
-		}
-	}
-
-	existingKeys = append(existingKeys, remainingKeys...)
-
-	// Build hierarchy - each key merges to the previous one (except the first)
-	for i, key := range existingKeys {
-		wConfig := worktreeConfig{
-			Branch:      mapping[key],
-			Description: strings.ToUpper(key[:1]) + key[1:] + " branch",
-		}
-
-		// Add merge_into relationship for all except the first (root)
-		if i > 0 {
-			wConfig.MergeInto = existingKeys[i-1]
-		}
-
-		config.Worktrees[key] = wConfig
+		Worktrees: worktrees,
 	}
 
 	// Marshal the config to YAML
@@ -374,6 +276,7 @@ func (r *GitTestRepo) CreateGBMConfig(mapping map[string]string) error {
 	// Add a header comment to the YAML
 	content := "# Git Branch Manager Configuration\n\n# Worktree definitions - key is the worktree name, value defines the branch and merge strategy\n" + string(yamlData)
 
+	fmt.Println("🚨", content)
 	return r.WriteFile("gbm.branchconfig.yaml", content)
 }
 

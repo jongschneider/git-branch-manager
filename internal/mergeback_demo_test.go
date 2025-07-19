@@ -20,10 +20,21 @@ func TestMergeBackDetection_RealWorldDemo(t *testing.T) {
 	)
 
 	// Set up a typical production environment hierarchy
-	err := repo.CreateGBMConfig(map[string]string{
-		"main":    "main",
-		"staging": "staging",
-		"prod":    "production",
+	err := repo.CreateGBMConfig(map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",
+			Description: "Main branch",
+		},
+		"staging": {
+			Branch:      "staging",
+			MergeInto:   "main",
+			Description: "Staging branch",
+		},
+		"prod": {
+			Branch:      "production",
+			MergeInto:   "staging",
+			Description: "Production branch",
+		},
 	})
 	require.NoError(t, err)
 

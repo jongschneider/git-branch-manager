@@ -45,7 +45,7 @@ func TestCloneCommand_Basic(t *testing.T) {
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees"))
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "main"))
 	assert.FileExists(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
-	
+
 	// Verify .gbm directory and files are created
 	assert.DirExists(t, filepath.Join(repoPath, ".gbm"))
 	assert.FileExists(t, filepath.Join(repoPath, ".gbm", "config.toml"))
@@ -60,7 +60,7 @@ func TestCloneCommand_Basic(t *testing.T) {
 			},
 		},
 	}
-	assert.Equal(t, expected, config)
+	assert.Equal(t, expected.Worktrees, config.Worktrees)
 }
 
 func TestCloneCommand_WithExistingGBMConfig(t *testing.T) {
@@ -86,7 +86,7 @@ func TestCloneCommand_WithExistingGBMConfig(t *testing.T) {
 	repoPath := filepath.Join(targetDir, repoName)
 
 	assert.FileExists(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
-	
+
 	// Verify .gbm directory and files are created
 	assert.DirExists(t, filepath.Join(repoPath, ".gbm"))
 	assert.FileExists(t, filepath.Join(repoPath, ".gbm", "config.toml"))
@@ -111,7 +111,7 @@ func TestCloneCommand_WithExistingGBMConfig(t *testing.T) {
 			},
 		},
 	}
-	assert.Equal(t, expected, config)
+	assert.Equal(t, expected.Worktrees, config.Worktrees)
 }
 
 func TestCloneCommand_WithoutGBMConfig(t *testing.T) {
@@ -133,7 +133,7 @@ func TestCloneCommand_WithoutGBMConfig(t *testing.T) {
 	repoPath := filepath.Join(targetDir, repoName)
 
 	assert.FileExists(t, filepath.Join(repoPath, internal.DefaultBranchConfigFilename))
-	
+
 	// Verify .gbm directory and files are created
 	assert.DirExists(t, filepath.Join(repoPath, ".gbm"))
 	assert.FileExists(t, filepath.Join(repoPath, ".gbm", "config.toml"))
@@ -148,7 +148,7 @@ func TestCloneCommand_WithoutGBMConfig(t *testing.T) {
 			},
 		},
 	}
-	assert.Equal(t, expected, config)
+	assert.Equal(t, expected.Worktrees, config.Worktrees)
 }
 
 func TestCloneCommand_DifferentDefaultBranches(t *testing.T) {
@@ -194,7 +194,7 @@ func TestCloneCommand_DifferentDefaultBranches(t *testing.T) {
 					},
 				},
 			}
-			assert.Equal(t, expected, config)
+			assert.Equal(t, expected.Worktrees, config.Worktrees)
 		})
 	}
 }
@@ -255,7 +255,6 @@ func TestCloneCommand_InvalidRepository(t *testing.T) {
 	assert.Contains(t, err.Error(), "failed to clone repository")
 }
 
-
 func TestExtractRepoName(t *testing.T) {
 	tests := []struct {
 		name     string
@@ -297,7 +296,7 @@ func TestCreateDefaultGBMConfig(t *testing.T) {
 			},
 		},
 	}
-	assert.Equal(t, expected, config)
+	assert.Equal(t, expected.Worktrees, config.Worktrees)
 
 	// Also verify the file contains expected comments by reading raw content
 	content, err := os.ReadFile(configPath)

@@ -1,6 +1,7 @@
 package testutils
 
 import (
+	"strings"
 	"testing"
 )
 
@@ -30,10 +31,73 @@ func NewMultiBranchRepo(t *testing.T) *GitTestRepo {
 }
 
 
+// stringMappingToWorktreeConfigs converts the old string mapping format to the new explicit format
+// This preserves the old behavior for backward compatibility in scenarios
+func stringMappingToWorktreeConfigs(mapping map[string]string) map[string]WorktreeConfig {
+	worktrees := make(map[string]WorktreeConfig)
+
+	// Standard order that tests expect - matches the original .envrc order
+	orderedKeys := []string{"main", "preview", "staging", "dev", "feat", "prod", "hotfix"}
+
+	// Find keys that exist in the mapping
+	var existingKeys []string
+	for _, key := range orderedKeys {
+		if _, exists := mapping[key]; exists {
+			existingKeys = append(existingKeys, key)
+		}
+	}
+
+	// Add any remaining keys alphabetically
+	var remainingKeys []string
+	for key := range mapping {
+		found := false
+		for _, standardKey := range orderedKeys {
+			if key == standardKey {
+				found = true
+				break
+			}
+		}
+		if !found {
+			remainingKeys = append(remainingKeys, key)
+		}
+	}
+
+	// Sort remaining keys for determinism
+	for i := 0; i < len(remainingKeys); i++ {
+		for j := i + 1; j < len(remainingKeys); j++ {
+			if remainingKeys[i] > remainingKeys[j] {
+				remainingKeys[i], remainingKeys[j] = remainingKeys[j], remainingKeys[i]
+			}
+		}
+	}
+
+	existingKeys = append(existingKeys, remainingKeys...)
+
+	// Build hierarchy - each key merges to the previous one (except the first)
+	for i, key := range existingKeys {
+		config := WorktreeConfig{
+			Branch:      mapping[key],
+			Description: strings.ToUpper(key[:1]) + key[1:] + " branch",
+		}
+
+		// Add merge_into relationship for all except the first (root)
+		if i > 0 {
+			config.MergeInto = existingKeys[i-1]
+		}
+
+		worktrees[key] = config
+	}
+
+	return worktrees
+}
+
 func NewGBMConfigRepo(t *testing.T, mapping map[string]string) *GitTestRepo {
 	repo := NewMultiBranchRepo(t)
 
-	if err := repo.CreateGBMConfig(mapping); err != nil {
+	// Convert string mapping to WorktreeConfig mapping
+	worktrees := stringMappingToWorktreeConfigs(mapping)
+
+	if err := repo.CreateGBMConfig(worktrees); err != nil {
 		t.Fatalf("Failed to create gbm.branchconfig.yaml: %v", err)
 	}
 

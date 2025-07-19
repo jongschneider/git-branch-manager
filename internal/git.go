@@ -299,15 +299,15 @@ func Remote(branchName string) string {
 
 // BranchExistsLocalOrRemote checks if a branch exists either locally or remotely
 func (gm *GitManager) BranchExistsLocalOrRemote(branchName string) (bool, error) {
-	// Check if local branch exists
-	_, err := ExecGitCommand(gm.repoPath, "rev-parse", "--verify", branchName)
-	if err == nil {
-		return true, nil
-	}
-	
+	// // Check if local branch exists
+	// _, err := ExecGitCommand(gm.repoPath, "rev-parse", "--verify", branchName)
+	// if err == nil {
+	// 	return true, nil
+	// }
+
 	// Check if remote branch exists
 	remoteBranch := Remote(branchName)
-	_, err = ExecGitCommand(gm.repoPath, "rev-parse", "--verify", remoteBranch)
+	_, err := ExecGitCommand(gm.repoPath, "rev-parse", "--verify", remoteBranch)
 	return err == nil, nil
 }
 

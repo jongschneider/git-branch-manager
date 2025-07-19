@@ -3,6 +3,7 @@ package cmd
 import (
 	"fmt"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 
@@ -13,10 +14,10 @@ import (
 
 func newMergebackCommand() *cobra.Command {
 	cmd := &cobra.Command{
-	Use:     "mergeback [worktree-name] [jira-ticket]",
-	Aliases: []string{"mb"},
-	Short:   "Create a mergeback worktree to merge changes up the deployment chain",
-	Long: `Create a mergeback worktree to merge changes up the deployment chain.
+		Use:     "mergeback [worktree-name] [jira-ticket]",
+		Aliases: []string{"mb"},
+		Short:   "Create a mergeback worktree to merge changes up the deployment chain",
+		Long: `Create a mergeback worktree to merge changes up the deployment chain.
 
 The mergeback command automatically:
 - Detects which branch in the mergeback chain needs the merge based on configuration
@@ -37,70 +38,70 @@ Examples:
 Tab Completion:
   Press TAB to see intelligent suggestions based on recent hotfix/merge activity,
   or press ENTER for automatic detection with confirmation prompt.`,
-	Args: cobra.MaximumNArgs(2),
-	RunE: func(cmd *cobra.Command, args []string) error {
-		var worktreeName string
-		var jiraTicket string
+		Args: cobra.MaximumNArgs(2),
+		RunE: func(cmd *cobra.Command, args []string) error {
+			var worktreeName string
+			var jiraTicket string
 
-		// Create manager
-		manager, err := createInitializedManager()
-		if err != nil {
-			return err
-		}
-
-		// Handle auto-detection if no worktree name provided
-		if len(args) == 0 {
-			worktreeName, jiraTicket, err = autoDetectMergebackTarget(manager)
+			// Create manager
+			manager, err := createInitializedManager()
 			if err != nil {
-				return fmt.Errorf("failed to auto-detect mergeback target: %w", err)
+				return err
 			}
-			PrintVerbose("Auto-detected mergeback target: %s (JIRA: %s)", worktreeName, jiraTicket)
-		} else {
-			worktreeName = args[0]
-			// Check for explicit JIRA ticket in second argument
-			if len(args) > 1 {
-				jiraTicket = args[1]
-			} else if internal.IsJiraKey(worktreeName) {
-				jiraTicket = worktreeName
+
+			// Handle auto-detection if no worktree name provided
+			if len(args) == 0 {
+				worktreeName, jiraTicket, err = autoDetectMergebackTarget(manager)
+				if err != nil {
+					return fmt.Errorf("failed to auto-detect mergeback target: %w", err)
+				}
+				PrintVerbose("Auto-detected mergeback target: %s (JIRA: %s)", worktreeName, jiraTicket)
+			} else {
+				worktreeName = args[0]
+				// Check for explicit JIRA ticket in second argument
+				if len(args) > 1 {
+					jiraTicket = args[1]
+				} else if internal.IsJiraKey(worktreeName) {
+					jiraTicket = worktreeName
+				}
 			}
-		}
 
-		// Find the target branch for merging
-		baseBranch, baseWorktreeName, err := findMergeTargetBranchAndWorktree(manager)
-		if err != nil {
-			return fmt.Errorf("failed to determine merge target branch: %w", err)
-		}
+			// Find the target branch for merging
+			baseBranch, baseWorktreeName, err := findMergeTargetBranchAndWorktree(manager)
+			if err != nil {
+				return fmt.Errorf("failed to determine merge target branch: %w", err)
+			}
 
-		PrintInfo("Using branch '%s' (worktree '%s') as base for mergeback", baseBranch, baseWorktreeName)
+			PrintInfo("Using branch '%s' (worktree '%s') as base for mergeback", baseBranch, baseWorktreeName)
 
-		// Generate mergeback branch name (jiraTicket already set above)
+			// Generate mergeback branch name (jiraTicket already set above)
 
-		branchName, err := generateMergebackBranchName(worktreeName, jiraTicket, baseWorktreeName, manager)
-		if err != nil {
-			return fmt.Errorf("failed to generate mergeback branch name: %w", err)
-		}
+			branchName, err := generateMergebackBranchName(worktreeName, jiraTicket, baseWorktreeName, manager)
+			if err != nil {
+				return fmt.Errorf("failed to generate mergeback branch name: %w", err)
+			}
 
-		// Get mergeback prefix from config and build worktree name
-		mergebackPrefix := manager.GetConfig().Settings.MergebackPrefix
-		var mergebackWorktreeName string
-		if mergebackPrefix != "" {
-			mergebackWorktreeName = mergebackPrefix + "_" + worktreeName + "_" + baseWorktreeName
-		} else {
-			mergebackWorktreeName = worktreeName + "_" + baseWorktreeName
-		}
+			// Get mergeback prefix from config and build worktree name
+			mergebackPrefix := manager.GetConfig().Settings.MergebackPrefix
+			var mergebackWorktreeName string
+			if mergebackPrefix != "" {
+				mergebackWorktreeName = mergebackPrefix + "_" + worktreeName + "_" + baseWorktreeName
+			} else {
+				mergebackWorktreeName = worktreeName + "_" + baseWorktreeName
+			}
 
-		PrintInfo("Creating mergeback worktree '%s' on branch '%s'", mergebackWorktreeName, branchName)
+			PrintInfo("Creating mergeback worktree '%s' on branch '%s'", mergebackWorktreeName, branchName)
 
-		// Add the mergeback worktree
-		if err := manager.AddWorktree(mergebackWorktreeName, branchName, true, baseBranch); err != nil {
-			return fmt.Errorf("failed to add mergeback worktree: %w", err)
-		}
+			// Add the mergeback worktree
+			if err := manager.AddWorktree(mergebackWorktreeName, branchName, true, baseBranch); err != nil {
+				return fmt.Errorf("failed to add mergeback worktree: %w", err)
+			}
 
-		PrintInfo("Mergeback worktree '%s' added successfully", mergebackWorktreeName)
-		PrintInfo("Ready to merge changes into '%s'", baseBranch)
+			PrintInfo("Mergeback worktree '%s' added successfully", mergebackWorktreeName)
+			PrintInfo("Ready to merge changes into '%s'", baseBranch)
 
-		return nil
-	},
+			return nil
+		},
 	}
 
 	// Add smart auto-detection results as tab completion for first argument
@@ -119,7 +120,7 @@ Tab Completion:
 }
 
 // findMergeTargetBranchAndWorktree finds the branch and worktree that should be used as the base for mergeback
-// This analyzes the mergeback chain to determine where the merge should go
+// Uses tree structure and git log to find branches that need merging
 func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string, error) {
 	// Get current working directory and find git root
 	wd, err := os.Getwd()
@@ -132,101 +133,90 @@ func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string
 		return "", "", fmt.Errorf("failed to find git root: %w", err)
 	}
 
-	// Look for gbm.branchconfig.yaml file
+	// Load config
 	configPath := filepath.Join(repoRoot, internal.DefaultBranchConfigFilename)
 	config, err := internal.ParseGBMConfig(configPath)
 	if err != nil {
-		// If no config file, fall back to default branch
 		PrintVerbose("No gbm.branchconfig.yaml found, using default branch as merge target")
 		defaultBranch, err := manager.GetGitManager().GetDefaultBranch()
 		if err != nil {
 			return "", "", err
 		}
-		return defaultBranch, "main", nil // Use "main" as default worktree name
+		return defaultBranch, "main", nil
 	}
 
-	// Try to detect current context to determine merge target
-	// If we're in a worktree, use its branch to determine the next step in the chain
-	currentBranch, err := manager.GetGitManager().GetCurrentBranch()
-	if err != nil {
-		PrintVerbose("Could not get current branch: %v", err)
-		// Fallback to finding the next branch up the chain from production
-		return findNextBranchAndWorktreeInChain(config)
+	// Get deepest leaf nodes (production branches) from all trees
+	deepestLeaves := config.Tree.GetAllDeepestLeafNodes()
+	if len(deepestLeaves) == 0 {
+		return "", "", fmt.Errorf("no leaf nodes found in branch configuration")
 	}
 
-	// Find the current branch in the config and determine its merge target
-	for _, worktreeConfig := range config.Worktrees {
-		if worktreeConfig.Branch == currentBranch && worktreeConfig.MergeInto != "" {
-			// Find the worktree name for the merge target branch
-			for worktreeName, targetConfig := range config.Worktrees {
-				if targetConfig.Branch == worktreeConfig.MergeInto {
-					PrintVerbose("Found current branch '%s' merges into '%s' (worktree '%s')", currentBranch, worktreeConfig.MergeInto, worktreeName)
-					return worktreeConfig.MergeInto, worktreeName, nil
-				}
+	// Check each deepest leaf node (production branch) to see if it needs mergeback
+	gitManager := manager.GetGitManager()
+	for _, leaf := range deepestLeaves {
+		// Check if this leaf has commits that need to be merged into its parent
+		if leaf.Parent != nil {
+			hasCommits, err := hasCommitsBetweenBranches(gitManager, leaf.Parent.Config.Branch, leaf.Config.Branch)
+			if err != nil {
+				PrintVerbose("Error checking commits between %s and %s: %v", leaf.Parent.Config.Branch, leaf.Config.Branch, err)
+				continue
 			}
-			// If we can't find the worktree name, use the branch name as fallback
-			PrintVerbose("Found current branch '%s' merges into '%s' (using branch name as worktree fallback)", currentBranch, worktreeConfig.MergeInto)
-			return worktreeConfig.MergeInto, worktreeConfig.MergeInto, nil
+
+			if hasCommits {
+				PrintVerbose("Found mergeback needed: %s -> %s (worktree '%s')", leaf.Config.Branch, leaf.Parent.Config.Branch, leaf.Parent.Name)
+				return leaf.Parent.Config.Branch, leaf.Parent.Name, nil
+			}
 		}
 	}
 
-	// If current branch not in config, find the next logical step
-	PrintVerbose("Current branch not in mergeback config, finding next step in chain")
-	return findNextBranchAndWorktreeInChain(config)
+	// If no deepest leaves need mergeback, check their parents recursively
+	return findNextMergeTargetInChain(config.Tree, deepestLeaves, gitManager)
 }
 
-// findNextBranchAndWorktreeInChain finds the next branch and worktree up the deployment chain
-// This is used when we can't determine from current context
-func findNextBranchAndWorktreeInChain(config *internal.GBMConfig) (string, string, error) {
-	// Build the chain: find production (no merge_into) and work backwards
-	var branches []string
-	branchToMergeInto := make(map[string]string)
-
-	// Collect all branches and their merge targets
-	worktreeNameToBranch := make(map[string]string)
-	branchToWorktreeName := make(map[string]string)
-	for worktreeName, worktreeConfig := range config.Worktrees {
-		branches = append(branches, worktreeConfig.Branch)
-		worktreeNameToBranch[worktreeName] = worktreeConfig.Branch
-		branchToWorktreeName[worktreeConfig.Branch] = worktreeName
-		if worktreeConfig.MergeInto != "" {
-			branchToMergeInto[worktreeConfig.Branch] = worktreeConfig.MergeInto
+// hasCommitsBetweenBranches checks if source has commits that target doesn't have
+func hasCommitsBetweenBranches(gitManager *internal.GitManager, targetBranch, sourceBranch string) (bool, error) {
+	// First try with origin/ prefix
+	cmd := exec.Command("git", "log", fmt.Sprintf("origin/%s..origin/%s", targetBranch, sourceBranch), "--oneline")
+	output, err := cmd.Output()
+	if err != nil {
+		// Fallback to local branches if origin branches don't exist
+		cmd = exec.Command("git", "log", fmt.Sprintf("%s..%s", targetBranch, sourceBranch), "--oneline")
+		output, err = cmd.Output()
+		if err != nil {
+			return false, fmt.Errorf("failed to check commits between branches: %w", err)
 		}
 	}
 
-	// Find production branch (no merge target)
-	var productionBranch string
-	for branch := range branches {
-		branchName := branches[branch]
-		if _, hasMergeTarget := branchToMergeInto[branchName]; !hasMergeTarget {
-			if productionBranch != "" {
-				// Multiple root branches, use heuristics
-				if isProductionBranchName(branchName) {
-					productionBranch = branchName
+	// If there's output, there are commits to merge
+	return strings.TrimSpace(string(output)) != "", nil
+}
+
+// findNextMergeTargetInChain recursively checks parent branches for merge opportunities
+func findNextMergeTargetInChain(tree *internal.WorktreeManager, leaves []*internal.WorktreeNode, gitManager *internal.GitManager) (string, string, error) {
+	// Check parent branches of the leaves
+	checkedBranches := make(map[string]bool)
+
+	for _, leaf := range leaves {
+		if leaf.Parent != nil && !checkedBranches[leaf.Parent.Config.Branch] {
+			checkedBranches[leaf.Parent.Config.Branch] = true
+
+			// Check if parent needs mergeback to its parent
+			if leaf.Parent.Parent != nil {
+				hasCommits, err := hasCommitsBetweenBranches(gitManager, leaf.Parent.Parent.Config.Branch, leaf.Parent.Config.Branch)
+				if err != nil {
+					PrintVerbose("Error checking commits between %s and %s: %v", leaf.Parent.Parent.Config.Branch, leaf.Parent.Config.Branch, err)
+					continue
 				}
-			} else {
-				productionBranch = branchName
+
+				if hasCommits {
+					PrintVerbose("Found mergeback needed: %s -> %s (worktree '%s')", leaf.Parent.Config.Branch, leaf.Parent.Parent.Config.Branch, leaf.Parent.Parent.Name)
+					return leaf.Parent.Parent.Config.Branch, leaf.Parent.Parent.Name, nil
+				}
 			}
 		}
 	}
 
-	if productionBranch == "" {
-		return "", "", fmt.Errorf("no production branch found in mergeback configuration")
-	}
-
-	// Find the branch that merges into production (this is typically preview/staging)
-	for branch, mergeTarget := range branchToMergeInto {
-		if mergeTarget == productionBranch {
-			worktreeName := branchToWorktreeName[branch]
-			PrintVerbose("Found preview branch '%s' (worktree '%s') that merges into production '%s'", branch, worktreeName, productionBranch)
-			return branch, worktreeName, nil
-		}
-	}
-
-	// If no preview branch found, production is the target
-	productionWorktreeName := branchToWorktreeName[productionBranch]
-	PrintVerbose("No preview branch found, using production branch '%s' (worktree '%s') as target", productionBranch, productionWorktreeName)
-	return productionBranch, productionWorktreeName, nil
+	return "", "", fmt.Errorf("no mergeback targets found")
 }
 
 // generateMergebackBranchName creates a mergeback branch name with proper formatting
@@ -530,4 +520,3 @@ func getJiraCompletions() []string {
 
 	return completions
 }
-

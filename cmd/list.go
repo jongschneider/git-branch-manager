@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"slices"
 
@@ -20,7 +21,9 @@ Displays which branches are out of sync, lists missing worktrees, and shows orph
 		RunE: func(cmd *cobra.Command, args []string) error {
 			manager, err := createInitializedManagerStrict()
 			if err != nil {
-				return err
+				if !errors.Is(err, internal.ErrNoRootNodesFound) {
+					return err
+				}
 			}
 
 			PrintVerbose("Retrieving sync status for list operation")

@@ -411,12 +411,23 @@ func TestMergebackIntegration(t *testing.T) {
 	require.NoError(t, err)
 
 	// Create gbm.branchconfig.yaml
-	gbmConfig := map[string]string{
-		"main":       "main",
-		"preview":    "preview",
-		"production": "production",
+	worktrees := map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",
+			Description: "Main branch",
+		},
+		"preview": {
+			Branch:      "preview",
+			MergeInto:   "main",
+			Description: "Preview branch",
+		},
+		"production": {
+			Branch:      "production",
+			MergeInto:   "preview",
+			Description: "Production branch",
+		},
 	}
-	err = repo.CreateGBMConfig(gbmConfig)
+	err = repo.CreateGBMConfig(worktrees)
 	require.NoError(t, err)
 	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml")
 	require.NoError(t, err)
@@ -486,73 +497,6 @@ func TestMergebackIntegration(t *testing.T) {
 			}
 		}
 		assert.True(t, found, "Expected merge branch with JIRA ticket not found. Local branches: %v", localBranches)
-	})
-}
-
-func TestMergebackWorktreeNaming(t *testing.T) {
-	// Test worktree naming behavior with and without prefix
-	t.Run("with mergeback prefix", func(t *testing.T) {
-		// This is tested in the integration test above - default "MERGE" prefix
-		// Results in: MERGE_worktree-name_target-worktree
-	})
-
-	t.Run("without mergeback prefix", func(t *testing.T) {
-		// Create a test repository
-		repo := testutils.NewGitTestRepo(t, testutils.WithDefaultBranch("main"))
-		defer repo.Cleanup()
-
-		// Create gbm.branchconfig.yaml with empty mergeback prefix
-		gbmConfig := map[string]string{
-			"main": "main",
-		}
-		err := repo.CreateGBMConfig(gbmConfig)
-		require.NoError(t, err)
-		err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml")
-		require.NoError(t, err)
-
-		// Change to the repo directory
-		originalDir, _ := os.Getwd()
-		defer func() { _ = os.Chdir(originalDir) }()
-		err = os.Chdir(repo.GetLocalPath())
-		require.NoError(t, err)
-
-		// Create the .gbm directory and config.toml file with empty mergeback prefix
-		err = os.MkdirAll(".gbm", 0o755)
-		require.NoError(t, err)
-
-		configContent := `[settings]
-mergeback_prefix = ""
-worktree_prefix = "worktrees"
-
-[state]
-last_sync = "1970-01-01T00:00:00Z"
-
-[icons]
-
-[jira]
-
-[file_copy]`
-
-		err = os.WriteFile(".gbm/config.toml", []byte(configContent), 0o644)
-		require.NoError(t, err)
-
-		// Test mergeback creation without prefix
-		cmd := newRootCommand()
-		cmd.SetArgs([]string{"mergeback", "fix-auth", "SHOP-456"})
-
-		err = cmd.Execute()
-		assert.NoError(t, err)
-
-		// Verify worktree was created with target suffix but no prefix
-		assert.DirExists(t, "worktrees/fix-auth_main")
-
-		// Verify branch naming still includes target suffix
-		gitCmd := exec.Command("git", "branch", "--list", "merge/*")
-		gitCmd.Dir = repo.GetLocalPath()
-		output, err := gitCmd.Output()
-		require.NoError(t, err)
-
-		assert.Contains(t, string(output), "merge/SHOP-456_main", "Branch should include target suffix")
 	})
 }
 

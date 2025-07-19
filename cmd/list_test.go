@@ -312,7 +312,7 @@ func TestListCommand_SortedOutput(t *testing.T) {
 
 	// Create an additional ad-hoc worktree to test sorting
 	addCmd := newRootCommand()
-	addCmd.SetArgs([]string{"add", "--new-branch", "adhoc", "production/v1.0"})
+	addCmd.SetArgs([]string{"add", "--new-branch", "adhoc", "production/v2.0"})
 	err := addCmd.Execute()
 	require.NoError(t, err)
 
@@ -350,7 +350,7 @@ func TestListCommand_SortedOutput(t *testing.T) {
 
 	adhocWorktree, found := findWorktreeInRows(rows, "adhoc")
 	require.True(t, found, "adhoc worktree should be present")
-	assert.Equal(t, "production/v1.0", adhocWorktree.Branch)
+	assert.Equal(t, "production/v2.0", adhocWorktree.Branch)
 
 	// Verify sorting: gbm.branchconfig.yaml worktrees (main, dev, feat) should come before ad-hoc (adhoc)
 	// The order in the rows slice should reflect the display order

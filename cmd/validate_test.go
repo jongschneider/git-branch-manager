@@ -15,9 +15,9 @@ import (
 
 // Test helper functions
 
-func setupValidateTest(t *testing.T, repo *testutils.GitTestRepo, gbmMapping map[string]string) {
-	if gbmMapping != nil {
-		err := repo.CreateGBMConfig(gbmMapping)
+func setupValidateTest(t *testing.T, repo *testutils.GitTestRepo, worktrees map[string]testutils.WorktreeConfig) {
+	if worktrees != nil {
+		err := repo.CreateGBMConfig(worktrees)
 		require.NoError(t, err, "Failed to create gbm.branchconfig.yaml")
 
 		err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
@@ -126,15 +126,34 @@ func TestValidateCommand_SomeBranchesInvalid(t *testing.T) {
 	repo := testutils.NewMultiBranchRepo(t)
 
 	// Create gbm.branchconfig.yaml with some valid and some invalid branch references
-	gbmMapping := map[string]string{
-		"main":    "main",               // valid - exists
-		"dev":     "develop",            // valid - exists
-		"feat":    "feature/auth",       // valid - exists
-		"invalid": "nonexistent-branch", // invalid - doesn't exist
-		"missing": "another-missing",    // invalid - doesn't exist
+	worktrees := map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",               // valid - exists
+			Description: "Main branch",
+		},
+		"dev": {
+			Branch:      "develop",            // valid - exists
+			MergeInto:   "main",
+			Description: "Dev branch",
+		},
+		"feat": {
+			Branch:      "feature/auth",       // valid - exists
+			MergeInto:   "dev",
+			Description: "Feat branch",
+		},
+		"invalid": {
+			Branch:      "nonexistent-branch", // invalid - doesn't exist
+			MergeInto:   "feat",
+			Description: "Invalid branch",
+		},
+		"missing": {
+			Branch:      "another-missing",    // invalid - doesn't exist
+			MergeInto:   "invalid",
+			Description: "Missing branch",
+		},
 	}
 
-	setupValidateTest(t, repo, gbmMapping)
+	setupValidateTest(t, repo, worktrees)
 
 	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
 	require.Error(t, err, "Validate command should fail when some branches are invalid")
@@ -154,18 +173,33 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 	tests := []struct {
 		name            string
 		setupRepo       func(t *testing.T) *testutils.GitTestRepo
-		gbmMapping      map[string]string
+		worktrees       map[string]testutils.WorktreeConfig
 		shouldPass      bool
 		expectedResults map[string]string
 	}{
 		{
 			name:      "local branches only",
 			setupRepo: testutils.NewMultiBranchRepo,
-			gbmMapping: map[string]string{
-				"main": "main",
-				"dev":  "develop",
-				"feat": "feature/auth",
-				"prod": "production/v1.0",
+			worktrees: map[string]testutils.WorktreeConfig{
+				"main": {
+					Branch:      "main",
+					Description: "Main branch",
+				},
+				"dev": {
+					Branch:      "develop",
+					MergeInto:   "main",
+					Description: "Dev branch",
+				},
+				"feat": {
+					Branch:      "feature/auth",
+					MergeInto:   "dev",
+					Description: "Feat branch",
+				},
+				"prod": {
+					Branch:      "production/v1.0",
+					MergeInto:   "feat",
+					Description: "Prod branch",
+				},
 			},
 			shouldPass: true,
 			expectedResults: map[string]string{
@@ -178,9 +212,16 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 		{
 			name:      "remote branches only",
 			setupRepo: testutils.NewMultiBranchRepo,
-			gbmMapping: map[string]string{
-				"main": "main",
-				"dev":  "develop",
+			worktrees: map[string]testutils.WorktreeConfig{
+				"main": {
+					Branch:      "main",
+					Description: "Main branch",
+				},
+				"dev": {
+					Branch:      "develop",
+					MergeInto:   "main",
+					Description: "Dev branch",
+				},
 			},
 			shouldPass: true,
 			expectedResults: map[string]string{
@@ -191,11 +232,26 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 		{
 			name:      "both local and remote branches",
 			setupRepo: testutils.NewMultiBranchRepo,
-			gbmMapping: map[string]string{
-				"main": "main",
-				"dev":  "develop",
-				"feat": "feature/auth",
-				"prod": "production/v1.0",
+			worktrees: map[string]testutils.WorktreeConfig{
+				"main": {
+					Branch:      "main",
+					Description: "Main branch",
+				},
+				"dev": {
+					Branch:      "develop",
+					MergeInto:   "main",
+					Description: "Dev branch",
+				},
+				"feat": {
+					Branch:      "feature/auth",
+					MergeInto:   "dev",
+					Description: "Feat branch",
+				},
+				"prod": {
+					Branch:      "production/v1.0",
+					MergeInto:   "feat",
+					Description: "Prod branch",
+				},
 			},
 			shouldPass: true,
 			expectedResults: map[string]string{
@@ -208,10 +264,21 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 		{
 			name:      "non-existent branches",
 			setupRepo: testutils.NewBasicRepo,
-			gbmMapping: map[string]string{
-				"main":    "main",
-				"missing": "does-not-exist",
-				"invalid": "also-missing",
+			worktrees: map[string]testutils.WorktreeConfig{
+				"main": {
+					Branch:      "main",
+					Description: "Main branch",
+				},
+				"missing": {
+					Branch:      "does-not-exist",
+					MergeInto:   "main",
+					Description: "Missing branch",
+				},
+				"invalid": {
+					Branch:      "also-missing",
+					MergeInto:   "missing",
+					Description: "Invalid branch",
+				},
 			},
 			shouldPass: false,
 			expectedResults: map[string]string{
@@ -223,10 +290,21 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 		{
 			name:      "branches with special characters/slashes",
 			setupRepo: testutils.NewMultiBranchRepo,
-			gbmMapping: map[string]string{
-				"main":    "main",
-				"feature": "feature/auth",
-				"release": "production/v1.0",
+			worktrees: map[string]testutils.WorktreeConfig{
+				"main": {
+					Branch:      "main",
+					Description: "Main branch",
+				},
+				"feature": {
+					Branch:      "feature/auth",
+					MergeInto:   "main",
+					Description: "Feature branch",
+				},
+				"release": {
+					Branch:      "production/v1.0",
+					MergeInto:   "feature",
+					Description: "Release branch",
+				},
 			},
 			shouldPass: true,
 			expectedResults: map[string]string{
@@ -240,7 +318,7 @@ func TestValidateCommand_BranchExistence(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			repo := tt.setupRepo(t)
-			setupValidateTest(t, repo, tt.gbmMapping)
+			setupValidateTest(t, repo, tt.worktrees)
 
 			output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
 
@@ -327,10 +405,13 @@ func TestValidateCommand_CorruptGitRepository(t *testing.T) {
 	repo := testutils.NewBasicRepo(t)
 
 	// Create gbm.branchconfig.yaml file first
-	gbmMapping := map[string]string{
-		"main": "main",
+	worktrees := map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",
+			Description: "Main branch",
+		},
 	}
-	setupValidateTest(t, repo, gbmMapping)
+	setupValidateTest(t, repo, worktrees)
 
 	// Corrupt the .git directory by removing essential files
 	gitDir := repo.GetLocalPath() + "/.git"
@@ -380,11 +461,18 @@ func TestValidateCommand_VeryLongBranchNames(t *testing.T) {
 	require.NoError(t, err, "Failed to create long branch")
 
 	// Create gbm.branchconfig.yaml with very long branch name and worktree name
-	gbmMapping := map[string]string{
-		"main":                             "main",
-		"very_long_worktree_variable_name": longBranchName,
+	worktrees := map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",
+			Description: "Main branch",
+		},
+		"very_long_worktree_variable_name": {
+			Branch:      longBranchName,
+			MergeInto:   "main",
+			Description: "Very long worktree variable name branch",
+		},
 	}
-	setupValidateTest(t, repo, gbmMapping)
+	setupValidateTest(t, repo, worktrees)
 
 	output, err := runValidateCommand(t, repo.GetLocalPath(), []string{})
 	require.NoError(t, err, "Should succeed with long branch names")

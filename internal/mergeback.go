@@ -6,8 +6,6 @@ import (
 	"strconv"
 	"strings"
 	"time"
-
-	"gopkg.in/yaml.v3"
 )
 
 type MergeBackStatus struct {
@@ -33,22 +31,27 @@ type MergeBackCommitInfo struct {
 	IsUser    bool
 }
 
-
 func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
+	// Initialize default empty status
+	status := &MergeBackStatus{
+		MergeBacksNeeded: []MergeBackInfo{},
+		HasUserCommits:   false,
+	}
+
 	// Try to find git root and create GitManager
 	cwd, err := os.Getwd()
 	if err != nil {
-		return nil, nil
+		return status, nil
 	}
 
 	gitRoot, err := FindGitRoot(cwd)
 	if err != nil {
-		return nil, nil
+		return status, nil
 	}
 
 	gitManager, err := NewGitManager(gitRoot, DefaultWorktreeDirname)
 	if err != nil {
-		return nil, nil
+		return status, nil
 	}
 
 	if _, err := os.Stat(configPath); os.IsNotExist(err) {
@@ -57,92 +60,88 @@ func CheckMergeBackStatus(configPath string) (*MergeBackStatus, error) {
 
 	config, err := parseConfigFile(configPath)
 	if err != nil {
-		return nil, nil
+		return status, nil
 	}
 
 	if len(config.Worktrees) <= 1 {
-		return &MergeBackStatus{}, nil
+		return status, nil
 	}
 
 	userEmail, userName, err := getUserInfo(gitRoot)
 	if err != nil {
-		return &MergeBackStatus{}, nil
+		// Can't get user info, but continue anyway
+		userEmail, userName = "", ""
 	}
 
-	status := &MergeBackStatus{
-		MergeBacksNeeded: []MergeBackInfo{},
-		HasUserCommits:   false,
+	// Use tree-based logic to find only the most urgent mergeback (like the mergeback command)
+	if config.Tree == nil {
+		return status, nil
 	}
 
-	// Check each worktree that has a merge_into target
-	for worktreeName, worktreeConfig := range config.Worktrees {
-		if worktreeConfig.MergeInto == "" {
-			continue // Skip root worktrees (no merge target)
-		}
+	// Start from deepest leaf nodes and work up the tree
+	deepestLeaves := config.Tree.GetAllDeepestLeafNodes()
+	checkedNodes := make(map[string]bool)
 
-		// Find the target worktree config
-		targetConfig, exists := config.Worktrees[worktreeConfig.MergeInto]
-		if !exists {
-			continue // Skip if target worktree doesn't exist in config
-		}
-
-		// Check if both branches exist (local or remote)
-		fromExists, _ := gitManager.BranchExistsLocalOrRemote(worktreeConfig.Branch)
-		toExists, _ := gitManager.BranchExistsLocalOrRemote(targetConfig.Branch)
-		if !fromExists || !toExists {
-			continue
-		}
-
-		// Get commits that need to be merged back
-		commits, err := getCommitsNeedingMergeBack(gitRoot, targetConfig.Branch, worktreeConfig.Branch)
-		if err != nil {
-			// Log configuration error but continue processing other branches
-			fmt.Println("⚠️  Warning:", err)
-			continue
-		}
-
-		if len(commits) == 0 {
-			continue
-		}
-
-		// Identify user commits
-		userCommits := []MergeBackCommitInfo{}
-		for _, commit := range commits {
-			if isUserCommit(commit, userEmail, userName) {
-				commit.IsUser = true
-				userCommits = append(userCommits, commit)
-				status.HasUserCommits = true
+	for _, leaf := range deepestLeaves {
+		// Walk up from this leaf, checking each node for mergebacks
+		current := leaf
+		for current != nil && current.Parent != nil {
+			// Skip if we've already checked this node
+			if checkedNodes[current.Name] {
+				current = current.Parent
+				continue
 			}
-		}
+			checkedNodes[current.Name] = true
 
-		mergeBackInfo := MergeBackInfo{
-			FromBranch:  worktreeName,
-			ToBranch:    worktreeConfig.MergeInto,
-			Commits:     commits,
-			UserCommits: userCommits,
-			TotalCount:  len(commits),
-			UserCount:   len(userCommits),
-		}
+			// Check if both branches exist
+			fromExists, _ := gitManager.BranchExistsLocalOrRemote(current.Config.Branch)
+			toExists, _ := gitManager.BranchExistsLocalOrRemote(current.Parent.Config.Branch)
+			if !fromExists || !toExists {
+				current = current.Parent
+				continue
+			}
 
-		status.MergeBacksNeeded = append(status.MergeBacksNeeded, mergeBackInfo)
+			// Get commits that need to be merged back
+			commits, err := getCommitsNeedingMergeBack(gitRoot, current.Parent.Config.Branch, current.Config.Branch)
+			if err != nil {
+				fmt.Println("⚠️  Warning:", err)
+				current = current.Parent
+				continue
+			}
+
+			if len(commits) > 0 {
+				// Identify user commits
+				userCommits := []MergeBackCommitInfo{}
+				for _, commit := range commits {
+					if isUserCommit(commit, userEmail, userName) {
+						commit.IsUser = true
+						userCommits = append(userCommits, commit)
+						status.HasUserCommits = true
+					}
+				}
+
+				mergeBackInfo := MergeBackInfo{
+					FromBranch:  current.Name,
+					ToBranch:    current.Parent.Name,
+					Commits:     commits,
+					UserCommits: userCommits,
+					TotalCount:  len(commits),
+					UserCount:   len(userCommits),
+				}
+
+				status.MergeBacksNeeded = append(status.MergeBacksNeeded, mergeBackInfo)
+			}
+
+			current = current.Parent
+		}
 	}
 
 	return status, nil
 }
 
-
 func parseConfigFile(configPath string) (*GBMConfig, error) {
-	data, err := os.ReadFile(configPath)
-	if err != nil {
-		return nil, err
-	}
-
-	var config GBMConfig
-	if err := yaml.Unmarshal(data, &config); err != nil {
-		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
-	}
-
-	return &config, nil
+	// Use the existing ParseGBMConfig function that properly builds the tree
+	return ParseGBMConfig(configPath)
 }
 
 func getUserInfo(repoPath string) (string, string, error) {
@@ -168,16 +167,17 @@ func getUserInfo(repoPath string) (string, string, error) {
 func getCommitsNeedingMergeBack(repoPath, targetBranch, sourceBranch string) ([]MergeBackCommitInfo, error) {
 	// First, try to fetch to ensure we have the latest remote state
 	ExecGitCommand(repoPath, "fetch", "--quiet")
-	
+
 	// Use remote branches for mergeback detection
 	remoteTargetBranch := Remote(targetBranch)
 	remoteSourceBranch := Remote(sourceBranch)
-	
+
 	output, err := ExecGitCommand(repoPath, "log", remoteTargetBranch+".."+remoteSourceBranch, "--format=%H|%s|%an|%ae|%ct")
 	if err != nil {
 		// If remote branch doesn't exist, this indicates a configuration error
 		return nil, fmt.Errorf("remote branch '%s' or '%s' does not exist - check your gbm.branchconfig.yaml configuration", remoteTargetBranch, remoteSourceBranch)
 	}
+
 
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	if len(lines) == 1 && lines[0] == "" {

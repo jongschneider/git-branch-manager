@@ -79,6 +79,7 @@ type ConfigJira struct {
 // YAML-based configuration structures
 type GBMConfig struct {
 	Worktrees map[string]WorktreeConfig `yaml:"worktrees"`
+	Tree      *WorktreeManager          `yaml:"-"`
 }
 
 type WorktreeConfig struct {
@@ -184,6 +185,13 @@ func ParseGBMConfig(path string) (*GBMConfig, error) {
 	if err := yaml.Unmarshal(data, &config); err != nil {
 		return nil, fmt.Errorf("failed to parse YAML config: %w", err)
 	}
+
+	// Initialize the tree structure
+	tree, err := NewWorktreeManager(&config)
+	if err != nil {
+		return nil, fmt.Errorf("failed to build worktree tree: %w", err)
+	}
+	config.Tree = tree
 
 	return &config, nil
 }

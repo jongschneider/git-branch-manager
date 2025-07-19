@@ -12,9 +12,9 @@ import (
 )
 
 func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
-	mainBranch := uuid.NewString()
-	previewBranch := uuid.NewString()
-	prodBranch := uuid.NewString()
+	mainBranch := "mainBranch"
+	previewBranch := "previewBranch"
+	prodBranch := "prodBranch"
 
 	// Create a repository with synchronized branch hierarchy first
 	repo := testutils.NewGitTestRepo(t,
@@ -23,14 +23,29 @@ func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
 	)
 
 	// Create gbm.branchconfig.yaml on main branch first
-	err := repo.CreateGBMConfig(map[string]string{
-		"main":    mainBranch,
-		"preview": previewBranch,
-		"prod":    prodBranch,
+	err := repo.CreateGBMConfig(map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      mainBranch,
+			Description: "Main branch",
+		},
+		"preview": {
+			Branch:      previewBranch,
+			MergeInto:   "main",
+			Description: "Preview branch",
+		},
+		"prod": {
+			Branch:      prodBranch,
+			MergeInto:   "preview",
+			Description: "Production branch",
+		},
 	})
 	require.NoError(t, err)
 
 	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
+	require.NoError(t, err)
+
+	// Push the main changes
+	err = repo.PushBranch(mainBranch)
 	require.NoError(t, err)
 
 	// Create synchronized branches from main
@@ -59,7 +74,7 @@ func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
 	require.NoError(t, err)
 
 	// Test merge-back detection
-	err = repo.InLocalRepo(func() error {
+	outererr := repo.InLocalRepo(func() error {
 		configPath := filepath.Join(repo.GetLocalPath(), DefaultBranchConfigFilename)
 		status, err := CheckMergeBackStatus(configPath)
 		require.NoError(t, err)
@@ -81,7 +96,7 @@ func TestMergeBackDetection_BasicThreeTierScenario(t *testing.T) {
 		assert.Contains(t, alertMsg, "⚠️  Merge-back required in tracked branches:\n\nprod → preview: 1 commits need merge-back (1 by you)")
 		return nil
 	})
-	require.NoError(t, err)
+	require.NoError(t, outererr)
 }
 
 func TestMergeBackDetection_MultipleCommits(t *testing.T) {
@@ -95,14 +110,29 @@ func TestMergeBackDetection_MultipleCommits(t *testing.T) {
 	)
 
 	// Create gbm.branchconfig.yaml on main first
-	err := repo.CreateGBMConfig(map[string]string{
-		"main":    mainBranch,
-		"preview": previewBranch,
-		"prod":    prodBranch,
+	err := repo.CreateGBMConfig(map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      mainBranch,
+			Description: "Main branch",
+		},
+		"preview": {
+			Branch:      previewBranch,
+			MergeInto:   "main",
+			Description: "Preview branch",
+		},
+		"prod": {
+			Branch:      prodBranch,
+			MergeInto:   "preview",
+			Description: "Production branch",
+		},
 	})
 	require.NoError(t, err)
 
 	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
+	require.NoError(t, err)
+
+	// Push the main changes
+	err = repo.PushBranch(mainBranch)
 	require.NoError(t, err)
 
 	// Create synchronized branches
@@ -184,10 +214,21 @@ func TestMergeBackDetection_CascadingMergebacks(t *testing.T) {
 	)
 
 	// Create gbm.branchconfig.yaml on main first
-	err := repo.CreateGBMConfig(map[string]string{
-		"main":    "main",
-		"preview": "preview",
-		"prod":    "prod",
+	err := repo.CreateGBMConfig(map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",
+			Description: "Main branch",
+		},
+		"preview": {
+			Branch:      "preview",
+			MergeInto:   "main",
+			Description: "Preview branch",
+		},
+		"prod": {
+			Branch:      "prod",
+			MergeInto:   "preview",
+			Description: "Production branch",
+		},
 	})
 	require.NoError(t, err)
 
@@ -263,8 +304,8 @@ func TestMergeBackDetection_CascadingMergebacks(t *testing.T) {
 
 		require.NotNil(t, previewToMain)
 		assert.Equal(t, "main", previewToMain.ToBranch)
-		assert.Equal(t, 1, previewToMain.TotalCount)
-		assert.Equal(t, 1, previewToMain.UserCount)
+		assert.Equal(t, 2, previewToMain.TotalCount) // Preview has 2 commits that main doesn't have
+		assert.Equal(t, 2, previewToMain.UserCount)  // Both commits are by the test user
 
 		return nil
 	})
@@ -279,14 +320,29 @@ func TestMergeBackDetection_NoMergeBacksNeeded(t *testing.T) {
 	)
 
 	// Create gbm.branchconfig.yaml on main first
-	err := repo.CreateGBMConfig(map[string]string{
-		"main":    "main",
-		"preview": "preview",
-		"prod":    "prod",
+	err := repo.CreateGBMConfig(map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",
+			Description: "Main branch",
+		},
+		"preview": {
+			Branch:      "preview",
+			MergeInto:   "main",
+			Description: "Preview branch",
+		},
+		"prod": {
+			Branch:      "prod",
+			MergeInto:   "preview",
+			Description: "Production branch",
+		},
 	})
 	require.NoError(t, err)
 
 	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
+	require.NoError(t, err)
+
+	// Push the main changes
+	err = repo.PushBranch("main")
 	require.NoError(t, err)
 
 	// Create synchronized branches with no additional commits
@@ -327,11 +383,26 @@ func TestMergeBackDetection_NonExistentBranches(t *testing.T) {
 	)
 
 	// Create gbm.branchconfig.yaml with non-existent branches
-	err := repo.CreateGBMConfig(map[string]string{
-		"main":    "main",
-		"preview": "nonexistent-preview",
-		"prod":    "nonexistent-prod",
-		"staging": "also-nonexistent",
+	err := repo.CreateGBMConfig(map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",
+			Description: "Main branch",
+		},
+		"preview": {
+			Branch:      "nonexistent-preview",
+			MergeInto:   "main",
+			Description: "Preview branch",
+		},
+		"prod": {
+			Branch:      "nonexistent-prod",
+			MergeInto:   "preview",
+			Description: "Production branch",
+		},
+		"staging": {
+			Branch:      "also-nonexistent",
+			MergeInto:   "prod",
+			Description: "Staging branch",
+		},
 	})
 	require.NoError(t, err)
 
@@ -362,16 +433,39 @@ func TestMergeBackDetection_DynamicHierarchy(t *testing.T) {
 	)
 
 	// Create gbm.branchconfig.yaml first on main
-	err := repo.CreateGBMConfig(map[string]string{
-		"main":    "main",
-		"staging": "staging",
-		"preview": "preview",
-		"prod":    "prod",
-		"hotfix":  "hotfix",
+	err := repo.CreateGBMConfig(map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",
+			Description: "Main branch",
+		},
+		"staging": {
+			Branch:      "staging",
+			MergeInto:   "main",
+			Description: "Staging branch",
+		},
+		"preview": {
+			Branch:      "preview",
+			MergeInto:   "staging",
+			Description: "Preview branch",
+		},
+		"prod": {
+			Branch:      "prod",
+			MergeInto:   "preview",
+			Description: "Production branch",
+		},
+		"hotfix": {
+			Branch:      "hotfix",
+			MergeInto:   "prod",
+			Description: "Hotfix branch",
+		},
 	})
 	require.NoError(t, err)
 
 	err = repo.CommitChangesWithForceAdd("Add gbm.branchconfig.yaml configuration")
+	require.NoError(t, err)
+
+	// Push the main changes
+	err = repo.PushBranch("main")
 	require.NoError(t, err)
 
 	// Create a five-tier hierarchy with synchronized branches
@@ -443,10 +537,21 @@ func TestMergeBackAlertFormatting_RealScenario(t *testing.T) {
 	)
 
 	// Create gbm.branchconfig.yaml on main first
-	err := repo.CreateGBMConfig(map[string]string{
-		"main":    "main",
-		"preview": "preview",
-		"prod":    "prod",
+	err := repo.CreateGBMConfig(map[string]testutils.WorktreeConfig{
+		"main": {
+			Branch:      "main",
+			Description: "Main branch",
+		},
+		"preview": {
+			Branch:      "preview",
+			MergeInto:   "main",
+			Description: "Preview branch",
+		},
+		"prod": {
+			Branch:      "prod",
+			MergeInto:   "preview",
+			Description: "Production branch",
+		},
 	})
 	require.NoError(t, err)
 

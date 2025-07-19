@@ -122,3 +122,4 @@ ERROR: Error: exit status 1
 - [ ] add worktree description throughout app
     - maybe column in `list`, `info`
     - use it in the messaging in `sync`
+- [ ] fix CreateGBMConfig in git_harness.go (not creating the correct mergeinto flow)
