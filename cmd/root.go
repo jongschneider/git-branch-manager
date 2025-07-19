@@ -1,6 +1,7 @@
 package cmd
 
 import (
+	"errors"
 	"fmt"
 	"os"
 	"runtime"
@@ -15,6 +16,7 @@ import (
 var (
 	logFile *os.File
 )
+
 
 func newRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
@@ -35,9 +37,22 @@ notifications when configurations drift out of sync.`,
 	rootCmd.PersistentFlags().String("worktree-dir", "", "override worktree directory location")
 	rootCmd.PersistentFlags().Bool("debug", false, "enable debug logging to ./gbm.log")
 
+	// Create manager for commands that need it
+	manager, err := createInitializedManager()
+	if err != nil {
+		// For commands that can work without manager, we still add them
+		// but pass nil manager and they handle gracefully
+		if !errors.Is(err, ErrLoadGBMConfig) {
+			// Hard error - something is seriously wrong
+			PrintError("Failed to initialize manager: %v", err)
+		} else {
+			PrintVerbose("Manager initialization failed: %v", err)
+		}
+	}
+
 	// Add all subcommands
 	rootCmd.AddCommand(newPushCommand())
-	rootCmd.AddCommand(newAddCommand())
+	rootCmd.AddCommand(newAddCommand(manager))
 	rootCmd.AddCommand(newCloneCommand())
 	rootCmd.AddCommand(completionCmd)
 	rootCmd.AddCommand(newHotfixCommand())

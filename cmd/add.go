@@ -1,7 +1,6 @@
 package cmd
 
 import (
-	"errors"
 	"fmt"
 	"strings"
 
@@ -10,7 +9,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-func newAddCommand() *cobra.Command {
+func newAddCommand(manager *internal.Manager) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <worktree-name> [branch-name] [base-branch]",
 		Short: "Add a new worktree",
@@ -31,14 +30,9 @@ This matches the behavior of 'git worktree add'.`,
 
 			worktreeName := args[0]
 
-			// Create manager
-			manager, err := createInitializedManager()
-			if err != nil {
-				if !errors.Is(err, ErrLoadGBMConfig) {
-					return err
-				}
-
-				PrintVerbose("%v", err)
+			// Use the manager passed in during command creation
+			if manager == nil {
+				return fmt.Errorf("manager not available - ensure you're in a git repository with gbm.branchconfig.yaml")
 			}
 
 			var branchName string
@@ -115,15 +109,10 @@ This matches the behavior of 'git worktree add'.`,
 	// Add JIRA key completions for the first positional argument
 	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			// Try to get config for JIRA completion, but don't fail if it's not available
-			manager, err := createInitializedManager()
-			if err != nil {
-				if !errors.Is(err, ErrLoadGBMConfig) {
-					return nil, cobra.ShellCompDirectiveNoFileComp
-
-				}
-
-				PrintVerbose("%v", err)
+			// Use the manager passed in during command creation
+			if manager == nil {
+				PrintVerbose("Manager not available for completion")
+				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
 
 			// Complete JIRA keys with summaries for context
@@ -144,9 +133,8 @@ This matches the behavior of 'git worktree add'.`,
 			// Complete branch name based on the JIRA key
 			worktreeName := args[0]
 			if internal.IsJiraKey(worktreeName) {
-				// Try to get config for JIRA completion
-				manager, err := createInitializedManager()
-				if err != nil {
+				// Use the manager passed in during command creation
+				if manager == nil {
 					// Fallback to default branch name generation
 					branchName := fmt.Sprintf("feature/%s", strings.ToLower(worktreeName))
 					return []string{branchName}, cobra.ShellCompDirectiveNoFileComp

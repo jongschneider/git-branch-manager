@@ -329,7 +329,8 @@ func TestAddCommand_ValidArgsFunction(t *testing.T) {
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			cmd := newAddCommand()
+			// Create add command with nil manager (simulates when manager creation fails)
+			cmd := newAddCommand(nil)
 			completions, directive := cmd.ValidArgsFunction(cmd, tt.args, "")
 
 			// Just verify the function doesn't panic and returns appropriate directive
