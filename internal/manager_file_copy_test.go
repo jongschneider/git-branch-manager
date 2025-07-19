@@ -13,7 +13,7 @@ func TestCopyFilesToWorktree_AdHocOnly(t *testing.T) {
 	// Create a temporary directory for testing
 	tmpDir, err := os.MkdirTemp("", "gbm-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create manager with test configuration (no gbmConfig means all worktrees are ad-hoc)
 	manager := &Manager{
@@ -78,7 +78,7 @@ func TestCopyFilesToWorktree_AdHocOnly(t *testing.T) {
 func TestCopyFilesToWorktree_NoRules(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "gbm-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	manager := &Manager{
 		repoPath: tmpDir,
@@ -100,7 +100,7 @@ func TestCopyFilesToWorktree_NoRules(t *testing.T) {
 func TestCopyFilesToWorktree_SourceNotExists(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "gbm-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	manager := &Manager{
 		repoPath: tmpDir,
@@ -127,7 +127,7 @@ func TestCopyFilesToWorktree_SourceNotExists(t *testing.T) {
 func TestAddWorktree_TrackedWorktreeNoFileCopy(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "gbm-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create git repo structure
 	repoPath := tmpDir
@@ -190,7 +190,7 @@ func TestAddWorktree_TrackedWorktreeNoFileCopy(t *testing.T) {
 func TestAddWorktree_AdHocWorktreeFileCopy(t *testing.T) {
 	tmpDir, err := os.MkdirTemp("", "gbm-test-*")
 	require.NoError(t, err)
-	defer os.RemoveAll(tmpDir)
+	defer func() { _ = os.RemoveAll(tmpDir) }()
 
 	// Create git repo structure
 	repoPath := tmpDir

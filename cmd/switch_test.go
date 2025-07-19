@@ -19,7 +19,7 @@ func TestSwitchCommand_BasicWorktreeSwitching(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	tests := []struct {
 		name         string
@@ -62,7 +62,7 @@ func TestSwitchCommand_PrintPathFlag(t *testing.T) {
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	tests := []struct {
 		name         string
@@ -101,7 +101,7 @@ func TestSwitchCommand_FuzzyMatching(t *testing.T) {
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	tests := []struct {
 		name          string
@@ -172,7 +172,7 @@ func TestSwitchCommand_ListWorktrees(t *testing.T) {
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"switch"})
@@ -197,7 +197,7 @@ func TestSwitchCommand_PreviousWorktree(t *testing.T) {
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// First, switch to dev to establish a previous worktree
 	cmd := newRootCommand()
@@ -227,7 +227,7 @@ func TestSwitchCommand_NoPreviousWorktree(t *testing.T) {
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Try to switch to previous without any previous worktree
 	cmd := newRootCommand()
@@ -243,7 +243,7 @@ func TestSwitchCommand_ShellIntegration(t *testing.T) {
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Set shell integration environment variable
 	t.Setenv("GBM_SHELL_INTEGRATION", "1")
@@ -311,9 +311,9 @@ func TestSwitchCommand_ErrorConditions(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			repoPath := tt.setupFunc(t)
 			originalDir, _ := os.Getwd()
-			defer os.Chdir(originalDir)
+			defer func() { _ = os.Chdir(originalDir) }()
 
-			os.Chdir(repoPath)
+			_ = os.Chdir(repoPath)
 
 			cmd := newRootCommand()
 			cmd.SetArgs(tt.args)

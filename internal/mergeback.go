@@ -166,7 +166,7 @@ func getUserInfo(repoPath string) (string, string, error) {
 
 func getCommitsNeedingMergeBack(repoPath, targetBranch, sourceBranch string) ([]MergeBackCommitInfo, error) {
 	// First, try to fetch to ensure we have the latest remote state
-	ExecGitCommand(repoPath, "fetch", "--quiet")
+	_, _ = ExecGitCommand(repoPath, "fetch", "--quiet")
 
 	// Use remote branches for mergeback detection
 	remoteTargetBranch := Remote(targetBranch)

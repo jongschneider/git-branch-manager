@@ -386,7 +386,7 @@ func TestPushCommand_EmptyWorktreeList(t *testing.T) {
 	originalDir, _ := os.Getwd()
 	defer func() { _ = os.Chdir(originalDir) }()
 
-	os.Chdir(targetDir)
+	_ = os.Chdir(targetDir)
 
 	// Clone the repository but don't sync worktrees
 	cloneCmd := newRootCommand()

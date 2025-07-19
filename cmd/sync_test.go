@@ -525,7 +525,7 @@ func TestSyncCommand_ErrorHandling(t *testing.T) {
 				// Clone it to set up proper structure, but don't defer the chdir - let the test handle it
 				repoPath := setupClonedRepo(t, sourceRepo)
 				// Immediately return to original dir so test can handle directory changes
-				os.Chdir(repoPath)
+				_ = os.Chdir(repoPath)
 				return repoPath
 			},
 			args:          []string{"sync"},
@@ -537,7 +537,7 @@ func TestSyncCommand_ErrorHandling(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			workingDir := tt.setup(t)
 			originalDir, _ := os.Getwd()
-			defer os.Chdir(originalDir)
+			defer func() { _ = os.Chdir(originalDir) }()
 
 			require.NoError(t, os.Chdir(workingDir))
 

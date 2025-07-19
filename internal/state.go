@@ -75,7 +75,7 @@ func (s *State) Save(gbmDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create state file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	encoder := toml.NewEncoder(file)
 	if err := encoder.Encode(s); err != nil {

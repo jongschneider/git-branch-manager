@@ -114,7 +114,7 @@ func TestRemoveCommand_SuccessfulRemoval(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Verify FEAT worktree exists before removal
 	verifyWorktreeExists(t, repoPath, "feat")
@@ -140,7 +140,7 @@ func TestRemoveCommand_NonexistentWorktree(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Try to remove nonexistent worktree
 	cmd := newRootCommand()
@@ -155,9 +155,9 @@ func TestRemoveCommand_NotInGitRepo(t *testing.T) {
 	// Create empty temp directory (not a git repo)
 	tempDir := t.TempDir()
 	originalDir, _ := os.Getwd()
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 
-	os.Chdir(tempDir)
+	_ = os.Chdir(tempDir)
 
 
 	// Try to remove in non-git directory
@@ -177,7 +177,7 @@ func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Create uncommitted changes in main worktree
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
@@ -207,7 +207,7 @@ func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Create uncommitted changes in PROD worktree
 	prodWorktreePath := filepath.Join(repoPath, "worktrees", "prod")
@@ -235,7 +235,7 @@ func TestRemoveCommand_ForceBypassesConfirmation(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Remove with force flag should bypass confirmation prompt
 	cmd := newRootCommand()
@@ -256,7 +256,7 @@ func TestRemoveCommand_UserAcceptsConfirmation(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Verify worktree exists before removal
 	verifyWorktreeExists(t, repoPath, "feat")
@@ -282,7 +282,7 @@ func TestRemoveCommand_UserAcceptsConfirmationWithYes(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Verify worktree exists before removal
 	verifyWorktreeExists(t, repoPath, "dev")
@@ -308,7 +308,7 @@ func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Verify worktree exists before attempted removal
 	verifyWorktreeExists(t, repoPath, "main")
@@ -334,7 +334,7 @@ func TestRemoveCommand_UserDeclinesWithEmptyInput(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Verify worktree exists before attempted removal
 	verifyWorktreeExists(t, repoPath, "prod")
@@ -361,7 +361,7 @@ func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
 
 	// Navigate into the FEAT worktree directory
 	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
-	os.Chdir(featWorktreePath)
+	_ = os.Chdir(featWorktreePath)
 
 	// Verify we're in the worktree directory (resolve any symlinks for comparison)
 	currentDir, _ := os.Getwd()
@@ -377,7 +377,7 @@ func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
 	require.NoError(t, err, "Remove should succeed even when executed from within the worktree")
 
 	// Change back to repo root to verify removal
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Verify worktree was removed
 	verifyWorktreeRemoved(t, repoPath, "feat")
@@ -391,7 +391,7 @@ func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// First, verify all expected worktrees exist
 	verifyWorktreeExists(t, repoPath, "main")
@@ -442,7 +442,7 @@ func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
 	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
 
 	// Stay in repo root
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	// Add some files to the main worktree
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")

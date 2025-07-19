@@ -525,7 +525,7 @@ func (gm *GitManager) GetWorktreeStatus(worktreePath string) (*GitStatus, error)
 		parts := strings.Fields(string(output))
 		if len(parts) == 2 {
 			if _, err := fmt.Sscanf(parts[0], "%d", &status.Ahead); err == nil {
-				fmt.Sscanf(parts[1], "%d", &status.Behind)
+				_, _ = fmt.Sscanf(parts[1], "%d", &status.Behind)
 			}
 		}
 	}
@@ -1076,17 +1076,12 @@ func (gm *GitManager) getRecentHotfixActivity(since string) ([]RecentActivity, e
 
 // Helper functions for parsing git data
 func parseTimestamp(timestampStr string) (time.Time, error) {
-	timestamp, err := time.Parse("1136073600", timestampStr) // Unix timestamp format
-	if err != nil {
-		// Try parsing as Unix timestamp
-		var unixTime int64
-		if _, err := fmt.Sscanf(timestampStr, "%d", &unixTime); err == nil {
-			timestamp = time.Unix(unixTime, 0)
-			return timestamp, nil
-		}
-		return time.Time{}, err
+	// Parse as Unix timestamp
+	var unixTime int64
+	if _, err := fmt.Sscanf(timestampStr, "%d", &unixTime); err != nil {
+		return time.Time{}, fmt.Errorf("invalid timestamp format: %w", err)
 	}
-	return timestamp, nil
+	return time.Unix(unixTime, 0), nil
 }
 
 func ExtractJiraTicket(message string) string {

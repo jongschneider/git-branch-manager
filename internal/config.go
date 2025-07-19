@@ -164,7 +164,7 @@ func (c *Config) Save(gbmDir string) error {
 	if err != nil {
 		return fmt.Errorf("failed to create config file: %w", err)
 	}
-	defer file.Close()
+	defer func() { _ = file.Close() }()
 
 	encoder := toml.NewEncoder(file)
 	if err := encoder.Encode(c); err != nil {

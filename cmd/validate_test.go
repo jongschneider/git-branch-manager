@@ -28,7 +28,7 @@ func setupValidateTest(t *testing.T, repo *testutils.GitTestRepo, worktrees map[
 func runValidateCommand(t *testing.T, workDir string, args []string) (string, error) {
 	originalDir, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalDir)
+	defer func() { _ = os.Chdir(originalDir) }()
 
 	err = os.Chdir(workDir)
 	require.NoError(t, err)

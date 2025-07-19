@@ -211,7 +211,7 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 	if force && len(status.OrphanedWorktrees) > 0 {
 		// Ask for confirmation unless a confirmation function is provided and returns true
 		if confirmFunc != nil {
-			message := fmt.Sprintf("The following worktrees will be PERMANENTLY DELETED:\n")
+			message := "The following worktrees will be PERMANENTLY DELETED:\n"
 			for _, envVar := range status.OrphanedWorktrees {
 				worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
 				message += fmt.Sprintf("  • %s (%s)\n", envVar, worktreePath)
@@ -540,14 +540,14 @@ func (m *Manager) copyFile(sourcePath, targetPath string) error {
 	if err != nil {
 		return fmt.Errorf("failed to open source file: %w", err)
 	}
-	defer sourceFile.Close()
+	defer func() { _ = sourceFile.Close() }()
 
 	// Create target file
 	targetFile, err := os.Create(targetPath)
 	if err != nil {
 		return fmt.Errorf("failed to create target file: %w", err)
 	}
-	defer targetFile.Close()
+	defer func() { _ = targetFile.Close() }()
 
 	// Copy file contents
 	if _, err := io.Copy(targetFile, sourceFile); err != nil {

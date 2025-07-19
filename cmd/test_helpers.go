@@ -18,9 +18,9 @@ func setupClonedRepo(t *testing.T, sourceRepo *testutils.GitTestRepo) string {
 	originalDir, _ := os.Getwd()
 
 	// Register cleanup to restore original directory when test completes
-	t.Cleanup(func() { os.Chdir(originalDir) })
+	t.Cleanup(func() { _ = os.Chdir(originalDir) })
 
-	os.Chdir(targetDir)
+	_ = os.Chdir(targetDir)
 
 	// Clone the repository
 	cloneCmd := newRootCommand()
@@ -31,7 +31,7 @@ func setupClonedRepo(t *testing.T, sourceRepo *testutils.GitTestRepo) string {
 	// Navigate to cloned repo
 	repoName := sourceRepo.GetRepoName()
 	repoPath := filepath.Join(targetDir, repoName)
-	os.Chdir(repoPath)
+	_ = os.Chdir(repoPath)
 
 	return repoPath
 }

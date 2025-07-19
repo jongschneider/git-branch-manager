@@ -335,9 +335,9 @@ func (r *GitTestRepo) ListBranches() ([]string, error) {
 
 func (r *GitTestRepo) WithWorkingDir(dir string) func() {
 	originalDir, _ := os.Getwd()
-	os.Chdir(dir)
+	_ = os.Chdir(dir)
 	return func() {
-		os.Chdir(originalDir)
+		_ = os.Chdir(originalDir)
 	}
 }
 

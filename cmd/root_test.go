@@ -24,7 +24,7 @@ func TestShouldShowMergeBackAlerts_DisabledByConfig(t *testing.T) {
 	// Change to test directory
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	
 	err = os.Chdir(tmpDir)
 	require.NoError(t, err)
@@ -55,7 +55,7 @@ func TestShouldShowMergeBackAlerts_EnabledWithNoState(t *testing.T) {
 	// Change to test directory
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	
 	err = os.Chdir(tmpDir)
 	require.NoError(t, err)
@@ -94,7 +94,7 @@ func TestShouldShowMergeBackAlerts_TimestampLogic(t *testing.T) {
 	// Change to test directory
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	
 	err = os.Chdir(tmpDir)
 	require.NoError(t, err)
@@ -147,7 +147,7 @@ func TestShouldShowMergeBackAlerts_UserCommitInterval(t *testing.T) {
 	// Change to test directory
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	
 	err = os.Chdir(tmpDir)
 	require.NoError(t, err)
@@ -192,7 +192,7 @@ func TestUpdateLastMergebackCheck(t *testing.T) {
 	// Change to the repository directory
 	originalWd, err := os.Getwd()
 	require.NoError(t, err)
-	defer os.Chdir(originalWd)
+	defer func() { _ = os.Chdir(originalWd) }()
 	
 	err = os.Chdir(repo.GetLocalPath())
 	require.NoError(t, err)
