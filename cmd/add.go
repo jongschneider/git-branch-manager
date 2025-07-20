@@ -17,7 +17,6 @@ func newAddCommand(manager *internal.Manager) *cobra.Command {
 - Create on existing branch: gbm add INGSVC-5544 existing-branch-name
 - Create on new branch: gbm add INGSVC-5544 feature/new-branch -b
 - Create on new branch with base: gbm add INGSVC-5544 feature/new-branch main -b
-- Interactive mode: gbm add INGSVC-5544 --interactive
 - Tab completion: Shows JIRA keys with summaries, suggests branch names when needed
 
 The third argument specifies which branch/commit to use as the starting point for new branches.
@@ -26,7 +25,6 @@ This matches the behavior of 'git worktree add'.`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			newBranch, _ := cmd.Flags().GetBool("new-branch")
-			interactive, _ := cmd.Flags().GetBool("interactive")
 
 			worktreeName := args[0]
 
@@ -38,32 +36,22 @@ This matches the behavior of 'git worktree add'.`,
 			var branchName string
 			var baseBranch string
 
-			if interactive {
-				// Handle interactive mode
-				result, err := handleInteractiveWithParams(manager)
-				if err != nil {
-					return fmt.Errorf("failed to handle interactive mode: %w", err)
+			// Handle direct specification
+			if len(args) > 1 {
+				branchName = args[1]
+				// Check for third argument (base branch)
+				if len(args) > 2 {
+					baseBranch = args[2]
 				}
-				branchName = result.branchName
-				newBranch = result.newBranch
+			} else if newBranch {
+				// Generate branch name from worktree name
+				branchName = generateBranchName(worktreeName, manager)
+			} else if internal.IsJiraKey(worktreeName) {
+				// Auto-suggest branch name for JIRA keys
+				suggestedBranch := generateBranchName(worktreeName, manager)
+				return fmt.Errorf("branch name required. Suggested: %s\n\nTry: gbm add %s %s -b", suggestedBranch, worktreeName, suggestedBranch)
 			} else {
-				// Handle direct specification
-				if len(args) > 1 {
-					branchName = args[1]
-					// Check for third argument (base branch)
-					if len(args) > 2 {
-						baseBranch = args[2]
-					}
-				} else if newBranch {
-					// Generate branch name from worktree name
-					branchName = generateBranchName(worktreeName, manager)
-				} else if internal.IsJiraKey(worktreeName) {
-					// Auto-suggest branch name for JIRA keys
-					suggestedBranch := generateBranchName(worktreeName, manager)
-					return fmt.Errorf("branch name required. Suggested: %s\n\nTry: gbm add %s %s -b", suggestedBranch, worktreeName, suggestedBranch)
-				} else {
-					return fmt.Errorf("branch name required when not creating new branch (use -b to create new branch)")
-				}
+				return fmt.Errorf("branch name required when not creating new branch (use -b to create new branch)")
 			}
 
 			PrintInfo("Adding worktree '%s' on branch '%s'", worktreeName, branchName)
@@ -104,7 +92,6 @@ This matches the behavior of 'git worktree add'.`,
 	}
 
 	cmd.Flags().BoolP("new-branch", "b", false, "Create a new branch for the worktree")
-	cmd.Flags().BoolP("interactive", "i", false, "Interactive mode to select branch")
 
 	// Add JIRA key completions for the first positional argument
 	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
@@ -155,54 +142,6 @@ This matches the behavior of 'git worktree add'.`,
 	return cmd
 }
 
-type interactiveResult struct {
-	branchName string
-	newBranch  bool
-}
-
-func handleInteractiveWithParams(manager *internal.Manager) (*interactiveResult, error) {
-	// Get available branches
-	branches, err := manager.GetRemoteBranches()
-	if err != nil {
-		return nil, fmt.Errorf("failed to get remote branches: %w", err)
-	}
-
-	fmt.Println(internal.FormatSubHeader("Available branches:"))
-	for i, branch := range branches {
-		fmt.Printf("  %s\n", internal.FormatInfo(fmt.Sprintf("%d. %s", i+1, branch)))
-	}
-	fmt.Printf("  %s\n", internal.FormatInfo(fmt.Sprintf("%d. Create new branch", len(branches)+1)))
-
-	var choice int
-	fmt.Print(internal.FormatPrompt("Select a branch: "))
-	if _, err := fmt.Scanln(&choice); err != nil {
-		return nil, fmt.Errorf("failed to read choice: %w", err)
-	}
-
-	if choice < 1 || choice > len(branches)+1 {
-		return nil, fmt.Errorf("invalid choice")
-	}
-
-	if choice == len(branches)+1 {
-		// Create new branch
-		fmt.Print(internal.FormatPrompt("Enter new branch name: "))
-		var branchName string
-		if _, err := fmt.Scanln(&branchName); err != nil {
-			return nil, fmt.Errorf("failed to read branch name: %w", err)
-		}
-
-		return &interactiveResult{
-			branchName: branchName,
-			newBranch:  true,
-		}, nil
-	} else {
-		// Use existing branch
-		return &interactiveResult{
-			branchName: branches[choice-1],
-			newBranch:  false,
-		}, nil
-	}
-}
 
 func generateBranchName(worktreeName string, manager *internal.Manager) string {
 	// Check if this is a JIRA key first

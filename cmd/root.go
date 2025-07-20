@@ -13,10 +13,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-var (
-	logFile *os.File
-)
-
+var logFile *os.File
 
 func newRootCommand() *cobra.Command {
 	rootCmd := &cobra.Command{
@@ -51,8 +48,8 @@ notifications when configurations drift out of sync.`,
 	}
 
 	// Add all subcommands
-	rootCmd.AddCommand(newPushCommand())
 	rootCmd.AddCommand(newAddCommand(manager))
+	rootCmd.AddCommand(newPushCommand())
 	rootCmd.AddCommand(newCloneCommand())
 	rootCmd.AddCommand(completionCmd)
 	rootCmd.AddCommand(newHotfixCommand())
