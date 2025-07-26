@@ -15,7 +15,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // Helper function to verify worktree no longer exists
 func verifyWorktreeRemoved(t *testing.T, repoPath, worktreeName string) {
 	worktreePath := filepath.Join(repoPath, "worktrees", worktreeName)
@@ -53,7 +52,7 @@ func verifyWorktreeExists(t *testing.T, repoPath, worktreeName string) {
 // Helper function to create uncommitted changes in a worktree
 func createUncommittedChanges(t *testing.T, worktreePath string) {
 	filePath := filepath.Join(worktreePath, "uncommitted_changes.txt")
-	err := os.WriteFile(filePath, []byte("These are uncommitted changes"), 0644)
+	err := os.WriteFile(filePath, []byte("These are uncommitted changes"), 0o644)
 	require.NoError(t, err, "Failed to create uncommitted changes")
 }
 
@@ -107,7 +106,6 @@ func captureOutput(fn func() error) (string, error) {
 }
 
 func TestRemoveCommand_SuccessfulRemoval(t *testing.T) {
-
 	// Create source repo with multiple branches and .envrc
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -133,7 +131,6 @@ func TestRemoveCommand_SuccessfulRemoval(t *testing.T) {
 }
 
 func TestRemoveCommand_NonexistentWorktree(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -159,7 +156,6 @@ func TestRemoveCommand_NotInGitRepo(t *testing.T) {
 
 	_ = os.Chdir(tempDir)
 
-
 	// Try to remove in non-git directory
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"remove", "SOME_WORKTREE"})
@@ -170,7 +166,6 @@ func TestRemoveCommand_NotInGitRepo(t *testing.T) {
 }
 
 func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -200,7 +195,6 @@ func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
 }
 
 func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -228,7 +222,6 @@ func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
 }
 
 func TestRemoveCommand_ForceBypassesConfirmation(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -249,7 +242,6 @@ func TestRemoveCommand_ForceBypassesConfirmation(t *testing.T) {
 }
 
 func TestRemoveCommand_UserAcceptsConfirmation(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -275,7 +267,6 @@ func TestRemoveCommand_UserAcceptsConfirmation(t *testing.T) {
 }
 
 func TestRemoveCommand_UserAcceptsConfirmationWithYes(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -301,7 +292,6 @@ func TestRemoveCommand_UserAcceptsConfirmationWithYes(t *testing.T) {
 }
 
 func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -327,7 +317,6 @@ func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
 }
 
 func TestRemoveCommand_UserDeclinesWithEmptyInput(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -353,7 +342,6 @@ func TestRemoveCommand_UserDeclinesWithEmptyInput(t *testing.T) {
 }
 
 func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -384,7 +372,6 @@ func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
 }
 
 func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -435,7 +422,6 @@ func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
 }
 
 func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
-
 	// Create source repo with worktrees
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
 
@@ -447,7 +433,7 @@ func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
 	// Add some files to the main worktree
 	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
 	testFile := filepath.Join(mainWorktreePath, "test_file.txt")
-	err := os.WriteFile(testFile, []byte("test content"), 0644)
+	err := os.WriteFile(testFile, []byte("test content"), 0o644)
 	require.NoError(t, err, "Failed to create test file in worktree")
 
 	// Verify file exists

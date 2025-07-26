@@ -13,7 +13,7 @@ func (gm *GitManager) CreateBranch(branchName, baseBranch string) error {
 		baseBranch = "HEAD"
 	}
 
-	if err := ExecGitCommandRun(gm.repoPath, "branch", branchName, baseBranch); err != nil {
+	if err := execGitCommandRun(gm.repoPath, "branch", branchName, baseBranch); err != nil {
 		return fmt.Errorf("failed to create branch: %w", err)
 	}
 

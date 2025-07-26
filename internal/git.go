@@ -64,8 +64,8 @@ func ExecGitCommand(dir string, args ...string) ([]byte, error) {
 	return cmd.Output()
 }
 
-// ExecGitCommandRun executes a git command in the specified directory without capturing output
-func ExecGitCommandRun(dir string, args ...string) error {
+// execGitCommandRun executes a git command in the specified directory without capturing output
+func execGitCommandRun(dir string, args ...string) error {
 	cmd := exec.Command("git", args...)
 	if dir != "" {
 		cmd.Dir = dir
@@ -400,19 +400,19 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 
 	if err == nil {
 		// Remote tracking branch exists, create worktree and set up tracking
-		if err := ExecGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
+		if err := execGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
 			return enhanceGitError(err, "worktree add")
 		}
 
 		// Set up tracking for the remote branch
-		if err := ExecGitCommandRun(worktreePath, "branch", "--set-upstream-to", remoteBranch, branchName); err != nil {
+		if err := execGitCommandRun(worktreePath, "branch", "--set-upstream-to", remoteBranch, branchName); err != nil {
 			return fmt.Errorf("failed to set up tracking: %w", err)
 		}
 
 		return nil
 	} else {
 		// No remote tracking branch, create worktree normally
-		if err := ExecGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
+		if err := execGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
 			return enhanceGitError(err, "worktree add")
 		}
 	}
@@ -420,16 +420,8 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 	return nil
 }
 
-func (gm *GitManager) RemoveWorktree(worktreePath string) error {
-	if err := ExecGitCommandRun(gm.repoPath, "worktree", "remove", worktreePath, "--force"); err != nil {
-		return enhanceGitError(err, "worktree remove")
-	}
-
-	return nil
-}
-
 func (gm *GitManager) MoveWorktree(sourceWorktreePath, targetWorktreePath string) error {
-	if err := ExecGitCommandRun(gm.repoPath, "worktree", "move", sourceWorktreePath, targetWorktreePath); err != nil {
+	if err := execGitCommandRun(gm.repoPath, "worktree", "move", sourceWorktreePath, targetWorktreePath); err != nil {
 		return enhanceGitError(err, "worktree move")
 	}
 

@@ -91,7 +91,7 @@ func TestGitManager_AddWorktree(t *testing.T) {
 			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
 				// Create a local-only existing branch
 				must(t, repo.InLocalRepo(func() error {
-					return ExecGitCommandRun(repo.GetLocalPath(), "checkout", "-b", "existing-branch")
+					return execGitCommandRun(repo.GetLocalPath(), "checkout", "-b", "existing-branch")
 				}))
 				must(t, repo.WriteFile("test.txt", "test content"))
 				must(t, repo.CommitChanges("Add test file"))
