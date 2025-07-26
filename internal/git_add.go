@@ -3,7 +3,6 @@ package internal
 import (
 	"fmt"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 )
@@ -34,7 +33,7 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 		return fmt.Errorf("failed to create worktrees directory: %w", err)
 	}
 
-	var cmd *exec.Cmd
+	var finalArgs []string
 	if createBranch {
 		// Check if branch already exists
 		branchExists, err := gm.BranchExists(branchName)
@@ -64,14 +63,14 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 			}
 
 			// Branch exists and is based on correct base (or no base specified), create worktree on existing branch
-			cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+			finalArgs = append(finalArgs, "worktree", "add", worktreePath, branchName)
 		} else {
 			// Create new branch and worktree with base branch
 			if baseBranch != "" {
-				cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath, baseBranch)
+				finalArgs = append(finalArgs, "worktree", "add", "-b", branchName, worktreePath, baseBranch)
 			} else {
 				// Use default behavior (current HEAD)
-				cmd = exec.Command("git", "worktree", "add", "-b", branchName, worktreePath)
+				finalArgs = append(finalArgs, "worktree", "add", "-b", branchName, worktreePath)
 			}
 		}
 	} else {
@@ -87,22 +86,19 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 
 		// Check if remote tracking branch exists
 		remoteBranch := Remote(branchName)
-		checkCmd := exec.Command("git", "rev-parse", "--verify", remoteBranch)
-		checkCmd.Dir = gm.repoPath
-		_, err = execCommand(checkCmd)
+		_, err = ExecGitCommand(gm.repoPath, "rev-parse", "--verify", remoteBranch)
 
 		if err == nil {
 			// Remote tracking branch exists, use --track but don't create new branch
-			cmd = exec.Command("git", "worktree", "add", "--track", worktreePath, remoteBranch)
+			finalArgs = append(finalArgs, "worktree", "add", "--track", worktreePath, remoteBranch)
 		} else {
 			// No remote tracking branch, create worktree without tracking
-			cmd = exec.Command("git", "worktree", "add", worktreePath, branchName)
+			finalArgs = append(finalArgs, "worktree", "add", worktreePath, branchName)
 		}
 	}
 
-	cmd.Dir = gm.repoPath
-	if err := execCommandRun(cmd); err != nil {
-		return fmt.Errorf("failed to add worktree (command: %s): %w", strings.Join(cmd.Args, " "), err)
+	if err := execGitCommandRun(gm.repoPath, finalArgs...); err != nil {
+		return fmt.Errorf("failed to add worktree (command: git %s): %w", strings.Join(finalArgs, " "), err)
 	}
 
 	return nil

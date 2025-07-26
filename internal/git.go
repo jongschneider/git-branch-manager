@@ -48,12 +48,6 @@ func execCommand(cmd *exec.Cmd) ([]byte, error) {
 	return output, err
 }
 
-// execCommandRun executes a command using Run() instead of Output() with debug output
-func execCommandRun(cmd *exec.Cmd) error {
-	err := cmd.Run()
-	return err
-}
-
 // ExecGitCommand executes a git command in the specified directory with optional output capture
 // This unified function replaces multiple duplicate git execution patterns across the codebase
 func ExecGitCommand(dir string, args ...string) ([]byte, error) {
@@ -80,6 +74,18 @@ func ExecGitCommandCombined(dir string, args ...string) ([]byte, error) {
 		cmd.Dir = dir
 	}
 	return cmd.CombinedOutput()
+}
+
+// ExecGitCommandInteractive executes a git command in the specified directory with live output to terminal
+func ExecGitCommandInteractive(dir string, args ...string) error {
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	cmd.Stdout = os.Stdout
+	cmd.Stderr = os.Stderr
+
+	return cmd.Run()
 }
 
 // enhanceGitError provides more specific error messages for common git failures
@@ -657,54 +663,36 @@ func (gm *GitManager) PullWorktree(worktreePath string) error {
 		return fmt.Errorf("worktree path does not exist: %s", worktreePath)
 	}
 
-	// Get the current branch
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = worktreePath
-	output, err := execCommand(cmd)
+	output, err := ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "HEAD")
 	if err != nil {
 		return fmt.Errorf("failed to get current branch: %w", err)
 	}
 
 	currentBranch := strings.TrimSpace(string(output))
 
-	// Check if upstream is set
-	cmd = exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
-	cmd.Dir = worktreePath
-	_, err = execCommand(cmd)
+	finalArgs := []string{"pull"}
 
+	// Check if upstream is set
+	output, err = ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "@{upstream}")
 	if err != nil {
 		// No upstream set, try to set it and pull
 		remoteBranch := Remote(currentBranch)
 
 		// Check if remote branch exists
-		cmd = exec.Command("git", "rev-parse", "--verify", remoteBranch)
-		cmd.Dir = worktreePath
-		_, err = execCommand(cmd)
-
+		output, err = ExecGitCommand(worktreePath, "rev-parse", "--verify", remoteBranch)
 		if err == nil {
 			// Remote branch exists, set upstream and pull
-			cmd = exec.Command("git", "branch", "--set-upstream-to", remoteBranch)
-			cmd.Dir = worktreePath
-			if err := execCommandRun(cmd); err != nil {
+			output, err = ExecGitCommand(worktreePath, "branch", "--set-upstream-to", remoteBranch)
+			if err != nil {
 				return fmt.Errorf("failed to set upstream: %w", err)
 			}
-
-			// Now pull
-			cmd = exec.Command("git", "pull")
 		} else {
 			// Remote branch doesn't exist, try to pull with explicit remote and branch
-			cmd = exec.Command("git", "pull", "origin", currentBranch)
+			finalArgs = append(finalArgs, "origin", currentBranch)
 		}
-	} else {
-		// Upstream is set, simple pull
-		cmd = exec.Command("git", "pull")
 	}
 
-	cmd.Dir = worktreePath
-	cmd.Stdout = os.Stdout
-	cmd.Stderr = os.Stderr
-
-	return cmd.Run()
+	return ExecGitCommandInteractive(worktreePath, finalArgs...)
 }
 
 func (gm *GitManager) IsInWorktree(currentPath string) (bool, string, error) {

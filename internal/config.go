@@ -27,15 +27,15 @@ type Config struct {
 }
 
 type ConfigSettings struct {
-	WorktreePrefix               string        `toml:"worktree_prefix"`
-	AutoFetch                    bool          `toml:"auto_fetch"`
-	CreateMissingBranches        bool          `toml:"create_missing_branches"`
-	MergeBackAlerts              bool          `toml:"merge_back_alerts"`
-	HotfixPrefix                 string        `toml:"hotfix_prefix"`
-	MergebackPrefix              string        `toml:"mergeback_prefix"`
-	MergeBackCheckInterval       time.Duration `toml:"merge_back_check_interval"`
-	MergeBackUserCommitInterval  time.Duration `toml:"merge_back_user_commit_interval"`
-	CandidateBranches            []string      `toml:"candidate_branches"`
+	WorktreePrefix              string        `toml:"worktree_prefix"`
+	AutoFetch                   bool          `toml:"auto_fetch"`
+	CreateMissingBranches       bool          `toml:"create_missing_branches"`
+	MergeBackAlerts             bool          `toml:"merge_back_alerts"`
+	HotfixPrefix                string        `toml:"hotfix_prefix"`
+	MergebackPrefix             string        `toml:"mergeback_prefix"`
+	MergeBackCheckInterval      time.Duration `toml:"merge_back_check_interval"`
+	MergeBackUserCommitInterval time.Duration `toml:"merge_back_user_commit_interval"`
+	CandidateBranches           []string      `toml:"candidate_branches"`
 }
 
 type FileCopyRule struct {
@@ -94,11 +94,11 @@ func DefaultConfig() *Config {
 			WorktreePrefix:              DefaultWorktreeDirname,
 			AutoFetch:                   true,
 			CreateMissingBranches:       false,
-			MergeBackAlerts:             true,                  // Enabled by default
-			HotfixPrefix:                "HOTFIX",              // Default hotfix prefix
-			MergebackPrefix:             "MERGE",               // Default mergeback prefix
-			MergeBackCheckInterval:      6 * time.Hour,        // Check every 6 hours by default
-			MergeBackUserCommitInterval: 30 * time.Minute,     // Alert every 30 minutes when user has commits
+			MergeBackAlerts:             true,                                         // Enabled by default
+			HotfixPrefix:                "HOTFIX",                                     // Default hotfix prefix
+			MergebackPrefix:             "MERGE",                                      // Default mergeback prefix
+			MergeBackCheckInterval:      3 * time.Hour,                                // Check every 3 hours by default
+			MergeBackUserCommitInterval: 30 * time.Minute,                             // Alert every 30 minutes when user has commits
 			CandidateBranches:           []string{"main", "master", "develop", "dev"}, // Default candidate branches
 		},
 		Icons: ConfigIcons{

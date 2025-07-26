@@ -149,14 +149,30 @@ func TestSyncCommand_Flags(t *testing.T) {
 			tt.setup(t, &testutils.GitTestRepo{LocalDir: repoPath})
 
 			var buf bytes.Buffer
-			cmd := newRootCommand()
-			cmd.SetArgs(tt.args)
-			cmd.SetOut(&buf)
-			cmd.SetErr(&buf)
+			var err error
 
-			err := cmd.Execute()
+			// Check if this test uses --force and needs user input simulation
+			usesForce := slices.Contains(tt.args, "--force")
+
+			if usesForce {
+				// Use simulateUserInput for tests that use --force
+				err = simulateUserInput("n", func() error {
+					cmd := newRootCommand()
+					cmd.SetArgs(tt.args)
+					cmd.SetOut(&buf)
+					cmd.SetErr(&buf)
+					return cmd.Execute()
+				})
+			} else {
+				// Standard execution for non-force tests
+				cmd := newRootCommand()
+				cmd.SetArgs(tt.args)
+				cmd.SetOut(&buf)
+				cmd.SetErr(&buf)
+				err = cmd.Execute()
+			}
+
 			output := buf.String()
-
 			tt.validate(t, repoPath, output, err)
 		})
 	}
