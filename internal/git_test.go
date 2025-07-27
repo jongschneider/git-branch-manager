@@ -719,3 +719,107 @@ func TestGitManager_GetCommitHistory(t *testing.T) {
 		})
 	}
 }
+
+func TestGitManager_GetFileChanges(t *testing.T) {
+	repo := testutils.NewGitTestRepo(t,
+		testutils.WithDefaultBranch("main"),
+		testutils.WithUser("Test User", "test@example.com"),
+	)
+	defer repo.Cleanup()
+
+	gitManager, err := NewGitManager(repo.GetLocalPath(), "worktrees")
+	require.NoError(t, err)
+
+	// Create some test file changes
+	must(t, repo.InLocalRepo(func() error {
+		// Create and stage a new file
+		must(t, repo.WriteFile("new.txt", "new content"))
+		if err := execGitCommandRun(repo.GetLocalPath(), "add", "new.txt"); err != nil {
+			return err
+		}
+
+		// Modify existing file (unstaged)
+		must(t, repo.WriteFile("README.md", "# Modified README\nAdded content"))
+
+		return nil
+	}))
+
+	tests := []struct {
+		name           string
+		options        FileChangeOptions
+		expectStaged   bool
+		expectUnstaged bool
+		expectError    bool
+	}{
+		{
+			name: "get unstaged changes only",
+			options: FileChangeOptions{
+				Unstaged: true,
+			},
+			expectStaged:   false,
+			expectUnstaged: true,
+			expectError:    false,
+		},
+		{
+			name: "get staged changes only",
+			options: FileChangeOptions{
+				Staged: true,
+			},
+			expectStaged:   true,
+			expectUnstaged: false,
+			expectError:    false,
+		},
+		{
+			name: "get both staged and unstaged changes",
+			options: FileChangeOptions{
+				Staged:   true,
+				Unstaged: true,
+			},
+			expectStaged:   true,
+			expectUnstaged: true,
+			expectError:    false,
+		},
+		{
+			name:           "default behavior (unstaged only)",
+			options:        FileChangeOptions{},
+			expectStaged:   false,
+			expectUnstaged: true,
+			expectError:    false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			changes, err := gitManager.GetFileChanges("", tt.options)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, changes)
+			} else {
+				assert.NoError(t, err)
+				assert.NotNil(t, changes)
+
+				// Check if we have the expected file changes
+				var hasNewFile, hasReadme bool
+				for _, change := range changes {
+					if change.Path == "new.txt" {
+						hasNewFile = true
+						assert.Equal(t, "added", change.Status)
+						assert.Greater(t, change.Additions, 0)
+					}
+					if change.Path == "README.md" {
+						hasReadme = true
+						assert.Equal(t, "modified", change.Status)
+					}
+				}
+
+				if tt.expectStaged {
+					assert.True(t, hasNewFile, "Should find staged new.txt file")
+				}
+				if tt.expectUnstaged {
+					assert.True(t, hasReadme, "Should find unstaged README.md file")
+				}
+			}
+		})
+	}
+}

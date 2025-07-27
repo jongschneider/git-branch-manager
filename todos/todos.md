@@ -19,10 +19,6 @@
 ### Phase 3: Low Priority - Info Command Extraction
 
 
-- [ ] **Add GetFileChanges utility function to GitManager**
-  - Location: `internal/git.go`
-  - Replace pattern: `git diff --numstat`, `git diff --cached --numstat`
-  - Files affected: `cmd/info.go:197,238`
 
 - [ ] **Extract git log calls from cmd/info.go to use GetCommitHistory**
   - Update line 161 to use new utility

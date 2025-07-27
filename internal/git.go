@@ -472,6 +472,129 @@ func (gm *GitManager) parseCommitHistory(output string) ([]CommitInfo, error) {
 	return commits, nil
 }
 
+// GetFileChanges retrieves file changes with flexible options
+// If path is empty, uses repository root. Returns all requested changes.
+func (gm *GitManager) GetFileChanges(path string, options FileChangeOptions) ([]FileChange, error) {
+	if path == "" {
+		path = gm.repoPath
+	}
+
+	var allChanges []FileChange
+
+	// Default to unstaged if neither is specified
+	if !options.Staged && !options.Unstaged {
+		options.Unstaged = true
+	}
+
+	// Get unstaged changes
+	if options.Unstaged {
+		changes, err := gm.getFileChangesByType(path, false, options)
+		if err != nil {
+			return nil, enhanceGitError(err, "get unstaged file changes")
+		}
+		allChanges = append(allChanges, changes...)
+	}
+
+	// Get staged changes
+	if options.Staged {
+		changes, err := gm.getFileChangesByType(path, true, options)
+		if err != nil {
+			return nil, enhanceGitError(err, "get staged file changes")
+		}
+		allChanges = append(allChanges, changes...)
+	}
+
+	return allChanges, nil
+}
+
+// getFileChangesByType gets file changes for either staged or unstaged
+func (gm *GitManager) getFileChangesByType(path string, staged bool, options FileChangeOptions) ([]FileChange, error) {
+	args := gm.buildGitDiffArgs(staged, options)
+	output, err := ExecGitCommand(path, args...)
+	if err != nil {
+		return nil, err
+	}
+
+	return gm.parseNumstatOutput(string(output))
+}
+
+// buildGitDiffArgs constructs git diff command arguments based on options
+func (gm *GitManager) buildGitDiffArgs(staged bool, options FileChangeOptions) []string {
+	args := []string{"diff"}
+
+	// Add staged flag
+	if staged {
+		args = append(args, "--cached")
+	}
+
+	// Add output format
+	if options.NamesOnly {
+		args = append(args, "--name-only")
+	} else if options.ShowStatus {
+		args = append(args, "--name-status")
+	} else {
+		args = append(args, "--numstat")
+	}
+
+	// Add extra arguments
+	args = append(args, options.ExtraArgs...)
+
+	return args
+}
+
+// parseNumstatOutput parses git diff --numstat output into FileChange structs
+func (gm *GitManager) parseNumstatOutput(output string) ([]FileChange, error) {
+	if strings.TrimSpace(output) == "" {
+		return []FileChange{}, nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	changes := make([]FileChange, 0, len(lines))
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		parts := strings.Fields(line)
+		if len(parts) != 3 {
+			continue // Skip malformed lines
+		}
+
+		// Parse additions and deletions
+		additions, err := strconv.Atoi(parts[0])
+		if err != nil {
+			additions = 0 // Binary files show "-"
+		}
+
+		deletions, err := strconv.Atoi(parts[1])
+		if err != nil {
+			deletions = 0 // Binary files show "-"
+		}
+
+		path := parts[2]
+
+		// Determine status based on additions/deletions
+		status := "modified"
+		if additions > 0 && deletions == 0 {
+			status = "added"
+		} else if additions == 0 && deletions > 0 {
+			status = "deleted"
+		}
+
+		change := FileChange{
+			Path:      path,
+			Status:    status,
+			Additions: additions,
+			Deletions: deletions,
+		}
+
+		changes = append(changes, change)
+	}
+
+	return changes, nil
+}
+
 // BranchExistsLocalOrRemote checks if a branch exists either locally or remotely
 func (gm *GitManager) BranchExistsLocalOrRemote(branchName string) (bool, error) {
 	// // Check if local branch exists
@@ -999,6 +1122,24 @@ type CommitHistoryOptions struct {
 
 	// Format specification - if empty, uses default: %H|%s|%an|%ae|%ct|%D
 	CustomFormat string
+}
+
+// FileChangeOptions defines options for retrieving file changes
+type FileChangeOptions struct {
+	// Include staged changes (--cached)
+	Staged bool
+
+	// Include unstaged changes (default: true if neither Staged nor Unstaged specified)
+	Unstaged bool
+
+	// Show only names (--name-only)
+	NamesOnly bool
+
+	// Show status (--name-status)
+	ShowStatus bool
+
+	// Custom diff options
+	ExtraArgs []string
 }
 
 // FileChange represents a modified file
