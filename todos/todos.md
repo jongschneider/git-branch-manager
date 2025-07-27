@@ -7,10 +7,6 @@
 ### Phase 1: High Priority - Branch Status Utilities
 
 
-- [ ] **Add GetUpstreamBranch utility function to GitManager** 
-  - Location: `internal/git.go`
-  - Replace pattern: `git rev-parse --abbrev-ref @{upstream}`
-  - Files affected: `cmd/info.go:300`, `internal/git.go:643,676`
 
 - [ ] **Add GetAheadBehindCount utility function to GitManager**
   - Location: `internal/git.go` 

@@ -97,3 +97,103 @@ func TestGitManager_GetCurrentBranchInPath(t *testing.T) {
 		})
 	}
 }
+
+func TestGitManager_GetUpstreamBranch(t *testing.T) {
+	repo := testutils.NewGitTestRepo(t,
+		testutils.WithDefaultBranch("main"),
+		testutils.WithUser("Test User", "test@example.com"),
+		testutils.WithRemoteName("origin"),
+	)
+	defer repo.Cleanup()
+
+	gitManager, err := NewGitManager(repo.GetLocalPath(), "worktrees")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name             string
+		setup            func(t *testing.T, repo *testutils.GitTestRepo)
+		testPath         func(repo *testutils.GitTestRepo) string
+		expectedUpstream string
+		expectError      bool
+	}{
+		{
+			name: "branch with upstream set",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// Create and checkout a branch, then set upstream
+				must(t, repo.InLocalRepo(func() error {
+					err := execGitCommandRun(repo.GetLocalPath(), "checkout", "-b", "feature/test")
+					if err != nil {
+						return err
+					}
+					// Push to set up tracking
+					return execGitCommandRun(repo.GetLocalPath(), "push", "-u", "origin", "feature/test")
+				}))
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			expectedUpstream: "origin/feature/test",
+			expectError:      false,
+		},
+		{
+			name: "branch without upstream",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// Create a local-only branch
+				must(t, repo.InLocalRepo(func() error {
+					return execGitCommandRun(repo.GetLocalPath(), "checkout", "-b", "local-only")
+				}))
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			expectedUpstream: "",
+			expectError:      false,
+		},
+		{
+			name: "main branch with upstream",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// Ensure main branch has upstream tracking
+				must(t, repo.InLocalRepo(func() error {
+					err := execGitCommandRun(repo.GetLocalPath(), "checkout", "main")
+					if err != nil {
+						return err
+					}
+					return execGitCommandRun(repo.GetLocalPath(), "branch", "--set-upstream-to", "origin/main")
+				}))
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			expectedUpstream: "origin/main",
+			expectError:      false,
+		},
+		{
+			name: "invalid path",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// No setup needed
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return "/nonexistent/path"
+			},
+			expectedUpstream: "",
+			expectError:      true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup(t, repo)
+
+			testPath := tt.testPath(repo)
+			upstream, err := gitManager.GetUpstreamBranch(testPath)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Empty(t, upstream)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedUpstream, upstream)
+			}
+		})
+	}
+}

@@ -636,6 +636,21 @@ func (gm *GitManager) GetRemoteBranches() ([]string, error) {
 	return branches, nil
 }
 
+// GetUpstreamBranch returns the upstream branch name for a given worktree path.
+// Returns empty string if no upstream is set (not an error condition).
+func (gm *GitManager) GetUpstreamBranch(worktreePath string) (string, error) {
+	output, err := ExecGitCommandCombined(worktreePath, "rev-parse", "--abbrev-ref", "@{upstream}")
+	if err != nil {
+		// Check if this is a "no upstream" error vs a real git error
+		errStr := string(output) // Combined output includes stderr
+		if strings.Contains(errStr, "no upstream configured") {
+			return "", nil // No upstream set - not an error
+		}
+		return "", enhanceGitError(err, "get upstream branch")
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
 func (gm *GitManager) PushWorktree(worktreePath string) error {
 	if _, err := os.Stat(worktreePath); os.IsNotExist(err) {
 		return fmt.Errorf("worktree path does not exist: %s", worktreePath)
@@ -650,10 +665,13 @@ func (gm *GitManager) PushWorktree(worktreePath string) error {
 	currentBranch := strings.TrimSpace(string(output))
 
 	// Check if upstream is set
-	_, err = ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "@{upstream}")
+	upstream, err := gm.GetUpstreamBranch(worktreePath)
+	if err != nil {
+		return fmt.Errorf("failed to check upstream branch: %w", err)
+	}
 
 	var cmd *exec.Cmd
-	if err != nil {
+	if upstream == "" {
 		// No upstream set, push with -u flag
 		cmd = exec.Command("git", "push", "-u", "origin", currentBranch)
 	} else {
@@ -683,8 +701,11 @@ func (gm *GitManager) PullWorktree(worktreePath string) error {
 	finalArgs := []string{"pull"}
 
 	// Check if upstream is set
-	_, err = ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "@{upstream}")
+	upstream, err := gm.GetUpstreamBranch(worktreePath)
 	if err != nil {
+		return fmt.Errorf("failed to check upstream branch: %w", err)
+	}
+	if upstream == "" {
 		// No upstream set, try to set it and pull
 		remoteBranch := Remote(currentBranch)
 

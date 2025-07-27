@@ -295,18 +295,15 @@ func getBaseBranchInfo(worktreePath, worktreeName string, manager *internal.Mana
 	// Not needed for base branch detection
 
 	// Get upstream branch
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
-	cmd.Dir = worktreePath
-	output, err := cmd.Output()
-	upstream := ""
-	if err == nil {
-		upstream = strings.TrimSpace(string(output))
+	upstream, err := manager.GetGitManager().GetUpstreamBranch(worktreePath)
+	if err != nil {
+		return nil, fmt.Errorf("failed to get upstream branch: %w", err)
 	}
 
 	// Get ahead/behind count
-	cmd = exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
+	cmd := exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
 	cmd.Dir = worktreePath
-	output, err = cmd.Output()
+	output, err := cmd.Output()
 	aheadBy, behindBy := 0, 0
 	if err == nil {
 		parts := strings.Fields(string(output))
@@ -333,7 +330,7 @@ func getBaseBranchInfo(worktreePath, worktreeName string, manager *internal.Mana
 			candidateBranches = []string{"main", "master", "develop", "dev"}
 		}
 		for _, candidate := range candidateBranches {
-			cmd = exec.Command("git", "rev-parse", "--verify", candidate)
+			cmd := exec.Command("git", "rev-parse", "--verify", candidate)
 			cmd.Dir = worktreePath
 			if _, err := cmd.Output(); err == nil {
 				// Branch exists, check if it's actually a base
