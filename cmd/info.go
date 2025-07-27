@@ -324,11 +324,13 @@ func getBaseBranchInfo(worktreePath, worktreeName string, manager *internal.Mana
 			candidateBranches = []string{"main", "master", "develop", "dev"}
 		}
 		for _, candidate := range candidateBranches {
-			cmd := exec.Command("git", "rev-parse", "--verify", candidate)
-			cmd.Dir = worktreePath
-			if _, err := cmd.Output(); err == nil {
+			exists, err := manager.GetGitManager().VerifyRefInPath(worktreePath, candidate)
+			if err != nil {
+				continue // Skip candidates that cause git errors
+			}
+			if exists {
 				// Branch exists, check if it's actually a base
-				cmd = exec.Command("git", "merge-base", "--is-ancestor", candidate, "HEAD")
+				cmd := exec.Command("git", "merge-base", "--is-ancestor", candidate, "HEAD")
 				cmd.Dir = worktreePath
 				if err := cmd.Run(); err == nil {
 					baseBranch = candidate

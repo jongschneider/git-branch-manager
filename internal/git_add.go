@@ -86,9 +86,12 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 
 		// Check if remote tracking branch exists
 		remoteBranch := Remote(branchName)
-		_, err = ExecGitCommand(gm.repoPath, "rev-parse", "--verify", remoteBranch)
+		exists, err := gm.VerifyRef(remoteBranch)
+		if err != nil {
+			return fmt.Errorf("failed to verify remote branch: %w", err)
+		}
 
-		if err == nil {
+		if exists {
 			// Remote tracking branch exists, use --track but don't create new branch
 			finalArgs = append(finalArgs, "worktree", "add", "--track", worktreePath, remoteBranch)
 		} else {

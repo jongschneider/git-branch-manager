@@ -10,16 +10,9 @@
 
 
 
-- [ ] **Replace duplicate branch status calls in test files with new utilities**
-  - Update `cmd/sync_test.go:210,403,410,875,882`
-  - Test: All sync tests pass
 
 ### Phase 2: Medium Priority - Repository Introspection
 
-- [ ] **Add VerifyRef utility function to GitManager**
-  - Location: `internal/git.go`
-  - Replace pattern: `git rev-parse --verify <ref>`
-  - Files affected: `cmd/info.go:338`, `internal/git_add.go:89`
 
 - [ ] **Add GetCommitHash utility function to GitManager**
   - Location: `internal/git.go`

@@ -304,6 +304,42 @@ func Remote(branchName string) string {
 	return fmt.Sprintf("origin/%s", branchName)
 }
 
+// VerifyRef verifies that a git reference (branch, tag, commit) exists and is valid.
+// Returns true if the ref exists, false if it doesn't exist (not an error condition).
+// Returns error only for git command failures or repository issues.
+func (gm *GitManager) VerifyRef(ref string) (bool, error) {
+	_, err := ExecGitCommand(gm.repoPath, "rev-parse", "--verify", ref)
+	if err != nil {
+		// Check if it's a "ref doesn't exist" vs actual git error
+		if exitError, ok := err.(*exec.ExitError); ok {
+			stderr := string(exitError.Stderr)
+			if exitError.ExitCode() == 128 && strings.Contains(stderr, "Needed a single revision") {
+				return false, nil // Reference doesn't exist - not an error
+			}
+		}
+		return false, enhanceGitError(err, "verify ref")
+	}
+	return true, nil
+}
+
+// VerifyRefInPath verifies that a git reference exists in a specific worktree/repository path.
+// Returns true if the ref exists, false if it doesn't exist (not an error condition).
+// Returns error only for git command failures or repository issues.
+func (gm *GitManager) VerifyRefInPath(path, ref string) (bool, error) {
+	_, err := ExecGitCommand(path, "rev-parse", "--verify", ref)
+	if err != nil {
+		// Check if it's a "ref doesn't exist" vs actual git error
+		if exitError, ok := err.(*exec.ExitError); ok {
+			stderr := string(exitError.Stderr)
+			if exitError.ExitCode() == 128 && strings.Contains(stderr, "Needed a single revision") {
+				return false, nil // Reference doesn't exist - not an error
+			}
+		}
+		return false, enhanceGitError(err, "verify ref")
+	}
+	return true, nil
+}
+
 // BranchExistsLocalOrRemote checks if a branch exists either locally or remotely
 func (gm *GitManager) BranchExistsLocalOrRemote(branchName string) (bool, error) {
 	// // Check if local branch exists

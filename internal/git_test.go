@@ -313,3 +313,166 @@ func TestGitManager_GetAheadBehindCount(t *testing.T) {
 		})
 	}
 }
+
+func TestGitManager_VerifyRef(t *testing.T) {
+	repo := testutils.NewGitTestRepo(t,
+		testutils.WithDefaultBranch("main"),
+		testutils.WithUser("Test User", "test@example.com"),
+		testutils.WithRemoteName("origin"),
+	)
+	defer repo.Cleanup()
+
+	gitManager, err := NewGitManager(repo.GetLocalPath(), "worktrees")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		setup       func(t *testing.T, repo *testutils.GitTestRepo)
+		ref         string
+		expectExist bool
+		expectError bool
+	}{
+		{
+			name: "existing branch",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// main branch should exist by default
+			},
+			ref:         "main",
+			expectExist: true,
+			expectError: false,
+		},
+		{
+			name: "non-existing branch",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// No setup needed
+			},
+			ref:         "nonexistent-branch",
+			expectExist: false,
+			expectError: false,
+		},
+		{
+			name: "existing remote branch",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// Create and push a branch to create remote ref
+				err := repo.InLocalRepo(func() error {
+					err := execGitCommandRun(repo.GetLocalPath(), "checkout", "-b", "feature/remote-test")
+					if err != nil {
+						return err
+					}
+					return execGitCommandRun(repo.GetLocalPath(), "push", "-u", "origin", "feature/remote-test")
+				})
+				require.NoError(t, err)
+			},
+			ref:         "origin/feature/remote-test",
+			expectExist: true,
+			expectError: false,
+		},
+		{
+			name: "existing commit hash",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// Get the current commit hash - it should exist
+			},
+			ref:         "HEAD",
+			expectExist: true,
+			expectError: false,
+		},
+		{
+			name: "invalid ref format",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// No setup needed
+			},
+			ref:         "invalid..ref",
+			expectExist: false,
+			expectError: false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup(t, repo)
+
+			exists, err := gitManager.VerifyRef(tt.ref)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectExist, exists)
+			}
+		})
+	}
+}
+
+func TestGitManager_VerifyRefInPath(t *testing.T) {
+	repo := testutils.NewGitTestRepo(t,
+		testutils.WithDefaultBranch("main"),
+		testutils.WithUser("Test User", "test@example.com"),
+		testutils.WithRemoteName("origin"),
+	)
+	defer repo.Cleanup()
+
+	gitManager, err := NewGitManager(repo.GetLocalPath(), "worktrees")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		setup       func(t *testing.T, repo *testutils.GitTestRepo)
+		testPath    func(repo *testutils.GitTestRepo) string
+		ref         string
+		expectExist bool
+		expectError bool
+	}{
+		{
+			name: "existing branch in main repo",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// main branch should exist by default
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			ref:         "main",
+			expectExist: true,
+			expectError: false,
+		},
+		{
+			name: "non-existing branch in main repo",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// No setup needed
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			ref:         "nonexistent-branch",
+			expectExist: false,
+			expectError: false,
+		},
+		{
+			name: "invalid path",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// No setup needed
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return "/nonexistent/path"
+			},
+			ref:         "main",
+			expectExist: false,
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup(t, repo)
+
+			testPath := tt.testPath(repo)
+			exists, err := gitManager.VerifyRefInPath(testPath, tt.ref)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectExist, exists)
+			}
+		})
+	}
+}
