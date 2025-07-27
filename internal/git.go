@@ -6,6 +6,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
@@ -518,14 +519,10 @@ func (gm *GitManager) GetWorktreeStatus(worktreePath string) (*GitStatus, error)
 	}
 
 	// Get ahead/behind info
-	output, err = ExecGitCommand(worktreePath, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
-	if err == nil {
-		parts := strings.Fields(string(output))
-		if len(parts) == 2 {
-			if _, err := fmt.Sscanf(parts[0], "%d", &status.Ahead); err == nil {
-				_, _ = fmt.Sscanf(parts[1], "%d", &status.Behind)
-			}
-		}
+	status.Ahead, status.Behind, err = gm.GetAheadBehindCount(worktreePath)
+	if err != nil {
+		// Maintain backward compatibility - use 0,0 if error occurs
+		status.Ahead, status.Behind = 0, 0
 	}
 
 	return status, nil
@@ -649,6 +646,34 @@ func (gm *GitManager) GetUpstreamBranch(worktreePath string) (string, error) {
 		return "", enhanceGitError(err, "get upstream branch")
 	}
 	return strings.TrimSpace(string(output)), nil
+}
+
+// GetAheadBehindCount returns the number of commits ahead and behind the upstream branch.
+// Returns (0, 0, nil) if no upstream is set (not an error condition).
+func (gm *GitManager) GetAheadBehindCount(worktreePath string) (int, int, error) {
+	output, err := ExecGitCommandCombined(worktreePath, "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
+	if err != nil {
+		// Check if this is a "no upstream" error vs a real git error
+		errStr := string(output)
+		if strings.Contains(errStr, "no upstream configured") {
+			return 0, 0, nil // No upstream set - not an error
+		}
+		return 0, 0, enhanceGitError(err, "get ahead/behind count")
+	}
+
+	parts := strings.Fields(strings.TrimSpace(string(output)))
+	if len(parts) != 2 {
+		return 0, 0, fmt.Errorf("unexpected git rev-list output format: %s", string(output))
+	}
+
+	ahead, err1 := strconv.Atoi(parts[0])
+	behind, err2 := strconv.Atoi(parts[1])
+
+	if err1 != nil || err2 != nil {
+		return 0, 0, fmt.Errorf("failed to parse ahead/behind counts: ahead=%s, behind=%s", parts[0], parts[1])
+	}
+
+	return ahead, behind, nil
 }
 
 func (gm *GitManager) PushWorktree(worktreePath string) error {

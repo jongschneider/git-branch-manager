@@ -301,16 +301,10 @@ func getBaseBranchInfo(worktreePath, worktreeName string, manager *internal.Mana
 	}
 
 	// Get ahead/behind count
-	cmd := exec.Command("git", "rev-list", "--left-right", "--count", "HEAD...@{upstream}")
-	cmd.Dir = worktreePath
-	output, err := cmd.Output()
-	aheadBy, behindBy := 0, 0
-	if err == nil {
-		parts := strings.Fields(string(output))
-		if len(parts) == 2 {
-			aheadBy, _ = strconv.Atoi(parts[0])
-			behindBy, _ = strconv.Atoi(parts[1])
-		}
+	aheadBy, behindBy, err := manager.GetGitManager().GetAheadBehindCount(worktreePath)
+	if err != nil {
+		// Maintain backward compatibility - use 0,0 if error occurs
+		aheadBy, behindBy = 0, 0
 	}
 
 	// Try to determine actual base branch - first check stored information

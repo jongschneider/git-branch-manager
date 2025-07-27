@@ -197,3 +197,119 @@ func TestGitManager_GetUpstreamBranch(t *testing.T) {
 		})
 	}
 }
+
+func TestGitManager_GetAheadBehindCount(t *testing.T) {
+	repo := testutils.NewGitTestRepo(t,
+		testutils.WithDefaultBranch("main"),
+		testutils.WithUser("Test User", "test@example.com"),
+		testutils.WithRemoteName("origin"),
+	)
+	defer repo.Cleanup()
+
+	gitManager, err := NewGitManager(repo.GetLocalPath(), "worktrees")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name           string
+		setup          func(t *testing.T, repo *testutils.GitTestRepo)
+		testPath       func(repo *testutils.GitTestRepo) string
+		expectedAhead  int
+		expectedBehind int
+		expectError    bool
+	}{
+		{
+			name: "branch with upstream and commits ahead",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// Create and checkout a branch, set upstream, then add commits
+				must(t, repo.InLocalRepo(func() error {
+					err := execGitCommandRun(repo.GetLocalPath(), "checkout", "-b", "feature/ahead")
+					if err != nil {
+						return err
+					}
+					// Push to set up tracking
+					err = execGitCommandRun(repo.GetLocalPath(), "push", "-u", "origin", "feature/ahead")
+					if err != nil {
+						return err
+					}
+					// Add a local commit to be ahead
+					err = repo.WriteFile("ahead.txt", "ahead content")
+					if err != nil {
+						return err
+					}
+					return execGitCommandRun(repo.GetLocalPath(), "add", "ahead.txt")
+				}))
+				must(t, repo.CommitChanges("Add ahead commit"))
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			expectedAhead:  1,
+			expectedBehind: 0,
+			expectError:    false,
+		},
+		{
+			name: "branch without upstream",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// Create a local-only branch
+				must(t, repo.InLocalRepo(func() error {
+					return execGitCommandRun(repo.GetLocalPath(), "checkout", "-b", "local-only")
+				}))
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			expectedAhead:  0,
+			expectedBehind: 0,
+			expectError:    false,
+		},
+		{
+			name: "branch with upstream and no divergence",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// Create and checkout a branch, set upstream with no extra commits
+				must(t, repo.InLocalRepo(func() error {
+					err := execGitCommandRun(repo.GetLocalPath(), "checkout", "-b", "feature/even")
+					if err != nil {
+						return err
+					}
+					// Push to set up tracking
+					return execGitCommandRun(repo.GetLocalPath(), "push", "-u", "origin", "feature/even")
+				}))
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			expectedAhead:  0,
+			expectedBehind: 0,
+			expectError:    false,
+		},
+		{
+			name: "invalid path",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) {
+				// No setup needed
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return "/nonexistent/path"
+			},
+			expectedAhead:  0,
+			expectedBehind: 0,
+			expectError:    true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.setup(t, repo)
+
+			testPath := tt.testPath(repo)
+			ahead, behind, err := gitManager.GetAheadBehindCount(testPath)
+
+			if tt.expectError {
+				assert.Error(t, err)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, tt.expectedAhead, ahead)
+				assert.Equal(t, tt.expectedBehind, behind)
+			}
+		})
+	}
+}

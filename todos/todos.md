@@ -8,10 +8,6 @@
 
 
 
-- [ ] **Add GetAheadBehindCount utility function to GitManager**
-  - Location: `internal/git.go` 
-  - Replace pattern: `git rev-list --left-right --count HEAD...@{upstream}`
-  - Files affected: `cmd/info.go:309`, `internal/git.go:521`
 
 - [ ] **Replace duplicate branch status calls in cmd/info.go with new utilities**
   - Update lines 291, 300, 309 to use new GitManager methods
