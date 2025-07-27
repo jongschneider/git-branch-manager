@@ -78,7 +78,7 @@ test-changed:
         packages=$(echo "$changed_files" | xargs dirname | sort -u | sed 's|^|./|' | sed 's|$|/...|' | tr '\n' ' ')
         for pkg in $packages; do
             echo "Testing $pkg..."
-            go test -v "$pkg" || exit 1
+            go test -timeout 10m -v "$pkg" || exit 1
         done
         echo "✓ All tests passed"
     else
@@ -90,7 +90,7 @@ test:
     #!/usr/bin/env bash
     set -euo pipefail
     echo "Running all tests..."
-    go test -v ./... || exit 1
+    go test -timeout 10m -v ./... || exit 1
     echo "✓ All tests passed"
 
 

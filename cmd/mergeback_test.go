@@ -27,8 +27,8 @@ func TestMergebackCommand(t *testing.T) {
 		{
 			name:        "no arguments - should attempt auto-detection",
 			args:        []string{},
-			expectError: true, // Will fail due to no confirmation input in test
-			errorMsg:    "failed to read confirmation",
+			expectError: false, // Now should work with simulated input
+			errorMsg:    "",
 		},
 		{
 			name:        "with worktree name",
@@ -69,7 +69,21 @@ func TestMergebackCommand(t *testing.T) {
 			args := append([]string{"mergeback"}, tt.args...)
 			cmd.SetArgs(args)
 
-			err = cmd.Execute()
+			// Handle interactive prompts by simulating "y" then "n" responses
+			if tt.name == "no arguments - should attempt auto-detection" {
+				// Simulate "y" for auto-detection confirmation, then "n" for merge prompt
+				err = simulateUserInput("y\nn", func() error {
+					return cmd.Execute()
+				})
+			} else if !tt.expectError {
+				// Simulate "n" for merge prompt for successful tests
+				err = simulateUserInput("n", func() error {
+					return cmd.Execute()
+				})
+			} else {
+				// For error cases, execute without simulation
+				err = cmd.Execute()
+			}
 
 			if tt.expectError {
 				assert.Error(t, err)
@@ -439,7 +453,10 @@ func TestMergebackIntegration(t *testing.T) {
 		cmd := newRootCommand()
 		cmd.SetArgs([]string{"mergeback", "fix-auth"})
 
-		err := cmd.Execute()
+		// Simulate "n" for merge prompt
+		err := simulateUserInput("n", func() error {
+			return cmd.Execute()
+		})
 		assert.NoError(t, err)
 
 		// Verify worktree was created (targets main based on current branch detection logic)
