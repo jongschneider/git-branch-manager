@@ -100,7 +100,9 @@ func getWorktreeInfo(manager *internal.Manager, worktreeName string) (*internal.
 	}
 
 	// Get recent commits
-	commits, err := getRecentCommits(targetWorktree.Path, 5)
+	commits, err := manager.GetGitManager().GetCommitHistory(targetWorktree.Path, internal.CommitHistoryOptions{
+		Limit: 5,
+	})
 	if err != nil {
 		PrintVerbose("Failed to get recent commits for worktree %s: %v", worktreeName, err)
 	}
@@ -155,41 +157,6 @@ func getWorktreeCreationTime(worktreePath string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return stat.ModTime(), nil
-}
-
-func getRecentCommits(worktreePath string, count int) ([]internal.CommitInfo, error) {
-	cmd := exec.Command("git", "log", fmt.Sprintf("-%d", count), "--oneline", "--format=%H|%s|%an|%ct")
-	cmd.Dir = worktreePath
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-
-	var commits []internal.CommitInfo
-	lines := strings.SplitSeq(strings.TrimSpace(string(output)), "\n")
-	for line := range lines {
-		if line == "" {
-			continue
-		}
-		parts := strings.Split(line, "|")
-		if len(parts) != 4 {
-			continue
-		}
-
-		timestamp, err := strconv.ParseInt(parts[3], 10, 64)
-		if err != nil {
-			continue
-		}
-
-		commits = append(commits, internal.CommitInfo{
-			Hash:      parts[0],
-			Message:   parts[1],
-			Author:    parts[2],
-			Timestamp: time.Unix(timestamp, 0),
-		})
-	}
-
-	return commits, nil
 }
 
 func getModifiedFiles(worktreePath string) ([]internal.FileChange, error) {
