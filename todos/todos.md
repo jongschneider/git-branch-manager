@@ -14,10 +14,7 @@
 ### Phase 2: Medium Priority - Repository Introspection
 
 - [x] **~~Replace duplicate rev-parse calls in cmd/info.go with new utilities~~** (COMPLETED - already using VerifyRef utilities)
-
-- [ ] **Replace duplicate rev-parse calls in internal/git_add.go with new utilities**
-  - Update lines 48, 54, 89 to use new utilities
-  - Test: `gbm add` command still works correctly
+- [x] **~~Replace duplicate rev-parse calls in internal/git_add.go with new utilities~~** (COMPLETED - already using GetCommitHash, VerifyRef utilities)
 
 ### Phase 3: Low Priority - Info Command Extraction
 
