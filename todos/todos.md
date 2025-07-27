@@ -21,9 +21,6 @@
 
 
 
-- [ ] **Extract git diff calls from cmd/info.go to use GetFileChanges**
-  - Update lines 197, 238 to use new utility
-  - Test: `gbm info` shows correct file changes
 
 ### Validation
 

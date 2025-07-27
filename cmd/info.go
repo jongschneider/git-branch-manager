@@ -7,7 +7,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"strconv"
 	"strings"
 	"time"
 
@@ -108,7 +107,10 @@ func getWorktreeInfo(manager *internal.Manager, worktreeName string) (*internal.
 	}
 
 	// Get modified files
-	modifiedFiles, err := getModifiedFiles(targetWorktree.Path)
+	modifiedFiles, err := manager.GetGitManager().GetFileChanges(targetWorktree.Path, internal.FileChangeOptions{
+		Staged:   true,
+		Unstaged: true,
+	})
 	if err != nil {
 		PrintVerbose("Failed to get modified files for worktree %s: %v", worktreeName, err)
 	}
@@ -157,100 +159,6 @@ func getWorktreeCreationTime(worktreePath string) (time.Time, error) {
 		return time.Time{}, err
 	}
 	return stat.ModTime(), nil
-}
-
-func getModifiedFiles(worktreePath string) ([]internal.FileChange, error) {
-	// Get unstaged changes
-	cmd := exec.Command("git", "diff", "--numstat")
-	cmd.Dir = worktreePath
-	output, err := cmd.Output()
-	if err != nil {
-		return nil, err
-	}
-
-	var files []internal.FileChange
-
-	// Parse unstaged changes
-	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
-	for _, line := range lines {
-		if line == "" {
-			continue
-		}
-		parts := strings.Fields(line)
-		if len(parts) != 3 {
-			continue
-		}
-
-		additions, _ := strconv.Atoi(parts[0])
-		deletions, _ := strconv.Atoi(parts[1])
-		path := parts[2]
-
-		// Determine status based on changes
-		status := "M"
-		if additions > 0 && deletions == 0 {
-			status = "A"
-		} else if additions == 0 && deletions > 0 {
-			status = "D"
-		}
-
-		files = append(files, internal.FileChange{
-			Path:      path,
-			Status:    status,
-			Additions: additions,
-			Deletions: deletions,
-		})
-	}
-
-	// Get staged changes
-	cmd = exec.Command("git", "diff", "--cached", "--numstat")
-	cmd.Dir = worktreePath
-	output, err = cmd.Output()
-	if err == nil {
-		lines = strings.Split(strings.TrimSpace(string(output)), "\n")
-		for _, line := range lines {
-			if line == "" {
-				continue
-			}
-			parts := strings.Fields(line)
-			if len(parts) != 3 {
-				continue
-			}
-
-			additions, _ := strconv.Atoi(parts[0])
-			deletions, _ := strconv.Atoi(parts[1])
-			path := parts[2]
-
-			// Check if file already exists in our list
-			found := false
-			for i, existing := range files {
-				if existing.Path == path {
-					// Update existing entry with staged changes
-					files[i].Additions += additions
-					files[i].Deletions += deletions
-					found = true
-					break
-				}
-			}
-
-			if !found {
-				status := "M"
-				if additions > 0 && deletions == 0 {
-					status = "A"
-				} else if additions == 0 && deletions > 0 {
-					status = "D"
-				}
-
-				files = append(files, internal.FileChange{
-					Path:      path,
-					Status:    status,
-					Additions: additions,
-					Deletions: deletions,
-				})
-			}
-		}
-	}
-
-	return files, nil
 }
 
 func getBaseBranchInfo(worktreePath, worktreeName string, manager *internal.Manager) (*internal.BranchInfo, error) {
