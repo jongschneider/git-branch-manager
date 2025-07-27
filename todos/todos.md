@@ -24,10 +24,6 @@
 
 ### Validation
 
-- [ ] **Run full test suite to validate all Git command abstractions**
-  - Command: `just test` or `go test ./...`
-  - Ensure: All tests pass after all refactoring
-  - Verify: No direct `exec.Command("git", ...)` calls outside utilities
 
 ## Notes
 
