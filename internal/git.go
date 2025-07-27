@@ -359,6 +359,119 @@ func (gm *GitManager) GetCommitHashInPath(path, ref string) (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+// GetCommitHistory retrieves commit history with flexible options
+// If path is empty, uses repository root. Returns commits in chronological order (newest first).
+func (gm *GitManager) GetCommitHistory(path string, options CommitHistoryOptions) ([]CommitInfo, error) {
+	if path == "" {
+		path = gm.repoPath
+	}
+
+	args := gm.buildGitLogArgs(options)
+	output, err := ExecGitCommand(path, args...)
+	if err != nil {
+		return nil, enhanceGitError(err, "get commit history")
+	}
+
+	return gm.parseCommitHistory(string(output))
+}
+
+// buildGitLogArgs constructs git log command arguments based on options
+func (gm *GitManager) buildGitLogArgs(options CommitHistoryOptions) []string {
+	args := []string{"log"}
+
+	// Add limit
+	if options.Limit > 0 {
+		args = append(args, fmt.Sprintf("-%d", options.Limit))
+	}
+
+	// Add range
+	if options.Range != "" {
+		args = append(args, options.Range)
+	}
+
+	// Add since
+	if options.Since != "" {
+		args = append(args, "--since="+options.Since)
+	}
+
+	// Add flags
+	if options.MergesOnly {
+		args = append(args, "--merges")
+	}
+
+	if options.AllBranches {
+		args = append(args, "--all")
+	}
+
+	if options.GrepPattern != "" {
+		args = append(args, "--grep="+options.GrepPattern)
+	}
+
+	// Add format
+	format := options.CustomFormat
+	if format == "" {
+		format = "%H|%s|%an|%ae|%ct|%D" // hash|message|author|email|timestamp|refs
+	}
+	args = append(args, "--pretty=format:"+format)
+
+	return args
+}
+
+// parseCommitHistory parses git log output into CommitInfo structs
+func (gm *GitManager) parseCommitHistory(output string) ([]CommitInfo, error) {
+	if strings.TrimSpace(output) == "" {
+		return []CommitInfo{}, nil
+	}
+
+	lines := strings.Split(strings.TrimSpace(output), "\n")
+	commits := make([]CommitInfo, 0, len(lines))
+
+	for _, line := range lines {
+		if strings.TrimSpace(line) == "" {
+			continue
+		}
+
+		parts := strings.Split(line, "|")
+		if len(parts) < 3 {
+			continue // Skip malformed lines - need at least hash, message, author
+		}
+
+		// Parse timestamp if available
+		var timestamp int64 = 0
+		if len(parts) > 4 {
+			timestampStr := strings.TrimSpace(parts[4])
+			parsedTime, err := strconv.ParseInt(timestampStr, 10, 64)
+			if err == nil {
+				timestamp = parsedTime
+			}
+		}
+
+		// Parse other fields with defaults
+		email := ""
+		if len(parts) > 3 {
+			email = strings.TrimSpace(parts[3])
+		}
+
+		refs := ""
+		if len(parts) > 5 {
+			refs = strings.TrimSpace(parts[5])
+		}
+
+		commit := CommitInfo{
+			Hash:      strings.TrimSpace(parts[0]),
+			Message:   strings.TrimSpace(parts[1]),
+			Author:    strings.TrimSpace(parts[2]),
+			Email:     email,
+			Timestamp: time.Unix(timestamp, 0),
+			Refs:      refs,
+		}
+
+		commits = append(commits, commit)
+	}
+
+	return commits, nil
+}
+
 // BranchExistsLocalOrRemote checks if a branch exists either locally or remotely
 func (gm *GitManager) BranchExistsLocalOrRemote(branchName string) (bool, error) {
 	// // Check if local branch exists
@@ -863,7 +976,29 @@ type CommitInfo struct {
 	Hash      string
 	Message   string
 	Author    string
+	Email     string
 	Timestamp time.Time
+	Refs      string // For commits with branch/tag references
+}
+
+// CommitHistoryOptions defines options for retrieving commit history
+type CommitHistoryOptions struct {
+	// Limit number of commits (equivalent to -N flag)
+	Limit int
+
+	// Range specification (e.g., "origin/main..origin/feature", "HEAD~5..HEAD")
+	Range string
+
+	// Since timestamp or relative time (e.g., "7.days.ago", "2023-01-01")
+	Since string
+
+	// Additional git log flags
+	MergesOnly  bool   // --merges
+	AllBranches bool   // --all
+	GrepPattern string // --grep=pattern
+
+	// Format specification - if empty, uses default: %H|%s|%an|%ae|%ct|%D
+	CustomFormat string
 }
 
 // FileChange represents a modified file

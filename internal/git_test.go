@@ -632,3 +632,90 @@ func TestGitManager_GetCommitHashInPath(t *testing.T) {
 	}
 }
 
+func TestGitManager_GetCommitHistory(t *testing.T) {
+	repo := testutils.NewGitTestRepo(t,
+		testutils.WithDefaultBranch("main"),
+		testutils.WithUser("Test User", "test@example.com"),
+	)
+	defer repo.Cleanup()
+
+	gitManager, err := NewGitManager(repo.GetLocalPath(), "worktrees")
+	require.NoError(t, err)
+
+	// Create some test commits using git harness utilities
+	var secondCommitHash string
+	must(t, repo.InLocalRepo(func() error {
+		// Create first commit
+		must(t, repo.WriteFile("test1.txt", "content1"))
+		must(t, repo.CommitChanges("First test commit"))
+
+		// Create second commit
+		must(t, repo.WriteFile("test2.txt", "content2"))
+		must(t, repo.CommitChanges("Second test commit"))
+
+		// Get second commit hash using GitManager utility
+		hash, err := gitManager.GetCommitHash("HEAD")
+		if err != nil {
+			return err
+		}
+		secondCommitHash = hash
+
+		return nil
+	}))
+
+	tests := []struct {
+		name          string
+		options       CommitHistoryOptions
+		expectedCount int
+		expectedFirst string // Hash of first commit in result
+		expectError   bool
+	}{
+		{
+			name: "get recent commits with limit",
+			options: CommitHistoryOptions{
+				Limit: 1,
+			},
+			expectedCount: 1,
+			expectedFirst: secondCommitHash, // Most recent commit
+			expectError:   false,
+		},
+		{
+			name: "get all commits",
+			options: CommitHistoryOptions{
+				Limit: 10, // More than we have
+			},
+			expectedCount: 3, // main initial + first + second
+			expectedFirst: secondCommitHash,
+			expectError:   false,
+		},
+		{
+			name: "get commits with custom format",
+			options: CommitHistoryOptions{
+				Limit:        1,
+				CustomFormat: "%H|%s|%an",
+			},
+			expectedCount: 1,
+			expectedFirst: secondCommitHash,
+			expectError:   false,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			commits, err := gitManager.GetCommitHistory("", tt.options)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Nil(t, commits)
+			} else {
+				assert.NoError(t, err)
+				assert.Len(t, commits, tt.expectedCount)
+				if tt.expectedCount > 0 {
+					assert.Equal(t, tt.expectedFirst, commits[0].Hash)
+					assert.NotEmpty(t, commits[0].Message)
+					assert.NotEmpty(t, commits[0].Author)
+				}
+			}
+		})
+	}
+}

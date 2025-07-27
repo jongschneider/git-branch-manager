@@ -18,10 +18,6 @@
 
 ### Phase 3: Low Priority - Info Command Extraction
 
-- [ ] **Add GetCommitHistory utility function to GitManager**
-  - Location: `internal/git.go`
-  - Replace pattern: `git log --oneline --format=...`
-  - Files affected: `cmd/info.go:161`
 
 - [ ] **Add GetFileChanges utility function to GitManager**
   - Location: `internal/git.go`
