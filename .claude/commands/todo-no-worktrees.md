@@ -40,8 +40,12 @@ Structured workflow to transform vague todos into implemented features. Works on
 
          ## Commands
          - Build: [command]
-         - Test: [command]
+         - Test: [command] 
+         - Test Changed: [command for testing only changed packages]
+         - Format: [command]
+         - Vet: [command]
          - Lint: [command]
+         - Validate: [command for full validation]
          - Dev/Run: [command if applicable]
 
          ## Testing
@@ -110,14 +114,17 @@ Structured workflow to transform vague todos into implemented features. Works on
       - Add new checkbox to `task.md` before proceeding
    - For the current checkbox:
       - Make code changes
+      - Run validation: `just format && just vet && just lint`
+         - If validation fails, fix issues before proceeding
       - Summarize changes
       - STOP → "Approve these changes? (y/n)"
       - Mark checkbox complete in `task.md`
       - Stage progress: `git add -A`
-2. After all checkboxes are complete, run project validation (lint/test/build).
+2. After all checkboxes are complete, run full project validation: `just format && just vet && just lint && just build && just test-changed`
     - If validation fails:
       - Report full error(s)
-      - Propose one or more new checkboxes to fix the issue
+      - Fix all issues that come up
+      - Propose one or more new checkboxes to fix remaining issues if needed
       - STOP → "Add these checkboxes to the plan? (y/n)"
       - Add new checkbox(es) to implementation plan in `task.md`
       - Go to step 1 of `IMPLEMENT`.
@@ -131,13 +138,15 @@ Structured workflow to transform vague todos into implemented features. Works on
 5. Set `**Status**: AwaitingCommit` in `task.md`
 
 ### COMMIT
-1. Present summary of what was done
-2. STOP → "Ready to commit all changes? (y/n)"
-3. Set `**Status**: Done` in `task.md`
-4. Move task and analysis to done:
+1. Run final validation: `just format && just vet && just lint && just build && just test-changed`
+   - Fix any issues that come up before proceeding
+2. Present summary of what was done
+3. STOP → "Ready to commit all changes? (y/n)"
+4. Set `**Status**: Done` in `task.md`
+5. Move task and analysis to done:
    - `mv todos/work/[timestamp]-[task-title-slug]/task.md todos/done/[timestamp]-[task-title-slug].md`
    - `mv todos/work/[timestamp]-[task-title-slug]/analysis.md todos/done/[timestamp]-[task-title-slug]-analysis.md`
    - `rmdir todos/work/[timestamp]-[task-title-slug]/`
-5. Stage all changes: `git add -A`
-6. Create single commit with descriptive message: `git commit -m "[task-title]: [summary of changes]"`
-7. STOP → "Task complete! Continue with next todo? (y/n)"
+6. Stage all changes: `git add -A`
+7. Create single commit with descriptive message: `git commit -m "[task-title]: [summary of changes]"`
+8. STOP → "Task complete! Continue with next todo? (y/n)"

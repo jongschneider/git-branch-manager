@@ -13,11 +13,7 @@
 
 ### Phase 2: Medium Priority - Repository Introspection
 
-
-
-- [ ] **Replace duplicate rev-parse calls in cmd/info.go with new utilities**
-  - Update line 338 to use VerifyRef
-  - Test: `gbm info` command still works correctly
+- [x] **~~Replace duplicate rev-parse calls in cmd/info.go with new utilities~~** (COMPLETED - already using VerifyRef utilities)
 
 - [ ] **Replace duplicate rev-parse calls in internal/git_add.go with new utilities**
   - Update lines 48, 54, 89 to use new utilities

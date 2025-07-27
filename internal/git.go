@@ -13,6 +13,7 @@ import (
 	"github.com/go-git/go-git/v5"
 	"github.com/go-git/go-git/v5/plumbing"
 	"github.com/go-git/go-git/v5/plumbing/storer"
+	"github.com/go-git/go-git/v5/plumbing/transport/ssh"
 )
 
 type GitManager struct {
@@ -516,12 +517,20 @@ func (gm *GitManager) PromoteWorktree(sourceWorktreePath, targetWorktreePath str
 }
 
 func (gm *GitManager) FetchAll() error {
+	// Create SSH agent authentication
+	auth, err := ssh.NewSSHAgentAuth("git")
+	if err != nil {
+		return fmt.Errorf("failed to create SSH agent auth: %w", err)
+	}
+
 	remote, err := gm.repo.Remote("origin")
 	if err != nil {
 		return fmt.Errorf("failed to get origin remote: %w", err)
 	}
 
-	err = remote.Fetch(&git.FetchOptions{})
+	err = remote.Fetch(&git.FetchOptions{
+		Auth: auth,
+	})
 	if err != nil && err != git.NoErrAlreadyUpToDate {
 		return fmt.Errorf("failed to fetch from remote: %w", err)
 	}
