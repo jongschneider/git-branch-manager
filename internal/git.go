@@ -578,6 +578,16 @@ func (gm *GitManager) GetCurrentBranch() (string, error) {
 	return strings.TrimSpace(string(output)), nil
 }
 
+// GetCurrentBranchInPath gets the current branch name from a specified directory path
+func (gm *GitManager) GetCurrentBranchInPath(path string) (string, error) {
+	output, err := ExecGitCommand(path, "rev-parse", "--abbrev-ref", "HEAD")
+	if err != nil {
+		return "", enhanceGitError(err, "get current branch")
+	}
+
+	return strings.TrimSpace(string(output)), nil
+}
+
 func (gm *GitManager) GetDefaultBranch() (string, error) {
 	// Try to get the default branch from remote HEAD
 	output, err := ExecGitCommand(gm.repoPath, "symbolic-ref", "refs/remotes/origin/HEAD")
@@ -673,16 +683,16 @@ func (gm *GitManager) PullWorktree(worktreePath string) error {
 	finalArgs := []string{"pull"}
 
 	// Check if upstream is set
-	output, err = ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "@{upstream}")
+	_, err = ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "@{upstream}")
 	if err != nil {
 		// No upstream set, try to set it and pull
 		remoteBranch := Remote(currentBranch)
 
 		// Check if remote branch exists
-		output, err = ExecGitCommand(worktreePath, "rev-parse", "--verify", remoteBranch)
+		_, err = ExecGitCommand(worktreePath, "rev-parse", "--verify", remoteBranch)
 		if err == nil {
 			// Remote branch exists, set upstream and pull
-			output, err = ExecGitCommand(worktreePath, "branch", "--set-upstream-to", remoteBranch)
+			_, err = ExecGitCommand(worktreePath, "branch", "--set-upstream-to", remoteBranch)
 			if err != nil {
 				return fmt.Errorf("failed to set upstream: %w", err)
 			}

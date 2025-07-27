@@ -288,18 +288,16 @@ func getModifiedFiles(worktreePath string) ([]internal.FileChange, error) {
 
 func getBaseBranchInfo(worktreePath, worktreeName string, manager *internal.Manager) (*internal.BranchInfo, error) {
 	// Get current branch (not used for base branch detection anymore)
-	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "HEAD")
-	cmd.Dir = worktreePath
-	output, err := cmd.Output()
+	_, err := manager.GetGitManager().GetCurrentBranchInPath(worktreePath)
 	if err != nil {
 		return nil, err
 	}
-	_ = strings.TrimSpace(string(output)) // Not needed for base branch detection
+	// Not needed for base branch detection
 
 	// Get upstream branch
-	cmd = exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
+	cmd := exec.Command("git", "rev-parse", "--abbrev-ref", "@{upstream}")
 	cmd.Dir = worktreePath
-	output, err = cmd.Output()
+	output, err := cmd.Output()
 	upstream := ""
 	if err == nil {
 		upstream = strings.TrimSpace(string(output))
