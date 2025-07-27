@@ -2,6 +2,7 @@ package internal
 
 import (
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"gbm/internal/testutils"
@@ -476,3 +477,158 @@ func TestGitManager_VerifyRefInPath(t *testing.T) {
 		})
 	}
 }
+
+func TestGitManager_GetCommitHash(t *testing.T) {
+	repo := testutils.NewGitTestRepo(t,
+		testutils.WithDefaultBranch("main"),
+		testutils.WithUser("Test User", "test@example.com"),
+		testutils.WithRemoteName("origin"),
+	)
+	defer repo.Cleanup()
+
+	gitManager, err := NewGitManager(repo.GetLocalPath(), "worktrees")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		setup       func(t *testing.T, repo *testutils.GitTestRepo) string // returns expected hash
+		ref         string
+		expectError bool
+	}{
+		{
+			name: "HEAD reference",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) string {
+				// Get the current HEAD commit hash to compare with
+				output, err := ExecGitCommand(repo.GetLocalPath(), "rev-parse", "HEAD")
+				require.NoError(t, err)
+				return strings.TrimSpace(string(output))
+			},
+			ref:         "HEAD",
+			expectError: false,
+		},
+		{
+			name: "main branch",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) string {
+				// main branch should point to same commit as HEAD initially
+				output, err := ExecGitCommand(repo.GetLocalPath(), "rev-parse", "main")
+				require.NoError(t, err)
+				return strings.TrimSpace(string(output))
+			},
+			ref:         "main",
+			expectError: false,
+		},
+		{
+			name: "non-existent branch",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) string {
+				return "" // No expected hash for error case
+			},
+			ref:         "non-existent-branch",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expectedHash := tt.setup(t, repo)
+
+			hash, err := gitManager.GetCommitHash(tt.ref)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Empty(t, hash)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, expectedHash, hash)
+				assert.Len(t, hash, 40) // Full SHA-1 hash should be 40 characters
+			}
+		})
+	}
+}
+
+func TestGitManager_GetCommitHashInPath(t *testing.T) {
+	repo := testutils.NewGitTestRepo(t,
+		testutils.WithDefaultBranch("main"),
+		testutils.WithUser("Test User", "test@example.com"),
+		testutils.WithRemoteName("origin"),
+	)
+	defer repo.Cleanup()
+
+	gitManager, err := NewGitManager(repo.GetLocalPath(), "worktrees")
+	require.NoError(t, err)
+
+	tests := []struct {
+		name        string
+		setup       func(t *testing.T, repo *testutils.GitTestRepo) string // returns expected hash
+		testPath    func(repo *testutils.GitTestRepo) string
+		ref         string
+		expectError bool
+	}{
+		{
+			name: "HEAD from repository root",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) string {
+				output, err := ExecGitCommand(repo.GetLocalPath(), "rev-parse", "HEAD")
+				require.NoError(t, err)
+				return strings.TrimSpace(string(output))
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			ref:         "HEAD",
+			expectError: false,
+		},
+		{
+			name: "main branch from repository root",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) string {
+				output, err := ExecGitCommand(repo.GetLocalPath(), "rev-parse", "main")
+				require.NoError(t, err)
+				return strings.TrimSpace(string(output))
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			ref:         "main",
+			expectError: false,
+		},
+		{
+			name: "non-existent branch",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) string {
+				return ""
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return repo.GetLocalPath()
+			},
+			ref:         "non-existent-branch",
+			expectError: true,
+		},
+		{
+			name: "invalid path",
+			setup: func(t *testing.T, repo *testutils.GitTestRepo) string {
+				return ""
+			},
+			testPath: func(repo *testutils.GitTestRepo) string {
+				return "/non/existent/path"
+			},
+			ref:         "HEAD",
+			expectError: true,
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			expectedHash := tt.setup(t, repo)
+			testPath := tt.testPath(repo)
+
+			hash, err := gitManager.GetCommitHashInPath(testPath, tt.ref)
+
+			if tt.expectError {
+				assert.Error(t, err)
+				assert.Empty(t, hash)
+			} else {
+				assert.NoError(t, err)
+				assert.Equal(t, expectedHash, hash)
+				assert.Len(t, hash, 40) // Full SHA-1 hash should be 40 characters
+			}
+		})
+	}
+}
+

@@ -51,10 +51,11 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 				}
 
 				// Get the commit hash of the base branch
-				baseCommit, err := ExecGitCommand(gm.repoPath, "rev-parse", baseBranch)
+				baseCommitHash, err := gm.GetCommitHash(baseBranch)
 				if err != nil {
 					return fmt.Errorf("failed to get base branch commit: %w", err)
 				}
+				baseCommit := []byte(baseCommitHash)
 
 				// Check if the existing branch is based on the correct base branch
 				if strings.TrimSpace(string(mergeBase)) != strings.TrimSpace(string(baseCommit)) {

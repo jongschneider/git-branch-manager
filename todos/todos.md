@@ -14,10 +14,6 @@
 ### Phase 2: Medium Priority - Repository Introspection
 
 
-- [ ] **Add GetCommitHash utility function to GitManager**
-  - Location: `internal/git.go`
-  - Replace pattern: `git rev-parse <ref>`
-  - Files affected: `internal/git_add.go:48,54`
 
 - [ ] **Replace duplicate rev-parse calls in cmd/info.go with new utilities**
   - Update line 338 to use VerifyRef

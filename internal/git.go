@@ -340,6 +340,24 @@ func (gm *GitManager) VerifyRefInPath(path, ref string) (bool, error) {
 	return true, nil
 }
 
+// GetCommitHash returns the commit hash for a given reference in the repository
+func (gm *GitManager) GetCommitHash(ref string) (string, error) {
+	output, err := ExecGitCommand(gm.repoPath, "rev-parse", ref)
+	if err != nil {
+		return "", enhanceGitError(err, "get commit hash")
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
+// GetCommitHashInPath returns the commit hash for a given reference in a specific path
+func (gm *GitManager) GetCommitHashInPath(path, ref string) (string, error) {
+	output, err := ExecGitCommand(path, "rev-parse", ref)
+	if err != nil {
+		return "", enhanceGitError(err, "get commit hash")
+	}
+	return strings.TrimSpace(string(output)), nil
+}
+
 // BranchExistsLocalOrRemote checks if a branch exists either locally or remotely
 func (gm *GitManager) BranchExistsLocalOrRemote(branchName string) (bool, error) {
 	// // Check if local branch exists
