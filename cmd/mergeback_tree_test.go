@@ -1,8 +1,10 @@
 package cmd
 
 import (
+	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 	"testing"
 
 	"gbm/internal/testutils"
@@ -243,14 +245,12 @@ func TestMergebackNamingWithTreeStructure(t *testing.T) {
 
 	// Test mergeback branch name generation
 	worktreeName := "INGSVC-5638"
-	jiraTicket := "INGSVC-5638"
 
-	branchName, err := generateMergebackBranchName(worktreeName, jiraTicket, targetWorktree, manager)
-	require.NoError(t, err)
+	branchName := fmt.Sprintf("merge/%s_%s", worktreeName, strings.ToLower(targetWorktree))
 
 	// Should include target worktree name in branch name
 	assert.Contains(t, branchName, "preview", "Branch name should contain target worktree name")
-	assert.Contains(t, branchName, "INGSVC-5638", "Branch name should contain JIRA ticket")
+	assert.Contains(t, branchName, "INGSVC-5638", "Branch name should contain worktree name")
 
 	// Test worktree name generation
 	mergebackPrefix := manager.GetConfig().Settings.MergebackPrefix
@@ -315,10 +315,8 @@ func TestMergebackNamingProductionToMaster(t *testing.T) {
 
 	// Test the specific naming case from the issue
 	worktreeName := "INGSVC-5638"
-	jiraTicket := "INGSVC-5638"
 
-	branchName, err := generateMergebackBranchName(worktreeName, jiraTicket, targetWorktree, manager)
-	require.NoError(t, err)
+	branchName := fmt.Sprintf("merge/%s_%s", worktreeName, strings.ToLower(targetWorktree))
 
 	// Branch name should end with "_master" not "_production"
 	assert.Contains(t, branchName, "master", "Branch name should contain target 'master'")

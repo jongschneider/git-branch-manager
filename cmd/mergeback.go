@@ -15,7 +15,7 @@ import (
 
 func newMergebackCommand() *cobra.Command {
 	cmd := &cobra.Command{
-		Use:     "mergeback [worktree-name] [jira-ticket]",
+		Use:     "mergeback [worktree-name]",
 		Aliases: []string{"mb"},
 		Short:   "Create a mergeback worktree to merge changes up the deployment chain",
 		Long: `Create a mergeback worktree to merge changes up the deployment chain.
@@ -24,25 +24,22 @@ The mergeback command automatically:
 - Detects which branch in the mergeback chain needs the merge based on configuration
 - Creates a worktree directory with configurable prefix (default: MERGE_<worktree>_<base>)
 - Creates a new branch with merge/ prefix
-- Integrates with JIRA for branch naming if ticket provided
 
 The worktree prefix can be configured in .gbm/config.toml under settings.mergeback_prefix.
 Set to empty string to disable prefixing (worktrees will still include target suffix for namespace separation).
 
 Examples:
-  gbm mergeback                            # Auto-detects recent hotfix/merge and creates appropriate mergeback
+  gbm mergeback                            # Auto-detects recent merge activity and creates appropriate mergeback
   gbm mergeback <TAB>                      # Shows smart suggestions from recent git activity (press Tab)
   gbm mergeback fix-auth                   # Creates worktree MERGE_fix-auth_preview with branch merge/fix-auth_preview
-  gbm mergeback PROJECT-123                # Creates worktree MERGE_PROJECT-123_main with branch merge/PROJECT-123_summary_main
-  gbm mb deploy-hotfix PROJECT-456         # Creates MERGE_deploy-hotfix_<base> worktree with JIRA integration
+  gbm mb deploy-hotfix                     # Creates MERGE_deploy-hotfix_<base> worktree
 
 Tab Completion:
-  Press TAB to see intelligent suggestions based on recent hotfix/merge activity,
+  Press TAB to see intelligent suggestions based on recent merge activity,
   or press ENTER for automatic detection with confirmation prompt.`,
-		Args: cobra.MaximumNArgs(2),
+		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
 			var worktreeName string
-			var jiraTicket string
 
 			// Create manager
 			manager, err := createInitializedManager()
@@ -56,19 +53,13 @@ Tab Completion:
 
 			// Handle auto-detection if no worktree name provided
 			if len(args) == 0 {
-				worktreeName, jiraTicket, err = autoDetectMergebackTarget(manager)
+				worktreeName, err = autoDetectMergebackTarget(manager)
 				if err != nil {
 					return fmt.Errorf("failed to auto-detect mergeback target: %w", err)
 				}
-				PrintVerbose("Auto-detected mergeback target: %s (JIRA: %s)", worktreeName, jiraTicket)
+				PrintVerbose("Auto-detected mergeback target: %s", worktreeName)
 			} else {
 				worktreeName = args[0]
-				// Check for explicit JIRA ticket in second argument
-				if len(args) > 1 {
-					jiraTicket = args[1]
-				} else if internal.IsJiraKey(worktreeName) {
-					jiraTicket = worktreeName
-				}
 			}
 
 			// Find the target branch for merging
@@ -79,12 +70,8 @@ Tab Completion:
 
 			PrintInfo("Using branch '%s' (worktree '%s') as base for mergeback", baseBranch, baseWorktreeName)
 
-			// Generate mergeback branch name (jiraTicket already set above)
-
-			branchName, err := generateMergebackBranchName(worktreeName, jiraTicket, baseWorktreeName, manager)
-			if err != nil {
-				return fmt.Errorf("failed to generate mergeback branch name: %w", err)
-			}
+			// Generate mergeback branch name
+			branchName := fmt.Sprintf("merge/%s_%s", worktreeName, strings.ToLower(baseWorktreeName))
 
 			// Get mergeback prefix from config and build worktree name
 			mergebackPrefix := manager.GetConfig().Settings.MergebackPrefix
@@ -112,11 +99,8 @@ Tab Completion:
 	// Add smart auto-detection results as tab completion for first argument
 	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
 		if len(args) == 0 {
-			// First argument: provide smart detection results + JIRA completions
+			// First argument: provide smart detection results
 			return getSmartMergebackCompletions(), cobra.ShellCompDirectiveNoFileComp
-		} else if len(args) == 1 {
-			// Second argument: JIRA ticket completions
-			return getJiraCompletions(), cobra.ShellCompDirectiveNoFileComp
 		}
 		return nil, cobra.ShellCompDirectiveNoFileComp
 	}
@@ -223,29 +207,22 @@ func findNextMergeTargetInChain(leaves []*internal.WorktreeNode) (string, string
 	return "", "", fmt.Errorf("no mergeback targets found")
 }
 
-// generateMergebackBranchName creates a mergeback branch name with proper formatting
-// Now includes target branch suffix to prevent conflicts: merge/PROJECT-123_fix_preview
-var generateMergebackBranchName = func(worktreeName, jiraTicket, targetWorktree string, manager *internal.Manager) (string, error) {
-	generator := createBranchNameGenerator("merge")
-	return generator(worktreeName, jiraTicket, strings.ToLower(targetWorktree), manager)
-}
-
 // autoDetectMergebackTarget analyzes recent git history to suggest a mergeback target
-func autoDetectMergebackTarget(manager *internal.Manager) (string, string, error) {
+func autoDetectMergebackTarget(manager *internal.Manager) (string, error) {
 	// Get recent mergeable activity from git history (only hotfix and merge types)
 	activities, err := manager.GetGitManager().GetRecentMergeableActivity(7) // Last 7 days
 	if err != nil {
-		return "", "", fmt.Errorf("failed to analyze git history: %w", err)
+		return "", fmt.Errorf("failed to analyze git history: %w", err)
 	}
 
 	// Filter to only hotfix and merge branches, and check if they're ahead
 	filteredActivities, err := filterAndValidateActivities(activities, manager)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to filter activities: %w", err)
+		return "", fmt.Errorf("failed to filter activities: %w", err)
 	}
 
 	if len(filteredActivities) == 0 {
-		return "", "", fmt.Errorf("no recent hotfix or merge activity found that needs mergeback in the last 7 days")
+		return "", fmt.Errorf("no recent hotfix or merge activity found that needs mergeback in the last 7 days")
 	}
 
 	// Find the most relevant recent activity
@@ -274,7 +251,7 @@ func autoDetectMergebackTarget(manager *internal.Manager) (string, string, error
 	}
 
 	if bestActivity == nil || bestActivity.WorktreeName == "" {
-		return "", "", fmt.Errorf("could not determine worktree name from recent activity")
+		return "", fmt.Errorf("could not determine worktree name from recent activity")
 	}
 
 	PrintInfo("Found recent %s activity: %s (%s)", bestActivity.Type, bestActivity.WorktreeName, bestActivity.CommitMessage)
@@ -292,14 +269,14 @@ func autoDetectMergebackTarget(manager *internal.Manager) (string, string, error
 	fmt.Printf("\n%s ", internal.FormatPrompt("Use this for mergeback? (y/n):"))
 	var response string
 	if _, err := fmt.Scanln(&response); err != nil {
-		return "", "", fmt.Errorf("failed to read confirmation: %w", err)
+		return "", fmt.Errorf("failed to read confirmation: %w", err)
 	}
 
 	if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
-		return "", "", fmt.Errorf("mergeback cancelled by user")
+		return "", fmt.Errorf("mergeback cancelled by user")
 	}
 
-	return bestActivity.WorktreeName, bestActivity.JiraTicket, nil
+	return bestActivity.WorktreeName, nil
 }
 
 // filterAndValidateActivities filters activities to only hotfix/merge types and validates they're ahead
@@ -445,30 +422,29 @@ func isBranchAheadOf(sourceBranch, targetBranch string, _ *internal.Manager) (bo
 
 // getSmartMergebackCompletions provides intelligent tab completion based on recent activity
 func getSmartMergebackCompletions() []string {
-	var completions []string
+	completions := make([]string, 0)
 
 	// Try to get smart detection results
 	manager, err := createInitializedManager()
 	if err != nil {
 		if !errors.Is(err, ErrLoadGBMConfig) {
-			return getJiraCompletions()
+			return completions
 		}
 
 		PrintVerbose("%v", err)
+		return completions
 	}
 
 	// Get recent mergeable activity (same logic as auto-detection)
 	activities, err := manager.GetGitManager().GetRecentMergeableActivity(7)
 	if err != nil {
-		// Fallback to JIRA completions if git analysis fails
-		return getJiraCompletions()
+		return completions
 	}
 
 	// Filter and validate activities
 	filteredActivities, err := filterAndValidateActivities(activities, manager)
 	if err != nil {
-		// Fallback to JIRA completions if filtering fails
-		return getJiraCompletions()
+		return completions
 	}
 
 	// Convert filtered activities to completions in priority order
@@ -484,48 +460,6 @@ func getSmartMergebackCompletions() []string {
 			activity.Timestamp.Format("2006-01-02"))
 
 		completion := fmt.Sprintf("%s\t%s", activity.WorktreeName, description)
-		completions = append(completions, completion)
-	}
-
-	// If no smart suggestions, fall back to JIRA
-	if len(completions) == 0 {
-		return getJiraCompletions()
-	}
-
-	// Add a separator and JIRA completions as additional options
-	jiraCompletions := getJiraCompletions()
-	if len(jiraCompletions) > 0 {
-		// Add separator
-		completions = append(completions, "---\tOther JIRA tickets:")
-		// Add JIRA completions
-		completions = append(completions, jiraCompletions...)
-	}
-
-	return completions
-}
-
-// getJiraCompletions provides JIRA ticket completions as fallback
-func getJiraCompletions() []string {
-	var completions []string
-
-	// Try to get config for JIRA completion
-	manager, err := createInitializedManager()
-	if err != nil {
-		if !errors.Is(err, ErrLoadGBMConfig) {
-			return completions
-		}
-
-		PrintVerbose("%v", err)
-	}
-
-	// Complete JIRA keys with summaries for context
-	jiraIssues, err := internal.GetJiraIssues(manager)
-	if err != nil {
-		return completions
-	}
-
-	for _, issue := range jiraIssues {
-		completion := fmt.Sprintf("%s\t%s", issue.Key, issue.Summary)
 		completions = append(completions, completion)
 	}
 
