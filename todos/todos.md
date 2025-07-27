@@ -9,9 +9,6 @@
 
 
 
-- [ ] **Replace duplicate branch status calls in cmd/info.go with new utilities**
-  - Update lines 291, 300, 309 to use new GitManager methods
-  - Test: `gbm info` command still works correctly
 
 - [ ] **Replace duplicate branch status calls in test files with new utilities**
   - Update `cmd/sync_test.go:210,403,410,875,882`
