@@ -22,50 +22,50 @@ and ensuring configuration correctness before syncing.`,
 				return err
 			}
 
-				PrintVerbose("Validating branch references...")
+			PrintVerbose("Validating branch references...")
 
-				// Get the mapping to validate
-				mapping, err := manager.GetWorktreeMapping()
+			// Get the mapping to validate
+			mapping, err := manager.GetWorktreeMapping()
+			if err != nil {
+				return err
+			}
+
+			// Create table for validation results
+			table := internal.NewTable([]string{"WORKTREE", "BRANCH", "STATUS"})
+
+			allValid := true
+			for worktreeName, branchName := range mapping {
+				exists, err := manager.BranchExists(branchName)
 				if err != nil {
-					return err
+					table.AddRow([]string{worktreeName, branchName, internal.FormatError("ERROR")})
+					allValid = false
+					continue
 				}
 
-				// Create table for validation results
-				table := internal.NewTable([]string{"WORKTREE", "BRANCH", "STATUS"})
-
-				allValid := true
-				for worktreeName, branchName := range mapping {
-					exists, err := manager.BranchExists(branchName)
-					if err != nil {
-						table.AddRow([]string{worktreeName, branchName, internal.FormatError("ERROR")})
-						allValid = false
-						continue
-					}
-
-					if exists {
-						table.AddRow([]string{worktreeName, branchName, internal.FormatSuccess("VALID")})
-					} else {
-						table.AddRow([]string{worktreeName, branchName, internal.FormatError("NOT FOUND")})
-						allValid = false
-					}
-				}
-
-				// Display validation header
-				if allValid {
-					PrintInfo("%s", internal.FormatSuccess("gbm.branchconfig.yaml validation passed"))
+				if exists {
+					table.AddRow([]string{worktreeName, branchName, internal.FormatSuccess("VALID")})
 				} else {
-					PrintError("%s", internal.FormatError("gbm.branchconfig.yaml validation failed"))
+					table.AddRow([]string{worktreeName, branchName, internal.FormatError("NOT FOUND")})
+					allValid = false
 				}
+			}
 
-				fmt.Println()
-				table.Print()
+			// Display validation header
+			if allValid {
+				PrintInfo("%s", internal.FormatSuccess("gbm.branchconfig.yaml validation passed"))
+			} else {
+				PrintError("%s", internal.FormatError("gbm.branchconfig.yaml validation failed"))
+			}
 
-				if !allValid {
-					return fmt.Errorf("validation failed - one or more branches do not exist")
-				}
+			fmt.Println()
+			table.Print()
 
-				return nil
-			},
+			if !allValid {
+				return fmt.Errorf("validation failed - one or more branches do not exist")
+			}
+
+			return nil
+		},
 	}
 
 	return cmd

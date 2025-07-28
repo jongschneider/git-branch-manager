@@ -4,12 +4,12 @@
 
 ### Phase 1: Establish Patterns (Low Complexity Commands)
 
-
-- [ ] **Extract worktreePuller interface for cmd/pull.go**
-  - Create interface with: PullAllWorktrees(), PullWorktree(), IsInWorktree(), GetAllWorktrees()
-  - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreePuller.go . worktreePuller`
-  - Refactor command functions to use interface
-  - Write unit tests with mocks
+**✅ COMPLETED**: Extract worktreePuller interface for cmd/pull.go
+- Interface created with: PullAllWorktrees(), PullWorktree(), IsInWorktree(), GetAllWorktrees()
+- Mock generation added: `//go:generate go tool moq -out ./autogen_worktreePuller.go . worktreePuller`
+- Command functions refactored to use interface
+- Unit tests with mocks completed (cmd/pull_test.go)
+- Integration tests added (internal/pull_test.go) - TestManager_PullWorktree fully working
 
 - [ ] **Extract worktreePusher interface for cmd/push.go**
   - Create interface with: PushAllWorktrees(), PushWorktree(), IsInWorktree(), GetAllWorktrees()
@@ -87,10 +87,40 @@
   - Add interface wrappers for backward compatibility
   - Update common completion functions to use interfaces
 
+- [ ] **Standardize integration test patterns in internal package**
+  - Use `internal/testutils/git_harness.go` GitTestRepo methods consistently
+  - Replace manual `execGitCommandRun` calls with GitTestRepo methods: `repo.CreateSynchronizedBranch()`, `repo.WriteFile()`, `repo.CommitChanges()`, `repo.PushBranch()`
+  - Create helper functions like `runGitInWorktree()` for worktree-specific operations
+  - Follow `internal/git_add_test.go` pattern for test structure and setup
+  - Use `testutils.NewGitTestRepo()` with proper options for consistent test environments
+
 - [ ] **Move integration tests to internal package**
   - Move cmd/*_test.go integration tests to internal/*_test.go
   - Ensure actual functionality is tested in internal package
   - Keep only interface-based unit tests in cmd package
+  - Pattern: cmd/pull_test.go has fast unit tests with mocks, internal/pull_test.go has integration tests with real git repos
+
+- [ ] **Improve integration test infrastructure**
+  - Add `createRemoteChanges()` helper pattern to simulate remote developer changes
+  - Standardize branch creation patterns to avoid git worktree tracking conflicts
+  - Use proper base branches when creating worktrees to ensure git operations work correctly
+  - Add debugging helpers for troubleshooting test failures (git worktree list, branch status, etc.)
+  
+- [ ] **Fix incomplete integration tests**
+  - Complete `TestManager_PullAllWorktrees()` in internal/pull_test.go (currently has issues with GetAllWorktrees returning 0 results)
+  - Investigate why Manager.GetAllWorktrees() doesn't find worktrees that exist in git worktree list
+  - Ensure integration tests cover both single and multiple worktree scenarios
+
+- [ ] **Document common testing patterns and gotchas**
+  - Document git worktree branch checkout conflicts (branch can only be checked out in one place)
+  - Create guide for when to use separate clones vs main repo for testing remote changes
+  - Add examples for proper base branch selection when creating test worktrees
+  - Document GitTestRepo method usage patterns and when to use each method
+
+- [ ] **Add interface generation validation**
+  - Ensure `//go:generate` directives are run and mock files are up-to-date in CI
+  - Add build validation that checks if mock files are in sync with interfaces
+  - Consider automating mock regeneration in pre-commit hooks or CI pipeline
 
 ### Validation
 

@@ -10,6 +10,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//go:generate go tool moq -out ./autogen_worktreePuller.go . worktreePuller
+
+// worktreePuller interface abstracts the Manager operations needed for pulling worktrees
+type worktreePuller interface {
+	PullAllWorktrees() error
+	PullWorktree(worktreeName string) error
+	IsInWorktree(currentPath string) (bool, string, error)
+	GetAllWorktrees() (map[string]*internal.WorktreeListInfo, error)
+}
+
 func newPullCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "pull [worktree-name]",
@@ -63,14 +73,14 @@ Usage:
 	return cmd
 }
 
-func handlePullAll(manager *internal.Manager) error {
+func handlePullAll(puller worktreePuller) error {
 	PrintInfo("Pulling all worktrees...")
-	return manager.PullAllWorktrees()
+	return puller.PullAllWorktrees()
 }
 
-func handlePullCurrent(manager *internal.Manager, currentPath string) error {
+func handlePullCurrent(puller worktreePuller, currentPath string) error {
 	// Check if we're in a worktree
-	inWorktree, worktreeName, err := manager.IsInWorktree(currentPath)
+	inWorktree, worktreeName, err := puller.IsInWorktree(currentPath)
 	if err != nil {
 		return fmt.Errorf("failed to check if in worktree: %w", err)
 	}
@@ -80,12 +90,12 @@ func handlePullCurrent(manager *internal.Manager, currentPath string) error {
 	}
 
 	PrintInfo("Pulling current worktree '%s'...", worktreeName)
-	return manager.PullWorktree(worktreeName)
+	return puller.PullWorktree(worktreeName)
 }
 
-func handlePullNamed(manager *internal.Manager, worktreeName string) error {
+func handlePullNamed(puller worktreePuller, worktreeName string) error {
 	// Check if worktree exists
-	worktrees, err := manager.GetAllWorktrees()
+	worktrees, err := puller.GetAllWorktrees()
 	if err != nil {
 		return fmt.Errorf("failed to get worktrees: %w", err)
 	}
@@ -95,6 +105,5 @@ func handlePullNamed(manager *internal.Manager, worktreeName string) error {
 	}
 
 	PrintInfo("Pulling worktree '%s'...", worktreeName)
-	return manager.PullWorktree(worktreeName)
+	return puller.PullWorktree(worktreeName)
 }
-

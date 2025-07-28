@@ -12,7 +12,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestSwitchCommand_BasicWorktreeSwitching(t *testing.T) {
 
 	sourceRepo := testutils.NewStandardGBMConfigRepo(t)

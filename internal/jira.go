@@ -119,10 +119,10 @@ func GetJiraIssue(key string, manager *Manager) (*JiraIssue, error) {
 	// Parse the view output to extract issue details
 	lines := strings.Split(string(output), "\n")
 	var issueType, summary, status string
-	
+
 	for _, line := range lines {
 		line = strings.TrimSpace(line)
-		
+
 		// Parse the header line with emojis to get status
 		if strings.Contains(line, "🐞") && strings.Contains(line, key) {
 			if strings.Contains(line, "🐞") {
@@ -132,7 +132,7 @@ func GetJiraIssue(key string, manager *Manager) (*JiraIssue, error) {
 				status = "Open"
 			}
 		}
-		
+
 		// Parse the title line starting with # - this is the summary
 		if strings.HasPrefix(line, "# ") {
 			summary = strings.TrimSpace(strings.TrimPrefix(line, "# "))
@@ -140,12 +140,11 @@ func GetJiraIssue(key string, manager *Manager) (*JiraIssue, error) {
 		}
 	}
 
-	
 	// Validate that we got the essential fields
 	if summary == "" {
 		return nil, fmt.Errorf("failed to parse JIRA issue %s: summary not found", key)
 	}
-	
+
 	// Default issueType to "Bug" if not found
 	if issueType == "" {
 		issueType = "Bug"

@@ -178,7 +178,6 @@ func getCommitsNeedingMergeBack(repoPath, targetBranch, sourceBranch string) ([]
 		return nil, fmt.Errorf("remote branch '%s' or '%s' does not exist - check your gbm.branchconfig.yaml configuration", remoteTargetBranch, remoteSourceBranch)
 	}
 
-
 	lines := strings.Split(strings.TrimSpace(string(output)), "\n")
 	if len(lines) == 1 && lines[0] == "" {
 		return []MergeBackCommitInfo{}, nil

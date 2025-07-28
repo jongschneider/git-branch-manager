@@ -30,7 +30,6 @@ func NewMultiBranchRepo(t *testing.T) *GitTestRepo {
 	return repo
 }
 
-
 // stringMappingToWorktreeConfigs converts the old string mapping format to the new explicit format
 // This preserves the old behavior for backward compatibility in scenarios
 func stringMappingToWorktreeConfigs(mapping map[string]string) map[string]WorktreeConfig {
@@ -111,7 +110,6 @@ func NewGBMConfigRepo(t *testing.T, mapping map[string]string) *GitTestRepo {
 
 	return repo
 }
-
 
 func NewStandardGBMConfigRepo(t *testing.T) *GitTestRepo {
 	mapping := map[string]string{

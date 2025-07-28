@@ -323,7 +323,6 @@ func TestCheckMergeBackStatusIntegration(t *testing.T) {
 	})
 }
 
-
 func TestMergeBackStructures(t *testing.T) {
 	t.Run("merge back status structure", func(t *testing.T) {
 		status := MergeBackStatus{
@@ -422,7 +421,7 @@ func TestRemoteBranchResolution(t *testing.T) {
 	t.Run("BranchExistsLocalOrRemote - checks both local and remote", func(t *testing.T) {
 		// Create a GitManager instance for testing
 		gitManager := &GitManager{repoPath: repo.GetLocalPath()}
-		
+
 		// Test with local branch
 		err := repo.CreateSynchronizedBranch("local-test-branch")
 		require.NoError(t, err)

@@ -128,16 +128,16 @@ func TestValidateCommand_SomeBranchesInvalid(t *testing.T) {
 	// Create gbm.branchconfig.yaml with some valid and some invalid branch references
 	worktrees := map[string]testutils.WorktreeConfig{
 		"main": {
-			Branch:      "main",               // valid - exists
+			Branch:      "main", // valid - exists
 			Description: "Main branch",
 		},
 		"dev": {
-			Branch:      "develop",            // valid - exists
+			Branch:      "develop", // valid - exists
 			MergeInto:   "main",
 			Description: "Dev branch",
 		},
 		"feat": {
-			Branch:      "feature/auth",       // valid - exists
+			Branch:      "feature/auth", // valid - exists
 			MergeInto:   "dev",
 			Description: "Feat branch",
 		},
@@ -147,7 +147,7 @@ func TestValidateCommand_SomeBranchesInvalid(t *testing.T) {
 			Description: "Invalid branch",
 		},
 		"missing": {
-			Branch:      "another-missing",    // invalid - doesn't exist
+			Branch:      "another-missing", // invalid - doesn't exist
 			MergeInto:   "invalid",
 			Description: "Missing branch",
 		},
@@ -486,4 +486,3 @@ func TestValidateCommand_VeryLongBranchNames(t *testing.T) {
 	assert.Contains(t, output, "┌", "Table should have proper borders")
 	assert.Contains(t, output, "│", "Table should have column separators")
 }
-

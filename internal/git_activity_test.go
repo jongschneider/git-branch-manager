@@ -404,4 +404,3 @@ func TestMockRecentActivity(t *testing.T) {
 	// Test sorting by timestamp (most recent first)
 	assert.True(t, hotfixAndMerge[0].Timestamp.After(hotfixAndMerge[1].Timestamp))
 }
-

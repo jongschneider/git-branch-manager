@@ -1,305 +1,254 @@
 package cmd
 
 import (
-	"os"
-	"path/filepath"
+	"errors"
 	"testing"
 
-	"gbm/internal/testutils"
+	"gbm/internal"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-// Helper function to make remote changes and push them
-func makeRemoteChanges(t *testing.T, repo *testutils.GitTestRepo, branch, filename, content string) {
-	err := repo.InLocalRepo(func() error {
-		if err := repo.SwitchToBranch(branch); err != nil {
-			return err
-		}
+// ============================================================================
+// UNIT TESTS (Using mocks - these are fast and don't require real git operations)
+// ============================================================================
+// These tests use the worktreePuller interface with mocks to test business logic
+// without requiring real git operations. They run in milliseconds.
 
-		if err := repo.WriteFile(filename, content); err != nil {
-			return err
-		}
+func TestHandlePullAll(t *testing.T) {
+	tests := []struct {
+		name      string
+		mockSetup func() *worktreePullerMock
+		expectErr func(t *testing.T, err error)
+	}{
+		{
+			name: "success - pull all worktrees",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					PullAllWorktreesFunc: func() error {
+						return nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "error - pull all fails with git error",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					PullAllWorktreesFunc: func() error {
+						return errors.New("git pull failed")
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "git pull failed")
+			},
+		},
+	}
 
-		if err := repo.CommitChanges("Remote change to " + filename); err != nil {
-			return err
-		}
-
-		return repo.PushBranch(branch)
-	})
-	require.NoError(t, err, "Failed to make remote changes")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := tt.mockSetup()
+			err := handlePullAll(mock)
+			tt.expectErr(t, err)
+		})
+	}
 }
 
-// Helper function to verify file content in a worktree
-func verifyWorktreeContent(t *testing.T, worktreePath, filename, expectedContent string) {
-	filePath := filepath.Join(worktreePath, filename)
-	content, err := os.ReadFile(filePath)
-	require.NoError(t, err, "Failed to read file %s", filePath)
-	assert.Equal(t, expectedContent, string(content), "File content mismatch in %s", filePath)
+func TestHandlePullCurrent(t *testing.T) {
+	tests := []struct {
+		name        string
+		currentPath string
+		mockSetup   func() *worktreePullerMock
+		expectErr   func(t *testing.T, err error)
+	}{
+		{
+			name:        "success - pull current worktree",
+			currentPath: "/test/worktrees/dev",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					IsInWorktreeFunc: func(currentPath string) (bool, string, error) {
+						return true, "dev", nil
+					},
+					PullWorktreeFunc: func(worktreeName string) error {
+						assert.Equal(t, "dev", worktreeName)
+						return nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name:        "error - not in worktree",
+			currentPath: "/test/repo",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					IsInWorktreeFunc: func(currentPath string) (bool, string, error) {
+						return false, "", nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "not currently in a worktree")
+			},
+		},
+		{
+			name:        "error - IsInWorktree fails",
+			currentPath: "/test/invalid",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					IsInWorktreeFunc: func(currentPath string) (bool, string, error) {
+						return false, "", errors.New("failed to determine worktree status")
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to check if in worktree")
+			},
+		},
+		{
+			name:        "error - PullWorktree fails",
+			currentPath: "/test/worktrees/dev",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					IsInWorktreeFunc: func(currentPath string) (bool, string, error) {
+						return true, "dev", nil
+					},
+					PullWorktreeFunc: func(worktreeName string) error {
+						return errors.New("git pull failed for worktree")
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "git pull failed for worktree")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := tt.mockSetup()
+			err := handlePullCurrent(mock, tt.currentPath)
+			tt.expectErr(t, err)
+		})
+	}
 }
 
-// Helper function to get current commit hash in a directory
-func getCurrentCommitHash(t *testing.T, dir string) string {
-	manager, err := createInitializedManager()
-	require.NoError(t, err, "Failed to create manager")
-	hash, err := manager.GetGitManager().GetCommitHashInPath(dir, "HEAD")
-	require.NoError(t, err, "Failed to get commit hash")
-	return hash
+func TestHandlePullNamed(t *testing.T) {
+	tests := []struct {
+		name         string
+		worktreeName string
+		mockSetup    func() *worktreePullerMock
+		expectErr    func(t *testing.T, err error)
+	}{
+		{
+			name:         "success - pull named worktree",
+			worktreeName: "dev",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+						return map[string]*internal.WorktreeListInfo{
+							"dev": {
+								Path:           "/test/worktrees/dev",
+								ExpectedBranch: "develop",
+								CurrentBranch:  "develop",
+							},
+						}, nil
+					},
+					PullWorktreeFunc: func(worktreeName string) error {
+						assert.Equal(t, "dev", worktreeName)
+						return nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name:         "error - worktree does not exist",
+			worktreeName: "nonexistent",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+						return map[string]*internal.WorktreeListInfo{
+							"dev": {
+								Path:           "/test/worktrees/dev",
+								ExpectedBranch: "develop",
+								CurrentBranch:  "develop",
+							},
+						}, nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "worktree 'nonexistent' does not exist")
+			},
+		},
+		{
+			name:         "error - GetAllWorktrees fails",
+			worktreeName: "dev",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+						return nil, errors.New("failed to enumerate worktrees")
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to get worktrees")
+			},
+		},
+		{
+			name:         "error - PullWorktree fails",
+			worktreeName: "dev",
+			mockSetup: func() *worktreePullerMock {
+				return &worktreePullerMock{
+					GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+						return map[string]*internal.WorktreeListInfo{
+							"dev": {
+								Path:           "/test/worktrees/dev",
+								ExpectedBranch: "develop",
+								CurrentBranch:  "develop",
+							},
+						}, nil
+					},
+					PullWorktreeFunc: func(worktreeName string) error {
+						return errors.New("git pull failed")
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "git pull failed")
+			},
+		},
+	}
+
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := tt.mockSetup()
+			err := handlePullNamed(mock, tt.worktreeName)
+			tt.expectErr(t, err)
+		})
+	}
 }
 
-func TestPullCommand_CurrentWorktree(t *testing.T) {
-
-	// Create source repo with multiple branches and gbm.branchconfig.yaml
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Navigate into the dev worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	_ = os.Chdir(devWorktreePath)
-
-	// Get initial commit hash
-	initialHash := getCurrentCommitHash(t, devWorktreePath)
-
-	// Make remote changes to the develop branch
-	makeRemoteChanges(t, sourceRepo, "develop", "new_feature.txt", "New feature content")
-
-	// Pull current worktree (should pull dev since we're in it)
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"pull"})
-
-	err := cmd.Execute()
-	require.NoError(t, err, "Pull command should succeed")
-
-	// Verify the changes were pulled
-	verifyWorktreeContent(t, devWorktreePath, "new_feature.txt", "New feature content")
-
-	// Verify commit hash changed
-	newHash := getCurrentCommitHash(t, devWorktreePath)
-	assert.NotEqual(t, initialHash, newHash, "Commit hash should change after pull")
-}
-
-func TestPullCommand_NamedWorktree(t *testing.T) {
-
-	// Create source repo with multiple branches and gbm.branchconfig.yaml
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root (not in a worktree)
-	_ = os.Chdir(repoPath)
-
-	// Get initial commit hash of feat worktree
-	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
-	initialHash := getCurrentCommitHash(t, featWorktreePath)
-
-	// Make remote changes to the feature/auth branch
-	makeRemoteChanges(t, sourceRepo, "feature/auth", "auth_changes.txt", "Authentication improvements")
-
-	// Pull specific worktree by name
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"pull", "feat"})
-
-	err := cmd.Execute()
-	require.NoError(t, err, "Pull command should succeed")
-
-	// Verify the changes were pulled to feat worktree
-	verifyWorktreeContent(t, featWorktreePath, "auth_changes.txt", "Authentication improvements")
-
-	// Verify commit hash changed
-	newHash := getCurrentCommitHash(t, featWorktreePath)
-	assert.NotEqual(t, initialHash, newHash, "Commit hash should change after pull")
-}
-
-func TestPullCommand_AllWorktrees(t *testing.T) {
-
-	// Create source repo with multiple branches and gbm.branchconfig.yaml
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Get initial commit hashes for all worktrees
-	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
-
-	initialMainHash := getCurrentCommitHash(t, mainWorktreePath)
-	initialDevHash := getCurrentCommitHash(t, devWorktreePath)
-	initialFeatHash := getCurrentCommitHash(t, featWorktreePath)
-
-	// Make remote changes to multiple branches
-	makeRemoteChanges(t, sourceRepo, "main", "main_update.txt", "Main branch update")
-	makeRemoteChanges(t, sourceRepo, "develop", "dev_update.txt", "Development update")
-	makeRemoteChanges(t, sourceRepo, "feature/auth", "feat_update.txt", "Feature update")
-
-	// Pull all worktrees
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"pull", "--all"})
-
-	err := cmd.Execute()
-	require.NoError(t, err, "Pull all command should succeed")
-
-	// Verify all worktrees were updated
-	verifyWorktreeContent(t, mainWorktreePath, "main_update.txt", "Main branch update")
-	verifyWorktreeContent(t, devWorktreePath, "dev_update.txt", "Development update")
-	verifyWorktreeContent(t, featWorktreePath, "feat_update.txt", "Feature update")
-
-	// Verify all commit hashes changed
-	newMainHash := getCurrentCommitHash(t, mainWorktreePath)
-	newDevHash := getCurrentCommitHash(t, devWorktreePath)
-	newFeatHash := getCurrentCommitHash(t, featWorktreePath)
-
-	assert.NotEqual(t, initialMainHash, newMainHash, "main commit hash should change")
-	assert.NotEqual(t, initialDevHash, newDevHash, "dev commit hash should change")
-	assert.NotEqual(t, initialFeatHash, newFeatHash, "feat commit hash should change")
-}
-
-func TestPullCommand_NotInWorktree(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root (not in a worktree)
-	_ = os.Chdir(repoPath)
-
-	// Try to pull without specifying worktree name
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"pull"})
-
-	err := cmd.Execute()
-	require.Error(t, err, "Pull should fail when not in a worktree")
-	assert.Contains(t, err.Error(), "failed to check if in worktree", "Error should mention worktree check failure")
-}
-
-func TestPullCommand_NonexistentWorktree(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Try to pull nonexistent worktree
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"pull", "NONEXISTENT"})
-
-	err := cmd.Execute()
-	require.Error(t, err, "Pull should fail for nonexistent worktree")
-	assert.Contains(t, err.Error(), "worktree 'NONEXISTENT' does not exist", "Error should mention worktree doesn't exist")
-}
-
-func TestPullCommand_NotInGitRepo(t *testing.T) {
-	// Create empty temp directory (not a git repo)
-	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(originalDir) }()
-
-	_ = os.Chdir(tempDir)
-
-	// Try to pull in non-git directory
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"pull"})
-
-	err := cmd.Execute()
-	require.Error(t, err, "Pull should fail when not in a git repository")
-	assert.Contains(t, err.Error(), "not in a git repository", "Error should mention not being in a git repository")
-}
-
-func TestPullCommand_FastForward(t *testing.T) {
-
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Navigate into dev worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	_ = os.Chdir(devWorktreePath)
-
-	// Get initial commit hash
-	initialHash := getCurrentCommitHash(t, devWorktreePath)
-
-	// Make remote changes (clean fast-forward scenario)
-	makeRemoteChanges(t, sourceRepo, "develop", "fast_forward.txt", "Fast forward content")
-
-	// Pull changes
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"pull"})
-
-	err := cmd.Execute()
-	require.NoError(t, err, "Fast-forward pull should succeed")
-
-	// Verify changes were pulled
-	verifyWorktreeContent(t, devWorktreePath, "fast_forward.txt", "Fast forward content")
-
-	// Verify commit hash changed
-	newHash := getCurrentCommitHash(t, devWorktreePath)
-	assert.NotEqual(t, initialHash, newHash, "Commit hash should change after fast-forward")
-}
-
-func TestPullCommand_UpToDate(t *testing.T) {
-
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Navigate into dev worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	_ = os.Chdir(devWorktreePath)
-
-	// Get initial commit hash
-	initialHash := getCurrentCommitHash(t, devWorktreePath)
-
-	// Pull without any remote changes (should be up to date)
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"pull"})
-
-	err := cmd.Execute()
-	require.NoError(t, err, "Pull should succeed even when up to date")
-
-	// Verify commit hash unchanged
-	newHash := getCurrentCommitHash(t, devWorktreePath)
-	assert.Equal(t, initialHash, newHash, "Commit hash should remain same when up to date")
-}
-
-func TestPullCommand_WithLocalChanges(t *testing.T) {
-
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Navigate into dev worktree
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "dev")
-	_ = os.Chdir(devWorktreePath)
-
-	// Make local uncommitted changes
-	localFilePath := filepath.Join(devWorktreePath, "local_changes.txt")
-	err := os.WriteFile(localFilePath, []byte("Local uncommitted changes"), 0644)
-	require.NoError(t, err, "Failed to create local file")
-
-	// Make remote changes
-	makeRemoteChanges(t, sourceRepo, "develop", "remote_changes.txt", "Remote changes")
-
-	// Pull should succeed (merge scenario)
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"pull"})
-
-	err = cmd.Execute()
-	require.NoError(t, err, "Pull should handle local uncommitted changes")
-
-	// Verify both local and remote changes exist
-	verifyWorktreeContent(t, devWorktreePath, "remote_changes.txt", "Remote changes")
-
-	// Local changes should still exist
-	localContent, err := os.ReadFile(localFilePath)
-	require.NoError(t, err, "Local file should still exist")
-	assert.Equal(t, "Local uncommitted changes", string(localContent), "Local changes should be preserved")
-}
+// ============================================================================
+// NOTE: Integration tests have been moved to internal/pull_test.go
+// ============================================================================
+// The integration tests that use real git repositories have been moved to the
+// internal package to test Manager methods directly. This follows the pattern
+// established in cmd/add.go and internal/git_add_test.go. Only fast unit tests
+// using mocks remain in this file.
