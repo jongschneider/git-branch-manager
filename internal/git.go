@@ -981,12 +981,10 @@ func (gm *GitManager) PushWorktree(worktreePath string) error {
 	}
 
 	// Get the current branch
-	output, err := ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "HEAD")
+	currentBranch, err := gm.GetCurrentBranchInPath(worktreePath)
 	if err != nil {
-		return fmt.Errorf("failed to get current branch: %w", err)
+		return err
 	}
-
-	currentBranch := strings.TrimSpace(string(output))
 
 	// Check if upstream is set
 	upstream, err := gm.GetUpstreamBranch(worktreePath)
@@ -1015,12 +1013,10 @@ func (gm *GitManager) PullWorktree(worktreePath string) error {
 		return fmt.Errorf("worktree path does not exist: %s", worktreePath)
 	}
 
-	output, err := ExecGitCommand(worktreePath, "rev-parse", "--abbrev-ref", "HEAD")
+	currentBranch, err := gm.GetCurrentBranchInPath(worktreePath)
 	if err != nil {
-		return fmt.Errorf("failed to get current branch: %w", err)
+		return err
 	}
-
-	currentBranch := strings.TrimSpace(string(output))
 
 	finalArgs := []string{"pull"}
 
