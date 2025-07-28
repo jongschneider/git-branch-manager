@@ -2,9 +2,7 @@ package cmd
 
 import (
 	"os"
-	"os/exec"
 	"path/filepath"
-	"strings"
 	"testing"
 
 	"gbm/internal/testutils"
@@ -43,13 +41,12 @@ func verifyWorktreeContent(t *testing.T, worktreePath, filename, expectedContent
 
 // Helper function to get current commit hash in a directory
 func getCurrentCommitHash(t *testing.T, dir string) string {
-	cmd := exec.Command("git", "rev-parse", "HEAD")
-	cmd.Dir = dir
-	output, err := cmd.Output()
+	manager, err := createInitializedManager()
+	require.NoError(t, err, "Failed to create manager")
+	hash, err := manager.GetGitManager().GetCommitHashInPath(dir, "HEAD")
 	require.NoError(t, err, "Failed to get commit hash")
-	return strings.TrimSpace(string(output))
+	return hash
 }
-
 
 func TestPullCommand_CurrentWorktree(t *testing.T) {
 
@@ -146,7 +143,6 @@ func TestPullCommand_AllWorktrees(t *testing.T) {
 	err := cmd.Execute()
 	require.NoError(t, err, "Pull all command should succeed")
 
-
 	// Verify all worktrees were updated
 	verifyWorktreeContent(t, mainWorktreePath, "main_update.txt", "Main branch update")
 	verifyWorktreeContent(t, devWorktreePath, "dev_update.txt", "Development update")
@@ -171,7 +167,6 @@ func TestPullCommand_NotInWorktree(t *testing.T) {
 	// Stay in repo root (not in a worktree)
 	_ = os.Chdir(repoPath)
 
-
 	// Try to pull without specifying worktree name
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull"})
@@ -190,7 +185,6 @@ func TestPullCommand_NonexistentWorktree(t *testing.T) {
 	// Stay in repo root
 	_ = os.Chdir(repoPath)
 
-
 	// Try to pull nonexistent worktree
 	cmd := newRootCommand()
 	cmd.SetArgs([]string{"pull", "NONEXISTENT"})
@@ -207,7 +201,6 @@ func TestPullCommand_NotInGitRepo(t *testing.T) {
 	defer func() { _ = os.Chdir(originalDir) }()
 
 	_ = os.Chdir(tempDir)
-
 
 	// Try to pull in non-git directory
 	cmd := newRootCommand()

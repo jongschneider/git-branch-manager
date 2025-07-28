@@ -207,11 +207,12 @@ func TestSyncCommand_SyncScenarios(t *testing.T) {
 			expectChanges: true,
 			validateResult: func(t *testing.T, repoPath string) {
 				// Verify feat worktree was updated to develop branch
-				cmd := exec.Command("git", "branch", "--show-current")
-				cmd.Dir = filepath.Join(repoPath, "worktrees", "feat")
-				branchOutput, err := cmd.Output()
+				manager, err := createInitializedManager()
 				require.NoError(t, err)
-				assert.Equal(t, "develop", strings.TrimSpace(string(branchOutput)))
+				worktreePath := filepath.Join(repoPath, "worktrees", "feat")
+				branch, err := manager.GetGitManager().GetCurrentBranchInPath(worktreePath)
+				require.NoError(t, err)
+				assert.Equal(t, "develop", branch)
 			},
 		},
 		{
@@ -400,18 +401,18 @@ func TestSyncCommand_UntrackedWorktrees(t *testing.T) {
 				assert.DirExists(t, filepath.Join(repoPath, "worktrees", "manual"))
 
 				// Verify feat worktree was updated to develop branch
-				cmd := exec.Command("git", "branch", "--show-current")
-				cmd.Dir = filepath.Join(repoPath, "worktrees", "feat")
-				featOutput, err := cmd.Output()
+				manager, err := createInitializedManager()
 				require.NoError(t, err)
-				assert.Equal(t, "develop", strings.TrimSpace(string(featOutput)))
+				featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
+				featBranch, err := manager.GetGitManager().GetCurrentBranchInPath(featWorktreePath)
+				require.NoError(t, err)
+				assert.Equal(t, "develop", featBranch)
 
 				// manual worktree should still be on main branch (unchanged)
-				manualCmd := exec.Command("git", "branch", "--show-current")
-				manualCmd.Dir = filepath.Join(repoPath, "worktrees", "manual")
-				manualOutput, err := manualCmd.Output()
+				manualWorktreePath := filepath.Join(repoPath, "worktrees", "manual")
+				manualBranch, err := manager.GetGitManager().GetCurrentBranchInPath(manualWorktreePath)
 				require.NoError(t, err)
-				assert.Equal(t, "main", strings.TrimSpace(string(manualOutput)))
+				assert.Equal(t, "main", manualBranch)
 			},
 		},
 	}
@@ -872,18 +873,18 @@ func TestSyncCommand_WorktreePromotion(t *testing.T) {
 	assert.DirExists(t, filepath.Join(repoPath, "worktrees", "production"))
 
 	// Check main worktree is on main branch
-	mainCmd := exec.Command("git", "branch", "--show-current")
-	mainCmd.Dir = filepath.Join(repoPath, "worktrees", "main")
-	mainOutput, err := mainCmd.Output()
+	manager, err := createInitializedManager()
 	require.NoError(t, err)
-	assert.Equal(t, "main", strings.TrimSpace(string(mainOutput)), "main worktree should be on main branch")
+	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
+	mainBranch, err := manager.GetGitManager().GetCurrentBranchInPath(mainWorktreePath)
+	require.NoError(t, err)
+	assert.Equal(t, "main", mainBranch, "main worktree should be on main branch")
 
 	// Check production worktree is on production-2025-07-1 branch (promoted from preview)
-	prodCmd := exec.Command("git", "branch", "--show-current")
-	prodCmd.Dir = filepath.Join(repoPath, "worktrees", "production")
-	prodOutput, err := prodCmd.Output()
+	prodWorktreePath := filepath.Join(repoPath, "worktrees", "production")
+	prodBranch, err := manager.GetGitManager().GetCurrentBranchInPath(prodWorktreePath)
 	require.NoError(t, err)
-	assert.Equal(t, "production-2025-07-1", strings.TrimSpace(string(prodOutput)), "production worktree should be on production-2025-07-1 branch")
+	assert.Equal(t, "production-2025-07-1", prodBranch, "production worktree should be on production-2025-07-1 branch")
 
 	// Validate that "preview" worktree no longer exists
 	assert.NoDirExists(t, filepath.Join(repoPath, "worktrees", "preview"), "preview worktree should no longer exist")
