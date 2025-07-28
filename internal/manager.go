@@ -336,6 +336,21 @@ func (m *Manager) BranchExists(branchName string) (bool, error) {
 	return m.gitManager.BranchExists(branchName)
 }
 
+// GetDefaultBranch returns the repository's default branch
+func (m *Manager) GetDefaultBranch() (string, error) {
+	return m.gitManager.GetDefaultBranch()
+}
+
+// GetJiraIssues returns JIRA issues for the current user
+func (m *Manager) GetJiraIssues() ([]JiraIssue, error) {
+	return GetJiraIssues(m)
+}
+
+// GenerateBranchFromJira generates a branch name from a JIRA key
+func (m *Manager) GenerateBranchFromJira(jiraKey string) (string, error) {
+	return GenerateBranchFromJira(jiraKey, m)
+}
+
 func (m *Manager) GetWorktreeList() (map[string]*WorktreeListInfo, error) {
 	if m.gbmConfig == nil {
 		return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)

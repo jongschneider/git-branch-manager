@@ -1,384 +1,436 @@
 package cmd
 
 import (
-	"os"
-	"path/filepath"
 	"testing"
 
 	"gbm/internal"
-	"gbm/internal/testutils"
 
 	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-func TestAddCommand_NewBranchFromRemote(t *testing.T) {
-	// Create a basic repository
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	repoPath := setupClonedRepo(t, sourceRepo)
+// ============================================================================
+// UNIT TESTS (Using mocks - these are fast and don't require real git operations)
+// ============================================================================
+// These tests use the worktreeAdder interface with mocks to test business logic
+// without requiring real git operations. They run in milliseconds.
 
+// Unit tests using table-driven approach with mocks for ArgsResolver
+func TestArgsResolver_ResolveArgs(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      []string
+		newBranch bool
+		mockSetup func() *worktreeAdderMock
+		expectErr func(t *testing.T, err error)
+		expect    func(t *testing.T, result *WorktreeArgs)
+	}{
+		{
+			name:      "missing worktree name",
+			args:      []string{},
+			newBranch: false,
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "worktree name is required")
+			},
+			expect: func(t *testing.T, result *WorktreeArgs) {
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:      "new branch with default base",
+			args:      []string{"test-worktree"},
+			newBranch: true,
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GetDefaultBranchFunc: func() (string, error) {
+						return "main", nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+			expect: func(t *testing.T, result *WorktreeArgs) {
+				assert.Equal(t, "test-worktree", result.WorktreeName)
+				assert.Equal(t, "feature/test-worktree", result.BranchName)
+				assert.True(t, result.NewBranch)
+				assert.Equal(t, "main", result.ResolvedBaseBranch)
+			},
+		},
+		{
+			name:      "existing branch",
+			args:      []string{"test-worktree", "existing-branch"},
+			newBranch: false,
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+			expect: func(t *testing.T, result *WorktreeArgs) {
+				assert.Equal(t, "test-worktree", result.WorktreeName)
+				assert.Equal(t, "existing-branch", result.BranchName)
+				assert.False(t, result.NewBranch)
+				assert.Equal(t, "", result.ResolvedBaseBranch)
+			},
+		},
+		{
+			name:      "new branch with valid base branch",
+			args:      []string{"test-worktree", "new-branch", "develop"},
+			newBranch: true,
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					BranchExistsFunc: func(branch string) (bool, error) {
+						return branch == "develop", nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+			expect: func(t *testing.T, result *WorktreeArgs) {
+				assert.Equal(t, "test-worktree", result.WorktreeName)
+				assert.Equal(t, "new-branch", result.BranchName)
+				assert.True(t, result.NewBranch)
+				assert.Equal(t, "develop", result.ResolvedBaseBranch)
+			},
+		},
+		{
+			name:      "new branch with invalid base branch",
+			args:      []string{"test-worktree", "new-branch", "invalid-base"},
+			newBranch: true,
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					BranchExistsFunc: func(branch string) (bool, error) {
+						return false, nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "base branch 'invalid-base' does not exist")
+			},
+			expect: func(t *testing.T, result *WorktreeArgs) {
+				assert.Nil(t, result)
+			},
+		},
+		{
+			name:      "JIRA key without branch name should suggest",
+			args:      []string{"PROJ-123"},
+			newBranch: false,
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GenerateBranchFromJiraFunc: func(jiraKey string) (string, error) {
+						return "feature/PROJ-123-implement-feature", nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "branch name required")
+				assert.Contains(t, err.Error(), "feature/PROJ-123-implement-feature")
+				assert.Contains(t, err.Error(), "gbm add PROJ-123 feature/PROJ-123-implement-feature -b")
+			},
+			expect: func(t *testing.T, result *WorktreeArgs) {
+				assert.Nil(t, result)
+			},
+		},
+	}
 
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockManager := tt.mockSetup()
+			resolver := &ArgsResolver{manager: mockManager}
 
-	// Test adding worktree with a new branch name based on a remote branch
-	// This should create a new branch and worktree
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"add", "TEST", "test-branch", "develop", "-b"})
+			result, err := resolver.ResolveArgs(tt.args, tt.newBranch)
 
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	// Verify worktree was created
-	worktreePath := filepath.Join(repoPath, "worktrees", "TEST")
-	assert.DirExists(t, worktreePath)
-
-	// Verify the branch was created
-	gitManager, err := internal.NewGitManager(repoPath, "worktrees")
-	require.NoError(t, err)
-	exists, err := gitManager.BranchExists("test-branch")
-	require.NoError(t, err)
-	assert.True(t, exists)
+			tt.expectErr(t, err)
+			tt.expect(t, result)
+		})
+	}
 }
 
-func TestAddCommand_NewBranch(t *testing.T) {
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	repoPath := setupClonedRepo(t, sourceRepo)
-
-
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"add", "FEATURE", "feature/new-feature", "-b"})
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	// Verify worktree was created
-	worktreePath := filepath.Join(repoPath, "worktrees", "FEATURE")
-	assert.DirExists(t, worktreePath)
-
-	// Verify branch was created (we can check this exists in git)
-	gitManager, err := internal.NewGitManager(repoPath, "worktrees")
-	require.NoError(t, err)
-	exists, err := gitManager.BranchExists("feature/new-feature")
-	require.NoError(t, err)
-	assert.True(t, exists)
-
-	// Since config updating seems to not work as expected in tests,
-	// just verify the worktree and branch were created successfully
-}
-
-func TestAddCommand_NewBranchWithBaseBranch(t *testing.T) {
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	repoPath := setupClonedRepo(t, sourceRepo)
-
-
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"add", "HOTFIX", "hotfix/urgent-fix", "develop", "-b"})
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	// Verify worktree was created
-	worktreePath := filepath.Join(repoPath, "worktrees", "HOTFIX")
-	assert.DirExists(t, worktreePath)
-
-	// Verify branch was created from the correct base
-	gitManager, err := internal.NewGitManager(repoPath, "worktrees")
-	require.NoError(t, err)
-	exists, err := gitManager.BranchExists("hotfix/urgent-fix")
-	require.NoError(t, err)
-	assert.True(t, exists)
-}
-
-func TestAddCommand_InvalidBaseBranch(t *testing.T) {
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	setupClonedRepo(t, sourceRepo)
-
-
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"add", "TEST", "feature/test", "nonexistent-branch", "-b"})
-
-	err = cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "base branch 'nonexistent-branch' does not exist")
-}
-
-func TestAddCommand_JIRAKeyGeneration(t *testing.T) {
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	setupClonedRepo(t, sourceRepo)
-
-
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
-
-	// Test JIRA key without branch name and no -b flag
-	// Should give a specific error with suggestion
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"add", "PROJ-123"})
-
-	err = cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "branch name required")
-	assert.Contains(t, err.Error(), "Suggested:")
-}
-
-func TestAddCommand_GenerateBranchName(t *testing.T) {
+func TestGenerateBranchName(t *testing.T) {
 	tests := []struct {
 		name         string
 		worktreeName string
-		expected     string
+		mockSetup    func() *worktreeAdderMock
+		expect       func(t *testing.T, result string)
 	}{
 		{
-			name:         "Regular name",
-			worktreeName: "my-feature",
-			expected:     "feature/my-feature",
+			name:         "JIRA key success",
+			worktreeName: "PROJ-456",
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GenerateBranchFromJiraFunc: func(jiraKey string) (string, error) {
+						return "feature/PROJ-456-add-new-feature", nil
+					},
+				}
+			},
+			expect: func(t *testing.T, result string) {
+				assert.Equal(t, "feature/PROJ-456-add-new-feature", result)
+			},
 		},
 		{
-			name:         "Name with spaces",
+			name:         "JIRA key with error fallback",
+			worktreeName: "PROJ-789",
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GenerateBranchFromJiraFunc: func(jiraKey string) (string, error) {
+						return "", assert.AnError
+					},
+				}
+			},
+			expect: func(t *testing.T, result string) {
+				assert.Equal(t, "feature/proj-789", result)
+			},
+		},
+		{
+			name:         "non-JIRA key",
 			worktreeName: "my feature",
-			expected:     "feature/my-feature",
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{}
+			},
+			expect: func(t *testing.T, result string) {
+				assert.Equal(t, "feature/my-feature", result)
+			},
 		},
 		{
-			name:         "Name with underscores",
-			worktreeName: "my_feature",
-			expected:     "feature/my-feature",
-		},
-		{
-			name:         "Already has prefix",
-			worktreeName: "bugfix/issue",
-			expected:     "bugfix/issue",
+			name:         "already has prefix",
+			worktreeName: "bugfix/urgent-fix",
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{}
+			},
+			expect: func(t *testing.T, result string) {
+				assert.Equal(t, "bugfix/urgent-fix", result)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Test non-JIRA branch name generation
-			result := generateBranchName(tt.worktreeName, nil)
-			assert.Equal(t, tt.expected, result)
+			mockManager := tt.mockSetup()
+
+			result := generateBranchName(tt.worktreeName, mockManager)
+
+			tt.expect(t, result)
 		})
 	}
 }
 
-func TestAddCommand_MissingBranchName(t *testing.T) {
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	setupClonedRepo(t, sourceRepo)
-
-
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"add", "TEST"})
-
-	err = cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "branch name required")
-}
-
-func TestAddCommand_NewBranchWithoutFlag(t *testing.T) {
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	setupClonedRepo(t, sourceRepo)
-
-
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"add", "TEST", "nonexistent-branch"})
-
-	err = cmd.Execute()
-	assert.Error(t, err)
-	// Should fail because the branch doesn't exist and -b flag wasn't used
-}
-
-func TestAddCommand_AutoGenerateBranchWithFlag(t *testing.T) {
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	repoPath := setupClonedRepo(t, sourceRepo)
-
-
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"add", "TEST-FEATURE", "-b"})
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	// Verify worktree was created
-	worktreePath := filepath.Join(repoPath, "worktrees", "TEST-FEATURE")
-	assert.DirExists(t, worktreePath)
-
-	// Verify the branch was created with expected name
-	gitManager, err := internal.NewGitManager(repoPath, "worktrees")
-	require.NoError(t, err)
-	exists, err := gitManager.BranchExists("feature/test-feature")
-	require.NoError(t, err)
-	assert.True(t, exists)
-}
-
-func TestAddCommand_DuplicateWorktreeName(t *testing.T) {
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	setupClonedRepo(t, sourceRepo)
-
-
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
-
-	// Add first worktree (create new branch to avoid the existing branch issue)
-	cmd1 := newRootCommand()
-	cmd1.SetArgs([]string{"add", "TEST", "test-branch-1", "-b"})
-	err = cmd1.Execute()
-	require.NoError(t, err)
-
-	// Try to add worktree with same name
-	cmd2 := newRootCommand()
-	cmd2.SetArgs([]string{"add", "TEST", "test-branch-2", "-b"})
-	err = cmd2.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "already exists")
-}
-
+// Table-driven unit tests for command functions using mocks
 func TestAddCommand_ValidArgsFunction(t *testing.T) {
-	// Test the completion function
 	tests := []struct {
-		name     string
-		args     []string
-		expected int // number of completions expected (approximate)
+		name       string
+		args       []string
+		toComplete string
+		mockSetup  func() *worktreeAdderMock
+		expectErr  func(t *testing.T, err error)
+		expect     func(t *testing.T, completions []string, directive cobra.ShellCompDirective)
 	}{
 		{
-			name:     "First argument - JIRA keys",
-			args:     []string{},
-			expected: 0, // Will be 0 without JIRA CLI configured
+			name:       "JIRA completion success",
+			args:       []string{},
+			toComplete: "PROJ",
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GetJiraIssuesFunc: func() ([]internal.JiraIssue, error) {
+						return []internal.JiraIssue{
+							{Key: "PROJ-123", Summary: "Implement new feature"},
+							{Key: "PROJ-124", Summary: "Fix critical bug"},
+						}, nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				// No error expected for completion
+			},
+			expect: func(t *testing.T, completions []string, directive cobra.ShellCompDirective) {
+				assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
+				assert.Len(t, completions, 2)
+				assert.Contains(t, completions, "PROJ-123\tImplement new feature")
+				assert.Contains(t, completions, "PROJ-124\tFix critical bug")
+			},
 		},
 		{
-			name:     "Second argument - branch name",
-			args:     []string{"PROJ-123"},
-			expected: 1, // Should suggest a branch name
+			name:       "JIRA completion error",
+			args:       []string{},
+			toComplete: "PROJ",
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GetJiraIssuesFunc: func() ([]internal.JiraIssue, error) {
+						return nil, assert.AnError
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				// No error expected for completion failure
+			},
+			expect: func(t *testing.T, completions []string, directive cobra.ShellCompDirective) {
+				assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
+				assert.Nil(t, completions)
+			},
 		},
 		{
-			name:     "Third argument",
-			args:     []string{"TEST", "branch"},
-			expected: 0, // No completions for third arg
+			name:       "branch name completion for JIRA key",
+			args:       []string{"PROJ-456"},
+			toComplete: "",
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GenerateBranchFromJiraFunc: func(jiraKey string) (string, error) {
+						return "feature/PROJ-456-implement-feature", nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				// No error expected for completion
+			},
+			expect: func(t *testing.T, completions []string, directive cobra.ShellCompDirective) {
+				assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
+				assert.Len(t, completions, 1)
+				assert.Equal(t, "feature/PROJ-456-implement-feature", completions[0])
+			},
+		},
+		{
+			name:       "branch name completion error fallback",
+			args:       []string{"PROJ-789"},
+			toComplete: "",
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GenerateBranchFromJiraFunc: func(jiraKey string) (string, error) {
+						return "", assert.AnError
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				// No error expected for completion
+			},
+			expect: func(t *testing.T, completions []string, directive cobra.ShellCompDirective) {
+				assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
+				assert.Len(t, completions, 1)
+				assert.Equal(t, "feature/proj-789", completions[0])
+			},
+		},
+		{
+			name:       "non-JIRA key no completion",
+			args:       []string{"regular-name"},
+			toComplete: "",
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{}
+			},
+			expectErr: func(t *testing.T, err error) {
+				// No error expected for completion
+			},
+			expect: func(t *testing.T, completions []string, directive cobra.ShellCompDirective) {
+				assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
+				assert.Nil(t, completions)
+			},
 		},
 	}
 
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
-			// Create add command with nil manager (simulates when manager creation fails)
-			cmd := newAddCommand(nil)
-			completions, directive := cmd.ValidArgsFunction(cmd, tt.args, "")
+			mockManager := tt.mockSetup()
+			cmd := newAddCommand(mockManager)
 
-			// Just verify the function doesn't panic and returns appropriate directive
-			assert.Equal(t, cobra.ShellCompDirectiveNoFileComp, directive)
+			completions, directive := cmd.ValidArgsFunction(cmd, tt.args, tt.toComplete)
 
-			if tt.expected > 0 {
-				assert.Len(t, completions, tt.expected)
-			}
+			tt.expect(t, completions, directive)
 		})
 	}
 }
 
-func TestAddCommand_FromWorktreeDirectory(t *testing.T) {
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-	repoPath := setupClonedRepo(t, sourceRepo)
+func TestAddCommand_Execute(t *testing.T) {
+	tests := []struct {
+		name      string
+		args      []string
+		mockSetup func() *worktreeAdderMock
+		expectErr func(t *testing.T, err error)
+		expect    func(t *testing.T, mock *worktreeAdderMock)
+	}{
+		{
+			name: "successful execution",
+			args: []string{"test-worktree", "-b"},
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GetDefaultBranchFunc: func() (string, error) {
+						return "main", nil
+					},
+					AddWorktreeFunc: func(worktreeName, branchName string, newBranch bool, baseBranch string) error {
+						return nil
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+			expect: func(t *testing.T, mock *worktreeAdderMock) {
+				assert.Len(t, mock.GetDefaultBranchCalls(), 1)
+				assert.Len(t, mock.AddWorktreeCalls(), 1)
 
+				addCall := mock.AddWorktreeCalls()[0]
+				assert.Equal(t, "test-worktree", addCall.WorktreeName)
+				assert.Equal(t, "feature/test-worktree", addCall.BranchName)
+				assert.True(t, addCall.NewBranch)
+				assert.Equal(t, "main", addCall.BaseBranch)
+			},
+		},
+		{
+			name: "AddWorktree error",
+			args: []string{"test-worktree", "-b"},
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GetDefaultBranchFunc: func() (string, error) {
+						return "main", nil
+					},
+					AddWorktreeFunc: func(worktreeName, branchName string, newBranch bool, baseBranch string) error {
+						return assert.AnError
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to add worktree")
+			},
+			expect: func(t *testing.T, mock *worktreeAdderMock) {
+				assert.Len(t, mock.GetDefaultBranchCalls(), 1)
+				assert.Len(t, mock.AddWorktreeCalls(), 1)
+			},
+		},
+		{
+			name: "GetDefaultBranch error",
+			args: []string{"test-worktree", "-b"},
+			mockSetup: func() *worktreeAdderMock {
+				return &worktreeAdderMock{
+					GetDefaultBranchFunc: func() (string, error) {
+						return "", assert.AnError
+					},
+				}
+			},
+			expectErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+			},
+			expect: func(t *testing.T, mock *worktreeAdderMock) {
+				assert.Len(t, mock.GetDefaultBranchCalls(), 1)
+				assert.Len(t, mock.AddWorktreeCalls(), 0) // Should not reach AddWorktree
+			},
+		},
+	}
 
-	// Create gbm.branchconfig.yaml in the cloned repo
-	gbmContent := `worktrees:
-  main:
-    branch: main
-    description: "Main production branch"
-`
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte(gbmContent), 0644)
-	require.NoError(t, err)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mockManager := tt.mockSetup()
+			cmd := newAddCommand(mockManager)
+			cmd.SetArgs(tt.args)
 
-	// First add a worktree (create new branch to avoid existing branch issues)
-	cmd1 := newRootCommand()
-	cmd1.SetArgs([]string{"add", "DEV", "dev-branch", "-b"})
-	err = cmd1.Execute()
-	require.NoError(t, err)
+			err := cmd.Execute()
 
-	// Change to the worktree directory
-	originalDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(originalDir) }()
-
-	worktreeDir := filepath.Join(repoPath, "worktrees", "DEV")
-	err = os.Chdir(worktreeDir)
-	require.NoError(t, err)
-
-	// Add another worktree from within the first worktree
-	cmd2 := newRootCommand()
-	cmd2.SetArgs([]string{"add", "FEATURE", "feature/test", "-b"})
-	err = cmd2.Execute()
-	require.NoError(t, err)
-
-	// Verify the new worktree was created in the correct location
-	newWorktreePath := filepath.Join(repoPath, "worktrees", "FEATURE")
-	assert.DirExists(t, newWorktreePath)
+			tt.expectErr(t, err)
+			tt.expect(t, mockManager)
+		})
+	}
 }
-

@@ -7,18 +7,6 @@ import (
 	"strings"
 )
 
-func (gm *GitManager) CreateBranch(branchName, baseBranch string) error {
-	if baseBranch == "" {
-		baseBranch = "HEAD"
-	}
-
-	if err := execGitCommandRun(gm.repoPath, "branch", branchName, baseBranch); err != nil {
-		return fmt.Errorf("failed to create branch: %w", err)
-	}
-
-	return nil
-}
-
 func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch bool, baseBranch string) error {
 	worktreeDir := filepath.Join(gm.repoPath, gm.worktreePrefix)
 	worktreePath := filepath.Join(worktreeDir, worktreeName)

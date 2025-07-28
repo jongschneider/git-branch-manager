@@ -10,6 +10,17 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//go:generate go tool moq -out ./autogen_worktreeAdder.go . worktreeAdder
+
+// worktreeAdder interface abstracts the Manager operations needed for adding worktrees
+type worktreeAdder interface {
+	AddWorktree(worktreeName, branchName string, newBranch bool, baseBranch string) error
+	GetDefaultBranch() (string, error)
+	BranchExists(branch string) (bool, error)
+	GetJiraIssues() ([]internal.JiraIssue, error)
+	GenerateBranchFromJira(jiraKey string) (string, error)
+}
+
 // WorktreeArgs represents the resolved arguments for creating a worktree
 type WorktreeArgs struct {
 	WorktreeName       string
@@ -20,7 +31,7 @@ type WorktreeArgs struct {
 
 // ArgsResolver handles the complex logic of resolving command arguments
 type ArgsResolver struct {
-	manager *internal.Manager
+	manager worktreeAdder
 }
 
 // ResolveArgs processes command arguments and flags to determine worktree parameters
@@ -87,11 +98,11 @@ func (r *ArgsResolver) resolveBaseBranch(newBranchFlag bool, baseBranch string) 
 	if baseBranch == "" {
 		// Use default branch
 		PrintInfo("Using default base branch")
-		return r.manager.GetGitManager().GetDefaultBranch()
+		return r.manager.GetDefaultBranch()
 	}
 
 	// Validate that the base branch exists
-	exists, err := r.manager.GetGitManager().BranchExists(baseBranch)
+	exists, err := r.manager.BranchExists(baseBranch)
 	if err != nil {
 		return "", fmt.Errorf("failed to check if base branch exists: %w", err)
 	}
@@ -102,7 +113,7 @@ func (r *ArgsResolver) resolveBaseBranch(newBranchFlag bool, baseBranch string) 
 	return baseBranch, nil
 }
 
-func newAddCommand(manager *internal.Manager) *cobra.Command {
+func newAddCommand(manager worktreeAdder) *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "add <worktree-name> [branch-name] [base-branch]",
 		Short: "Add a new worktree",
@@ -158,7 +169,7 @@ This matches the behavior of 'git worktree add'.`,
 			}
 
 			// Complete JIRA keys with summaries for context
-			jiraIssues, err := internal.GetJiraIssues(manager)
+			jiraIssues, err := manager.GetJiraIssues()
 			if err != nil {
 				// If JIRA CLI is not available, fall back to no completions
 				return nil, cobra.ShellCompDirectiveNoFileComp
@@ -182,7 +193,7 @@ This matches the behavior of 'git worktree add'.`,
 					return []string{branchName}, cobra.ShellCompDirectiveNoFileComp
 				}
 
-				branchName, err := internal.GenerateBranchFromJira(worktreeName, manager)
+				branchName, err := manager.GenerateBranchFromJira(worktreeName)
 				if err != nil {
 					// Fallback to default branch name generation
 					branchName = fmt.Sprintf("feature/%s", strings.ToLower(worktreeName))
@@ -197,10 +208,10 @@ This matches the behavior of 'git worktree add'.`,
 	return cmd
 }
 
-func generateBranchName(worktreeName string, manager *internal.Manager) string {
+func generateBranchName(worktreeName string, manager worktreeAdder) string {
 	// Check if this is a JIRA key first
 	if internal.IsJiraKey(worktreeName) {
-		branchName, err := internal.GenerateBranchFromJira(worktreeName, manager)
+		branchName, err := manager.GenerateBranchFromJira(worktreeName)
 		if err != nil {
 			PrintVerbose("Failed to generate branch name from JIRA issue %s: %v", worktreeName, err)
 			PrintInfo("Could not fetch JIRA issue details. Using default branch name format.")
