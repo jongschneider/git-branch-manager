@@ -300,6 +300,31 @@ func (gm *GitManager) BranchExists(branchName string) (bool, error) {
 	return found, nil
 }
 
+// BranchExistsLocal checks if a branch exists locally only (not remote)
+func (gm *GitManager) BranchExistsLocal(branchName string) (bool, error) {
+	refs, err := gm.repo.References()
+	if err != nil {
+		return false, err
+	}
+
+	var found bool
+	err = refs.ForEach(func(ref *plumbing.Reference) error {
+		if ref.Name().IsBranch() {
+			if ref.Name().Short() == branchName {
+				found = true
+				return storer.ErrStop
+			}
+		}
+		return nil
+	})
+
+	if err != nil && err != storer.ErrStop {
+		return false, err
+	}
+
+	return found, nil
+}
+
 // Remote returns the remote branch name for a given branch (e.g., "main" -> "origin/main")
 func Remote(branchName string) string {
 	return fmt.Sprintf("origin/%s", branchName)

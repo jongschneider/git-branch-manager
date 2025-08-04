@@ -64,28 +64,28 @@ func (gm *GitManager) AddWorktree(worktreeName, branchName string, createBranch 
 		}
 	} else {
 		// Create worktree on existing branch
-		branchExists, err := gm.BranchExists(branchName)
+		branchExistsAny, err := gm.BranchExists(branchName)
 		if err != nil {
 			return fmt.Errorf("failed to check if branch exists: %w", err)
 		}
 
-		if !branchExists {
+		if !branchExistsAny {
 			return fmt.Errorf("branch '%s' does not exist", branchName)
 		}
 
-		// Check if remote tracking branch exists
-		remoteBranch := Remote(branchName)
-		exists, err := gm.VerifyRef(remoteBranch)
+		// Check if branch exists locally
+		branchExistsLocal, err := gm.BranchExistsLocal(branchName)
 		if err != nil {
-			return fmt.Errorf("failed to verify remote branch: %w", err)
+			return fmt.Errorf("failed to check if local branch exists: %w", err)
 		}
 
-		if exists {
-			// Remote tracking branch exists, use --track but don't create new branch
-			finalArgs = append(finalArgs, "worktree", "add", "--track", worktreePath, remoteBranch)
-		} else {
-			// No remote tracking branch, create worktree without tracking
+		if branchExistsLocal {
+			// Local branch exists, create worktree directly
 			finalArgs = append(finalArgs, "worktree", "add", worktreePath, branchName)
+		} else {
+			// Branch exists only remotely, create local tracking branch first
+			remoteBranch := Remote(branchName)
+			finalArgs = append(finalArgs, "worktree", "add", "-b", branchName, worktreePath, remoteBranch)
 		}
 	}
 

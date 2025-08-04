@@ -90,19 +90,24 @@ func TestManager_AddWorktree_Integration(t *testing.T) {
 			},
 		},
 		{
-			name:         "error: checkout existing branch tracking issue",
+			name:         "checkout existing remote branch creates local tracking branch",
 			worktreeName: "develop-work",
-			branchName:   "develop", // This will fail due to tracking setup issues
+			branchName:   "develop", // This now works by creating a local tracking branch
 			newBranch:    false,
 			baseBranch:   "",
 			expectErr: func(t *testing.T, err error) {
-				assert.Error(t, err)
-				// This is actually an error case due to git worktree tracking behavior
+				assert.NoError(t, err)
+				// This now works correctly by creating a tracking branch
 			},
 			expect: func(t *testing.T, manager *Manager, worktreeName, branchName string) {
-				// Verify worktree directory was NOT created due to error
+				// Verify worktree directory was created successfully
 				worktreePath := filepath.Join(repoPath, DefaultWorktreeDirname, worktreeName)
-				assert.NoDirExists(t, worktreePath)
+				assert.DirExists(t, worktreePath)
+
+				// Verify the local branch was created and exists
+				exists, err := manager.BranchExistsLocal(branchName)
+				require.NoError(t, err)
+				assert.True(t, exists, "Local tracking branch should be created")
 			},
 		},
 		{

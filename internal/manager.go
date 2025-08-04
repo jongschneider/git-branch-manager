@@ -336,6 +336,11 @@ func (m *Manager) BranchExists(branchName string) (bool, error) {
 	return m.gitManager.BranchExists(branchName)
 }
 
+// BranchExistsLocal checks if a branch exists locally only (not remote)
+func (m *Manager) BranchExistsLocal(branchName string) (bool, error) {
+	return m.gitManager.BranchExistsLocal(branchName)
+}
+
 // GetDefaultBranch returns the repository's default branch
 func (m *Manager) GetDefaultBranch() (string, error) {
 	return m.gitManager.GetDefaultBranch()
