@@ -420,8 +420,20 @@ func (m *Manager) GetAllWorktrees() (map[string]*WorktreeListInfo, error) {
 
 	worktreePrefix := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)
 
+	// Resolve symlinks to handle cases like /var vs /private/var on macOS
+	resolvedWorktreePrefix, err := filepath.EvalSymlinks(worktreePrefix)
+	if err != nil {
+		resolvedWorktreePrefix = worktreePrefix // fallback to original if resolution fails
+	}
+
 	for _, wt := range worktrees {
-		if strings.HasPrefix(wt.Path, worktreePrefix) {
+		// Resolve symlinks for worktree path as well
+		resolvedWtPath, err := filepath.EvalSymlinks(wt.Path)
+		if err != nil {
+			resolvedWtPath = wt.Path // fallback to original if resolution fails
+		}
+
+		if strings.HasPrefix(resolvedWtPath, resolvedWorktreePrefix) {
 			// Extract worktree name from path
 			worktreeName := filepath.Base(wt.Path)
 

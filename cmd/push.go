@@ -10,6 +10,16 @@ import (
 	"github.com/spf13/cobra"
 )
 
+// worktreePusher interface for push operations to enable unit testing
+//
+//go:generate go run github.com/matryer/moq@latest -out ./autogen_worktreePusher.go . worktreePusher
+type worktreePusher interface {
+	PushAllWorktrees() error
+	PushWorktree(worktreeName string) error
+	IsInWorktree(currentPath string) (bool, string, error)
+	GetAllWorktrees() (map[string]*internal.WorktreeListInfo, error)
+}
+
 func newPushCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "push [worktree-name]",
@@ -65,14 +75,14 @@ The command will automatically set upstream (-u) if not already set.`,
 	return cmd
 }
 
-func handlePushAll(manager *internal.Manager) error {
+func handlePushAll(pusher worktreePusher) error {
 	PrintInfo("Pushing all worktrees...")
-	return manager.PushAllWorktrees()
+	return pusher.PushAllWorktrees()
 }
 
-func handlePushCurrent(manager *internal.Manager, currentPath string) error {
+func handlePushCurrent(pusher worktreePusher, currentPath string) error {
 	// Check if we're in a worktree
-	inWorktree, worktreeName, err := manager.IsInWorktree(currentPath)
+	inWorktree, worktreeName, err := pusher.IsInWorktree(currentPath)
 	if err != nil {
 		return fmt.Errorf("failed to check if in worktree: %w", err)
 	}
@@ -82,12 +92,12 @@ func handlePushCurrent(manager *internal.Manager, currentPath string) error {
 	}
 
 	PrintInfo("Pushing current worktree '%s'...", worktreeName)
-	return manager.PushWorktree(worktreeName)
+	return pusher.PushWorktree(worktreeName)
 }
 
-func handlePushNamed(manager *internal.Manager, worktreeName string) error {
+func handlePushNamed(pusher worktreePusher, worktreeName string) error {
 	// Check if worktree exists
-	worktrees, err := manager.GetAllWorktrees()
+	worktrees, err := pusher.GetAllWorktrees()
 	if err != nil {
 		return fmt.Errorf("failed to get worktrees: %w", err)
 	}
@@ -97,5 +107,5 @@ func handlePushNamed(manager *internal.Manager, worktreeName string) error {
 	}
 
 	PrintInfo("Pushing worktree '%s'...", worktreeName)
-	return manager.PushWorktree(worktreeName)
+	return pusher.PushWorktree(worktreeName)
 }

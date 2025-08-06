@@ -1084,7 +1084,19 @@ func (gm *GitManager) IsInWorktree(currentPath string) (bool, string, error) {
 
 	// Check if this is a worktree by checking if it's under the worktrees directory
 	worktreePrefix := filepath.Join(gm.repoPath, "worktrees")
-	if strings.HasPrefix(worktreePath, worktreePrefix) {
+
+	// Resolve symlinks to handle cases like /var vs /private/var on macOS
+	resolvedWorktreePath, err := filepath.EvalSymlinks(worktreePath)
+	if err != nil {
+		resolvedWorktreePath = worktreePath // fallback to original if resolution fails
+	}
+
+	resolvedWorktreePrefix, err := filepath.EvalSymlinks(worktreePrefix)
+	if err != nil {
+		resolvedWorktreePrefix = worktreePrefix // fallback to original if resolution fails
+	}
+
+	if strings.HasPrefix(resolvedWorktreePath, resolvedWorktreePrefix) {
 		worktreeName := filepath.Base(worktreePath)
 		return true, worktreeName, nil
 	}
