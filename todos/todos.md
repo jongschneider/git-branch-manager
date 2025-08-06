@@ -11,11 +11,13 @@
 - Unit tests with mocks completed (cmd/pull_test.go)
 - Integration tests added (internal/pull_test.go) - TestManager_PullWorktree fully working
 
-- [ ] **Extract worktreePusher interface for cmd/push.go**
-  - Create interface with: PushAllWorktrees(), PushWorktree(), IsInWorktree(), GetAllWorktrees()
-  - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreePusher.go . worktreePusher`
-  - Refactor command functions to use interface
-  - Write unit tests with mocks
+**✅ COMPLETED**: Extract worktreePusher interface for cmd/push.go
+- Interface created with: PushAllWorktrees(), PushWorktree(), IsInWorktree(), GetAllWorktrees()
+- Mock generation added: `//go:generate go run github.com/matryer/moq@latest -out ./autogen_worktreePusher.go . worktreePusher`
+- Command functions refactored to use interface
+- Unit tests with mocks completed (cmd/push_test.go)
+- Integration tests added (internal/push_test.go) - TestManager_PushWorktree and TestManager_PushAllWorktrees fully working
+
 
 - [ ] **Extract worktreeRemover interface for cmd/remove.go**
   - Create interface with: GetWorktreePath(), GetWorktreeStatus(), RemoveWorktree(), GetAllWorktrees()
