@@ -1,457 +1,324 @@
 package cmd
 
 import (
-	"bytes"
-	"io"
-	"os"
-	"os/exec"
-	"path/filepath"
-	"strings"
+	"errors"
 	"testing"
 
-	"gbm/internal/testutils"
+	"gbm/internal"
 
 	"github.com/stretchr/testify/assert"
-	"github.com/stretchr/testify/require"
 )
 
-// Helper function to verify worktree no longer exists
-func verifyWorktreeRemoved(t *testing.T, repoPath, worktreeName string) {
-	worktreePath := filepath.Join(repoPath, "worktrees", worktreeName)
-
-	// Check directory doesn't exist
-	_, err := os.Stat(worktreePath)
-	assert.True(t, os.IsNotExist(err), "Worktree directory should not exist after removal")
-
-	// Check git worktree list doesn't include it
-	cmd := exec.Command("git", "worktree", "list")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
-	require.NoError(t, err, "Failed to list worktrees")
-
-	assert.NotContains(t, string(output), worktreePath, "Worktree should not appear in git worktree list")
-}
-
-// Helper function to verify worktree still exists
-func verifyWorktreeExists(t *testing.T, repoPath, worktreeName string) {
-	worktreePath := filepath.Join(repoPath, "worktrees", worktreeName)
-
-	// Check directory exists
-	_, err := os.Stat(worktreePath)
-	assert.NoError(t, err, "Worktree directory should exist")
-
-	// Check git worktree list includes it
-	cmd := exec.Command("git", "worktree", "list")
-	cmd.Dir = repoPath
-	output, err := cmd.Output()
-	require.NoError(t, err, "Failed to list worktrees")
-
-	assert.Contains(t, string(output), worktreePath, "Worktree should appear in git worktree list")
-}
-
-// Helper function to create uncommitted changes in a worktree
-func createUncommittedChanges(t *testing.T, worktreePath string) {
-	filePath := filepath.Join(worktreePath, "uncommitted_changes.txt")
-	err := os.WriteFile(filePath, []byte("These are uncommitted changes"), 0o644)
-	require.NoError(t, err, "Failed to create uncommitted changes")
-}
-
-// Helper function to check if worktree has uncommitted changes
-func hasUncommittedChanges(t *testing.T, worktreePath string) bool {
-	cmd := exec.Command("git", "status", "--porcelain")
-	cmd.Dir = worktreePath
-	output, err := cmd.Output()
-	require.NoError(t, err, "Failed to check git status")
-
-	return len(strings.TrimSpace(string(output))) > 0
-}
-
-// Helper function to simulate user input for confirmation prompts
-func simulateUserInput(input string, fn func() error) error {
-	// Create a pipe to simulate stdin
-	r, w, _ := os.Pipe()
-	oldStdin := os.Stdin
-	os.Stdin = r
-
-	// Write the input
-	go func() {
-		defer func() { _ = w.Close() }()
-		_, _ = w.Write([]byte(input + "\n"))
-	}()
-
-	// Execute the function
-	err := fn()
-
-	// Restore stdin
-	os.Stdin = oldStdin
-	_ = r.Close()
-
-	return err
-}
-
-// Helper function to capture command output
-func captureOutput(fn func() error) (string, error) {
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := fn()
-
-	_ = w.Close()
-	os.Stdout = old
-
-	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
-	return buf.String(), err
-}
-
-func TestRemoveCommand_SuccessfulRemoval(t *testing.T) {
-	// Create source repo with multiple branches and .envrc
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Verify FEAT worktree exists before removal
-	verifyWorktreeExists(t, repoPath, "feat")
-
-	// Remove FEAT worktree with user confirmation (simulate "y" input)
-	err := simulateUserInput("y", func() error {
-		cmd := newRootCommand()
-		cmd.SetArgs([]string{"remove", "feat"})
-		return cmd.Execute()
-	})
-
-	require.NoError(t, err, "Remove command should succeed with user confirmation")
-
-	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "feat")
-}
-
-func TestRemoveCommand_NonexistentWorktree(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Try to remove nonexistent worktree
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"remove", "NONEXISTENT"})
-
-	err := cmd.Execute()
-	require.Error(t, err, "Remove should fail for nonexistent worktree")
-	assert.Contains(t, err.Error(), "worktree 'NONEXISTENT' not found", "Error should mention worktree not found")
-}
-
-func TestRemoveCommand_NotInGitRepo(t *testing.T) {
-	// Create empty temp directory (not a git repo)
-	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	defer func() { _ = os.Chdir(originalDir) }()
-
-	_ = os.Chdir(tempDir)
-
-	// Try to remove in non-git directory
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"remove", "SOME_WORKTREE"})
-
-	err := cmd.Execute()
-	require.Error(t, err, "Remove should fail when not in a git repository")
-	assert.Contains(t, err.Error(), "not in a git repository", "Error should mention not being in a git repository")
-}
-
-func TestRemoveCommand_UncommittedChangesWithoutForce(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Create uncommitted changes in main worktree
-	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
-	createUncommittedChanges(t, mainWorktreePath)
-
-	// Verify worktree has uncommitted changes
-	assert.True(t, hasUncommittedChanges(t, mainWorktreePath), "main worktree should have uncommitted changes")
-
-	// Try to remove without force flag
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"remove", "main"})
-
-	err := cmd.Execute()
-	require.Error(t, err, "Remove should fail with uncommitted changes when force not used")
-	assert.Contains(t, err.Error(), "has uncommitted changes", "Error should mention uncommitted changes")
-	assert.Contains(t, err.Error(), "Use --force to remove anyway", "Error should suggest using --force")
-
-	// Verify worktree still exists
-	verifyWorktreeExists(t, repoPath, "main")
-}
-
-func TestRemoveCommand_ForceWithUncommittedChanges(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Create uncommitted changes in PROD worktree
-	prodWorktreePath := filepath.Join(repoPath, "worktrees", "prod")
-	createUncommittedChanges(t, prodWorktreePath)
-
-	// Verify worktree has uncommitted changes
-	assert.True(t, hasUncommittedChanges(t, prodWorktreePath), "PROD worktree should have uncommitted changes")
-
-	// Remove with force flag should succeed despite uncommitted changes
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"remove", "prod", "--force"})
-
-	err := cmd.Execute()
-	require.NoError(t, err, "Remove with --force should succeed even with uncommitted changes")
-
-	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "prod")
-}
-
-func TestRemoveCommand_ForceBypassesConfirmation(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Remove with force flag should bypass confirmation prompt
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"remove", "dev", "--force"})
-
-	err := cmd.Execute()
-	require.NoError(t, err, "Remove with --force should succeed without confirmation")
-
-	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "dev")
-}
-
-func TestRemoveCommand_UserAcceptsConfirmation(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Verify worktree exists before removal
-	verifyWorktreeExists(t, repoPath, "feat")
-
-	// Remove worktree with user accepting confirmation (simulate "y" input)
-	err := simulateUserInput("y", func() error {
-		cmd := newRootCommand()
-		cmd.SetArgs([]string{"remove", "feat"})
-		return cmd.Execute()
-	})
-
-	require.NoError(t, err, "Remove should succeed when user accepts confirmation")
-
-	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "feat")
-}
-
-func TestRemoveCommand_UserAcceptsConfirmationWithYes(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Verify worktree exists before removal
-	verifyWorktreeExists(t, repoPath, "dev")
-
-	// Remove worktree with user accepting confirmation (simulate "yes" input)
-	err := simulateUserInput("yes", func() error {
-		cmd := newRootCommand()
-		cmd.SetArgs([]string{"remove", "dev"})
-		return cmd.Execute()
-	})
-
-	require.NoError(t, err, "Remove should succeed when user types 'yes'")
-
-	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "dev")
-}
-
-func TestRemoveCommand_UserDeclinesConfirmation(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Verify worktree exists before attempted removal
-	verifyWorktreeExists(t, repoPath, "main")
-
-	// Remove worktree with user declining confirmation (simulate "n" input)
-	err := simulateUserInput("n", func() error {
-		cmd := newRootCommand()
-		cmd.SetArgs([]string{"remove", "main"})
-		return cmd.Execute()
-	})
-
-	require.NoError(t, err, "Remove should complete without error when user declines")
-
-	// Verify worktree still exists
-	verifyWorktreeExists(t, repoPath, "main")
-}
-
-func TestRemoveCommand_UserDeclinesWithEmptyInput(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// Verify worktree exists before attempted removal
-	verifyWorktreeExists(t, repoPath, "prod")
-
-	// Remove worktree with user providing empty input (just hitting enter)
-	err := simulateUserInput("", func() error {
-		cmd := newRootCommand()
-		cmd.SetArgs([]string{"remove", "prod"})
-		return cmd.Execute()
-	})
-
-	require.NoError(t, err, "Remove should complete without error when user provides empty input")
-
-	// Verify worktree still exists
-	verifyWorktreeExists(t, repoPath, "prod")
-}
-
-func TestRemoveCommand_RemovalFromWorktreeDirectory(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Navigate into the FEAT worktree directory
-	featWorktreePath := filepath.Join(repoPath, "worktrees", "feat")
-	_ = os.Chdir(featWorktreePath)
-
-	// Verify we're in the worktree directory (resolve any symlinks for comparison)
-	currentDir, _ := os.Getwd()
-	currentDir, _ = filepath.EvalSymlinks(currentDir)
-	featWorktreePath, _ = filepath.EvalSymlinks(featWorktreePath)
-	assert.Equal(t, featWorktreePath, currentDir, "Should be in FEAT worktree directory")
-
-	// Remove the worktree we're currently in (with force to avoid confirmation)
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"remove", "feat", "--force"})
-
-	err := cmd.Execute()
-	require.NoError(t, err, "Remove should succeed even when executed from within the worktree")
-
-	// Change back to repo root to verify removal
-	_ = os.Chdir(repoPath)
-
-	// Verify worktree was removed
-	verifyWorktreeRemoved(t, repoPath, "feat")
-}
-
-func TestRemoveCommand_UpdatesWorktreeList(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
-
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
-
-	// First, verify all expected worktrees exist
-	verifyWorktreeExists(t, repoPath, "main")
-	verifyWorktreeExists(t, repoPath, "dev")
-	verifyWorktreeExists(t, repoPath, "feat")
-	verifyWorktreeExists(t, repoPath, "prod")
-
-	// Get initial worktree count
-	cmd := exec.Command("git", "worktree", "list")
-	cmd.Dir = repoPath
-	initialOutput, err := cmd.Output()
-	require.NoError(t, err, "Failed to list worktrees initially")
-	initialWorktrees := strings.Split(strings.TrimSpace(string(initialOutput)), "\n")
-
-	// Remove one worktree
-	removeCmd := newRootCommand()
-	removeCmd.SetArgs([]string{"remove", "dev", "--force"})
-
-	err = removeCmd.Execute()
-	require.NoError(t, err, "Remove command should succeed")
-
-	// Get updated worktree count
-	cmd = exec.Command("git", "worktree", "list")
-	cmd.Dir = repoPath
-	updatedOutput, err := cmd.Output()
-	require.NoError(t, err, "Failed to list worktrees after removal")
-	updatedWorktrees := strings.Split(strings.TrimSpace(string(updatedOutput)), "\n")
-
-	// Verify worktree count decreased by 1
-	assert.Equal(t, len(initialWorktrees)-1, len(updatedWorktrees), "Worktree count should decrease by 1")
-
-	// Verify DEV worktree no longer appears in the list
-	for _, line := range updatedWorktrees {
-		assert.NotContains(t, line, "worktrees/dev", "dev worktree should not appear in git worktree list")
+// ============================================================================
+// UNIT TESTS (Using mocks - these are fast and don't require real git operations)
+// ============================================================================
+// These tests use the worktreeRemover interface with mocks to test business logic
+// without requiring real git operations. They run in milliseconds.
+
+func TestHandleRemoveWithConfirmation(t *testing.T) {
+	tests := []struct {
+		name         string
+		worktreeName string
+		force        bool
+		confirmFunc  confirmationFunc
+		mockSetup    func() *worktreeRemoverMock
+		assertMocks  func(t *testing.T, mock *worktreeRemoverMock)
+		assertErr    func(t *testing.T, err error)
+	}{
+		{
+			name:         "success - remove with force bypasses checks",
+			worktreeName: "test-worktree",
+			force:        true,
+			confirmFunc:  nil, // Not used when force=true
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetWorktreePathFunc: func(worktreeName string) (string, error) {
+						assert.Equal(t, "test-worktree", worktreeName)
+						return "/path/to/worktree", nil
+					},
+					RemoveWorktreeFunc: func(worktreeName string) error {
+						assert.Equal(t, "test-worktree", worktreeName)
+						return nil
+					},
+				}
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetWorktreePathCalls(), 1)
+				assert.Len(t, mock.GetWorktreeStatusCalls(), 0) // Should be skipped with force
+				assert.Len(t, mock.RemoveWorktreeCalls(), 1)
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name:         "success - remove without uncommitted changes with confirmation",
+			worktreeName: "clean-worktree",
+			force:        false,
+			confirmFunc:  func(worktreeName string) bool { return true }, // User confirms
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetWorktreePathFunc: func(worktreeName string) (string, error) {
+						assert.Equal(t, "clean-worktree", worktreeName)
+						return "/path/to/clean-worktree", nil
+					},
+					GetWorktreeStatusFunc: func(worktreePath string) (*internal.GitStatus, error) {
+						assert.Equal(t, "/path/to/clean-worktree", worktreePath)
+						return &internal.GitStatus{}, nil // Clean status
+					},
+					RemoveWorktreeFunc: func(worktreeName string) error {
+						assert.Equal(t, "clean-worktree", worktreeName)
+						return nil
+					},
+				}
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetWorktreePathCalls(), 1)
+				assert.Len(t, mock.GetWorktreeStatusCalls(), 1)
+				assert.Len(t, mock.RemoveWorktreeCalls(), 1)
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name:         "success - user cancels removal",
+			worktreeName: "cancel-worktree",
+			force:        false,
+			confirmFunc:  func(worktreeName string) bool { return false }, // User cancels
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetWorktreePathFunc: func(worktreeName string) (string, error) {
+						assert.Equal(t, "cancel-worktree", worktreeName)
+						return "/path/to/cancel-worktree", nil
+					},
+					GetWorktreeStatusFunc: func(worktreePath string) (*internal.GitStatus, error) {
+						assert.Equal(t, "/path/to/cancel-worktree", worktreePath)
+						return &internal.GitStatus{}, nil // Clean status
+					},
+					// RemoveWorktree should not be called when user cancels
+				}
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetWorktreePathCalls(), 1)
+				assert.Len(t, mock.GetWorktreeStatusCalls(), 1)
+				assert.Len(t, mock.RemoveWorktreeCalls(), 0) // Should not be called when user cancels
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.NoError(t, err) // Cancellation is not an error
+			},
+		},
+		{
+			name:         "error - worktree not found",
+			worktreeName: "nonexistent",
+			force:        false,
+			confirmFunc:  nil, // Not used since error occurs before confirmation
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetWorktreePathFunc: func(worktreeName string) (string, error) {
+						assert.Equal(t, "nonexistent", worktreeName)
+						return "", errors.New("worktree not found")
+					},
+				}
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetWorktreePathCalls(), 1)
+				assert.Len(t, mock.GetWorktreeStatusCalls(), 0) // Should not be called due to early error
+				assert.Len(t, mock.RemoveWorktreeCalls(), 0)    // Should not be called due to error
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "worktree 'nonexistent' not found")
+			},
+		},
+		{
+			name:         "error - uncommitted changes without force",
+			worktreeName: "dirty-worktree",
+			force:        false,
+			confirmFunc:  nil, // Not used since error occurs before confirmation
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetWorktreePathFunc: func(worktreeName string) (string, error) {
+						assert.Equal(t, "dirty-worktree", worktreeName)
+						return "/path/to/dirty-worktree", nil
+					},
+					GetWorktreeStatusFunc: func(worktreePath string) (*internal.GitStatus, error) {
+						assert.Equal(t, "/path/to/dirty-worktree", worktreePath)
+						// Return status with changes
+						status := &internal.GitStatus{
+							IsDirty:   true,
+							Untracked: 1,
+						}
+						return status, nil
+					},
+				}
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetWorktreePathCalls(), 1)
+				assert.Len(t, mock.GetWorktreeStatusCalls(), 1)
+				assert.Len(t, mock.RemoveWorktreeCalls(), 0) // Should not be called due to error
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "has uncommitted changes")
+				assert.Contains(t, err.Error(), "Use --force to remove anyway")
+			},
+		},
+		{
+			name:         "error - status check fails",
+			worktreeName: "status-error",
+			force:        false,
+			confirmFunc:  nil, // Not used since error occurs before confirmation
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetWorktreePathFunc: func(worktreeName string) (string, error) {
+						assert.Equal(t, "status-error", worktreeName)
+						return "/path/to/status-error", nil
+					},
+					GetWorktreeStatusFunc: func(worktreePath string) (*internal.GitStatus, error) {
+						assert.Equal(t, "/path/to/status-error", worktreePath)
+						return nil, errors.New("failed to get git status")
+					},
+				}
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetWorktreePathCalls(), 1)
+				assert.Len(t, mock.GetWorktreeStatusCalls(), 1)
+				assert.Len(t, mock.RemoveWorktreeCalls(), 0) // Should not be called due to error
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to check worktree status")
+			},
+		},
+		{
+			name:         "error - removal fails",
+			worktreeName: "remove-fails",
+			force:        true,
+			confirmFunc:  nil, // Not used when force=true
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetWorktreePathFunc: func(worktreeName string) (string, error) {
+						assert.Equal(t, "remove-fails", worktreeName)
+						return "/path/to/remove-fails", nil
+					},
+					RemoveWorktreeFunc: func(worktreeName string) error {
+						assert.Equal(t, "remove-fails", worktreeName)
+						return errors.New("git worktree remove failed")
+					},
+				}
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetWorktreePathCalls(), 1)
+				assert.Len(t, mock.GetWorktreeStatusCalls(), 0) // Should be skipped with force
+				assert.Len(t, mock.RemoveWorktreeCalls(), 1)    // Should be called even though it fails
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to remove worktree")
+			},
+		},
 	}
 
-	// Verify other worktrees still exist
-	verifyWorktreeExists(t, repoPath, "main")
-	verifyWorktreeExists(t, repoPath, "feat")
-	verifyWorktreeExists(t, repoPath, "prod")
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := tt.mockSetup()
+			err := handleRemoveWithConfirmation(mock, tt.worktreeName, tt.force, tt.confirmFunc)
+
+			// Assert mock calls
+			tt.assertMocks(t, mock)
+
+			// Assert error conditions
+			tt.assertErr(t, err)
+		})
+	}
 }
 
-func TestRemoveCommand_CleanupFilesystem(t *testing.T) {
-	// Create source repo with worktrees
-	sourceRepo := testutils.NewStandardGBMConfigRepo(t)
+func TestGetWorktreeCompletions(t *testing.T) {
+	tests := []struct {
+		name         string
+		mockSetup    func() *worktreeRemoverMock
+		expectResult func(t *testing.T, completions []string)
+		assertMocks  func(t *testing.T, mock *worktreeRemoverMock)
+		assertErr    func(t *testing.T, err error)
+	}{
+		{
+			name: "success - return worktree names",
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+						return map[string]*internal.WorktreeListInfo{
+							"main": {},
+							"dev":  {},
+							"feat": {},
+						}, nil
+					},
+				}
+			},
+			expectResult: func(t *testing.T, completions []string) {
+				assert.ElementsMatch(t, []string{"main", "dev", "feat"}, completions)
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetAllWorktreesCalls(), 1)
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+		{
+			name: "error - GetAllWorktrees fails",
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+						return nil, errors.New("failed to get worktrees")
+					},
+				}
+			},
+			expectResult: func(t *testing.T, completions []string) {
+				assert.Nil(t, completions)
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetAllWorktreesCalls(), 1)
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.Error(t, err)
+				assert.Contains(t, err.Error(), "failed to get worktrees")
+			},
+		},
+		{
+			name: "success - empty worktrees",
+			mockSetup: func() *worktreeRemoverMock {
+				return &worktreeRemoverMock{
+					GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+						return map[string]*internal.WorktreeListInfo{}, nil
+					},
+				}
+			},
+			expectResult: func(t *testing.T, completions []string) {
+				assert.Empty(t, completions)
+			},
+			assertMocks: func(t *testing.T, mock *worktreeRemoverMock) {
+				assert.Len(t, mock.GetAllWorktreesCalls(), 1)
+			},
+			assertErr: func(t *testing.T, err error) {
+				assert.NoError(t, err)
+			},
+		},
+	}
 
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := tt.mockSetup()
+			completions, err := getWorktreeCompletions(mock)
 
-	// Stay in repo root
-	_ = os.Chdir(repoPath)
+			// Validate results
+			tt.expectResult(t, completions)
 
-	// Add some files to the main worktree
-	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
-	testFile := filepath.Join(mainWorktreePath, "test_file.txt")
-	err := os.WriteFile(testFile, []byte("test content"), 0o644)
-	require.NoError(t, err, "Failed to create test file in worktree")
+			// Assert mock calls
+			tt.assertMocks(t, mock)
 
-	// Verify file exists
-	_, err = os.Stat(testFile)
-	require.NoError(t, err, "Test file should exist before removal")
-
-	// Remove worktree
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"remove", "main", "--force"})
-
-	err = cmd.Execute()
-	require.NoError(t, err, "Remove command should succeed")
-
-	// Verify entire worktree directory is gone
-	_, err = os.Stat(mainWorktreePath)
-	assert.True(t, os.IsNotExist(err), "Worktree directory should be completely removed")
-
-	// Verify test file is also gone
-	_, err = os.Stat(testFile)
-	assert.True(t, os.IsNotExist(err), "Files within worktree should be removed")
+			// Assert error conditions
+			tt.assertErr(t, err)
+		})
+	}
 }

@@ -19,11 +19,6 @@
 - Integration tests added (internal/push_test.go) - TestManager_PushWorktree and TestManager_PushAllWorktrees fully working
 
 
-- [ ] **Extract worktreeRemover interface for cmd/remove.go**
-  - Create interface with: GetWorktreePath(), GetWorktreeStatus(), RemoveWorktree(), GetAllWorktrees()
-  - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreeRemover.go . worktreeRemover`
-  - Refactor command functions to use interface
-  - Write unit tests with mocks
 
 - [ ] **Extract worktreeSwitcher interface for cmd/switch.go**
   - Create interface with: GetWorktreePath(), SetCurrentWorktree(), GetPreviousWorktree(), GetAllWorktrees(), GetSortedWorktreeNames(), GetStatusIcon()

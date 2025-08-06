@@ -5,8 +5,87 @@ import (
 	"fmt"
 	"strings"
 
+	"gbm/internal"
+
 	"github.com/spf13/cobra"
 )
+
+//go:generate go run github.com/matryer/moq@latest -out ./autogen_worktreeRemover.go . worktreeRemover
+
+// worktreeRemover interface abstracts the Manager operations needed for removing worktrees
+type worktreeRemover interface {
+	GetWorktreePath(worktreeName string) (string, error)
+	GetWorktreeStatus(worktreePath string) (*internal.GitStatus, error)
+	RemoveWorktree(worktreeName string) error
+	GetAllWorktrees() (map[string]*internal.WorktreeListInfo, error)
+}
+
+// confirmationFunc is a function type for confirming actions
+type confirmationFunc func(worktreeName string) bool
+
+// defaultConfirmation is the default confirmation function that prompts the user
+func defaultConfirmation(worktreeName string) bool {
+	fmt.Printf("Are you sure you want to remove worktree '%s'? [y/N]: ", worktreeName)
+	var response string
+	_, _ = fmt.Scanln(&response)
+	return strings.ToLower(response) == "y" || strings.ToLower(response) == "yes"
+}
+
+// handleRemove handles the removal of a worktree with the specified options
+func handleRemove(remover worktreeRemover, worktreeName string, force bool) error {
+	return handleRemoveWithConfirmation(remover, worktreeName, force, defaultConfirmation)
+}
+
+// handleRemoveWithConfirmation handles the removal with a custom confirmation function
+func handleRemoveWithConfirmation(remover worktreeRemover, worktreeName string, force bool, confirm confirmationFunc) error {
+	// Check if worktree exists
+	worktreePath, err := remover.GetWorktreePath(worktreeName)
+	if err != nil {
+		return fmt.Errorf("worktree '%s' not found: %w", worktreeName, err)
+	}
+
+	// Check if worktree has uncommitted changes (unless force is used)
+	if !force {
+		gitStatus, err := remover.GetWorktreeStatus(worktreePath)
+		if err != nil {
+			return fmt.Errorf("failed to check worktree status: %w", err)
+		}
+
+		if gitStatus.HasChanges() {
+			return fmt.Errorf("worktree '%s' has uncommitted changes. Use --force to remove anyway", worktreeName)
+		}
+	}
+
+	// Confirm removal (unless force is used)
+	if !force {
+		if !confirm(worktreeName) {
+			PrintInfo("Removal cancelled")
+			return nil
+		}
+	}
+
+	// Remove the worktree
+	if err := remover.RemoveWorktree(worktreeName); err != nil {
+		return fmt.Errorf("failed to remove worktree: %w", err)
+	}
+
+	PrintInfo("Worktree '%s' removed successfully", worktreeName)
+	return nil
+}
+
+// getWorktreeCompletions gets worktree names for shell completion
+func getWorktreeCompletions(remover worktreeRemover) ([]string, error) {
+	worktrees, err := remover.GetAllWorktrees()
+	if err != nil {
+		return nil, err
+	}
+
+	var completions []string
+	for worktreeName := range worktrees {
+		completions = append(completions, worktreeName)
+	}
+	return completions, nil
+}
 
 func newRemoveCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -35,42 +114,7 @@ Examples:
 				PrintVerbose("%v", err)
 			}
 
-			// Check if worktree exists
-			worktreePath, err := manager.GetWorktreePath(worktreeName)
-			if err != nil {
-				return fmt.Errorf("worktree '%s' not found: %w", worktreeName, err)
-			}
-
-			// Check if worktree has uncommitted changes (unless force is used)
-			if !force {
-				gitStatus, err := manager.GetWorktreeStatus(worktreePath)
-				if err != nil {
-					return fmt.Errorf("failed to check worktree status: %w", err)
-				}
-
-				if gitStatus.HasChanges() {
-					return fmt.Errorf("worktree '%s' has uncommitted changes. Use --force to remove anyway", worktreeName)
-				}
-			}
-
-			// Confirm removal (unless force is used)
-			if !force {
-				fmt.Printf("Are you sure you want to remove worktree '%s'? [y/N]: ", worktreeName)
-				var response string
-				_, _ = fmt.Scanln(&response)
-				if strings.ToLower(response) != "y" && strings.ToLower(response) != "yes" {
-					PrintInfo("Removal cancelled")
-					return nil
-				}
-			}
-
-			// Remove the worktree
-			if err := manager.RemoveWorktree(worktreeName); err != nil {
-				return fmt.Errorf("failed to remove worktree: %w", err)
-			}
-
-			PrintInfo("Worktree '%s' removed successfully", worktreeName)
-			return nil
+			return handleRemove(manager, worktreeName, force)
 		},
 	}
 
@@ -89,15 +133,10 @@ Examples:
 				PrintVerbose("%v", err)
 			}
 
-			// Get all worktrees
-			worktrees, err := manager.GetAllWorktrees()
+			// Get worktree completions
+			completions, err := getWorktreeCompletions(manager)
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-
-			var completions []string
-			for worktreeName := range worktrees {
-				completions = append(completions, worktreeName)
 			}
 			return completions, cobra.ShellCompDirectiveNoFileComp
 		}
