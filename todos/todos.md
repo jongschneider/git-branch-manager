@@ -20,11 +20,6 @@
 
 
 
-- [ ] **Extract worktreeSwitcher interface for cmd/switch.go**
-  - Create interface with: GetWorktreePath(), SetCurrentWorktree(), GetPreviousWorktree(), GetAllWorktrees(), GetSortedWorktreeNames(), GetStatusIcon()
-  - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreeSwitcher.go . worktreeSwitcher`
-  - Refactor command functions to use interface
-  - Write unit tests with mocks
 
 ### Phase 2: Build on Patterns (Medium-Low Complexity)
 
@@ -33,18 +28,21 @@
   - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreeSyncer.go . worktreeSyncer`
   - Refactor command functions to use interface
   - Write unit tests with mocks
+  - Additionally, move any integration tests that use real git repos, worktrees, etc. out of the cmd layer and into the internal layer where they belong
 
 - [ ] **Extract worktreeValidator interface for cmd/validate.go**
   - Create interface with: GetWorktreeMapping(), BranchExists()
   - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreeValidator.go . worktreeValidator`
   - Refactor command functions to use interface
   - Write unit tests with mocks
+  - Additionally, move any integration tests that use real git repos, worktrees, etc. out of the cmd layer and into the internal layer where they belong
 
 - [ ] **Extract worktreeLister interface for cmd/list.go**
   - Create interface with: GetSyncStatus(), GetAllWorktrees(), GetSortedWorktreeNames(), GetWorktreeMapping()
   - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreeLister.go . worktreeLister`
   - Refactor command functions to use interface
   - Write unit tests with mocks
+  - Additionally, move any integration tests that use real git repos, worktrees, etc. out of the cmd layer and into the internal layer where they belong
 
 ### Phase 3: Handle Complex Data (Medium Complexity)
 
@@ -54,6 +52,7 @@
   - Mock external JIRA CLI calls
   - Separate data aggregation logic for better testing
   - Write comprehensive unit tests
+  - Additionally, move any integration tests that use real git repos, worktrees, etc. out of the cmd layer and into the internal layer where they belong
 
 - [ ] **Extract hotfixCreator interface for cmd/hotfix.go**
   - Create interface with: GetGBMConfig(), GetHotfixPrefix(), AddWorktree(), GenerateBranchFromJira(), GetJiraIssues(), FindProductionBranch()
@@ -61,6 +60,7 @@
   - Extract production branch detection logic to internal package
   - Interface JIRA integration
   - Write unit tests with mocks
+  - Additionally, move any integration tests that use real git repos, worktrees, etc. out of the cmd layer and into the internal layer where they belong
 
 ### Phase 4: Architectural Refactoring (High Complexity)
 

@@ -12,6 +12,18 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//go:generate go run github.com/matryer/moq@latest -out ./autogen_worktreeSwitcher.go . worktreeSwitcher
+
+// worktreeSwitcher interface abstracts the Manager operations needed for switching worktrees
+type worktreeSwitcher interface {
+	GetWorktreePath(worktreeName string) (string, error)
+	SetCurrentWorktree(worktreeName string) error
+	GetPreviousWorktree() string
+	GetAllWorktrees() (map[string]*internal.WorktreeListInfo, error)
+	GetSortedWorktreeNames(worktrees map[string]*internal.WorktreeListInfo) []string
+	GetStatusIcon(gitStatus *internal.GitStatus) string
+}
+
 func newSwitchCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "switch [WORKTREE_NAME]",
@@ -49,7 +61,7 @@ Examples:
 			}
 
 			if len(args) == 0 {
-				return listWorktrees(manager)
+				return handleListWorktrees(manager)
 			}
 
 			worktreeName := args[0]
@@ -64,7 +76,7 @@ Examples:
 				worktreeName = previous
 			}
 
-			return switchToWorktreeWithFlag(manager, worktreeName, printPath)
+			return handleSwitchToWorktree(manager, worktreeName, printPath)
 		},
 	}
 
@@ -81,18 +93,18 @@ Examples:
 	return cmd
 }
 
-func switchToWorktreeWithFlag(manager *internal.Manager, worktreeName string, printPath bool) error {
+func handleSwitchToWorktree(switcher worktreeSwitcher, worktreeName string, printPath bool) error {
 	PrintVerbose("Switching to worktree: %s", worktreeName)
 
 	// Try exact match first
-	targetPath, err := manager.GetWorktreePath(worktreeName)
+	targetPath, err := switcher.GetWorktreePath(worktreeName)
 	if err != nil {
 		// If exact match fails, try fuzzy matching
 		PrintVerbose("Exact match failed, trying fuzzy matching")
-		matchedName := findFuzzyMatch(manager, worktreeName)
+		matchedName := findFuzzyMatch(switcher, worktreeName)
 		if matchedName != "" {
 			PrintInfo("Fuzzy matched '%s' to '%s'", worktreeName, matchedName)
-			targetPath, err = manager.GetWorktreePath(matchedName)
+			targetPath, err = switcher.GetWorktreePath(matchedName)
 			if err != nil {
 				return err
 			}
@@ -103,7 +115,7 @@ func switchToWorktreeWithFlag(manager *internal.Manager, worktreeName string, pr
 	}
 
 	// Track this worktree switch
-	if err := manager.SetCurrentWorktree(worktreeName); err != nil {
+	if err := switcher.SetCurrentWorktree(worktreeName); err != nil {
 		PrintVerbose("Failed to track current worktree: %v", err)
 	}
 
@@ -125,8 +137,8 @@ func switchToWorktreeWithFlag(manager *internal.Manager, worktreeName string, pr
 	return nil
 }
 
-func findFuzzyMatch(manager *internal.Manager, target string) string {
-	worktrees, err := manager.GetAllWorktrees()
+func findFuzzyMatch(switcher worktreeSwitcher, target string) string {
+	worktrees, err := switcher.GetAllWorktrees()
 	if err != nil {
 		return ""
 	}
@@ -163,10 +175,10 @@ func findFuzzyMatch(manager *internal.Manager, target string) string {
 	return ""
 }
 
-func listWorktrees(manager *internal.Manager) error {
+func handleListWorktrees(switcher worktreeSwitcher) error {
 	PrintVerbose("Listing available worktrees")
 
-	worktrees, err := manager.GetAllWorktrees()
+	worktrees, err := switcher.GetAllWorktrees()
 	if err != nil {
 		return err
 	}
@@ -179,13 +191,13 @@ func listWorktrees(manager *internal.Manager) error {
 	fmt.Println(internal.FormatSubHeader("Available worktrees:"))
 
 	// Get sorted worktree names (.envrc first, then ad hoc by creation time desc)
-	names := manager.GetSortedWorktreeNames(worktrees)
+	names := switcher.GetSortedWorktreeNames(worktrees)
 
 	for _, name := range names {
 		info := worktrees[name]
 		status := "ready"
 		if info.GitStatus != nil {
-			status = manager.GetStatusIcon(info.GitStatus)
+			status = switcher.GetStatusIcon(info.GitStatus)
 		}
 
 		relPath, _ := filepath.Rel(".", info.Path)
