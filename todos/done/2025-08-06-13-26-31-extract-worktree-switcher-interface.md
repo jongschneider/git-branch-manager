@@ -1,5 +1,5 @@
 # Extract worktreeSwitcher interface for cmd/switch.go
-**Status:** AwaitingCommit
+**Status:** Done
 **Agent PID:** 49661
 
 ## Original Todo
