@@ -276,7 +276,6 @@ func (r *GitTestRepo) CreateGBMConfig(worktrees map[string]WorktreeConfig) error
 	// Add a header comment to the YAML
 	content := "# Git Branch Manager Configuration\n\n# Worktree definitions - key is the worktree name, value defines the branch and merge strategy\n" + string(yamlData)
 
-	fmt.Println("🚨", content)
 	return r.WriteFile("gbm.branchconfig.yaml", content)
 }
 
