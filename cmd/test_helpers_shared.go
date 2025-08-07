@@ -1,8 +1,6 @@
 package cmd
 
 import (
-	"bytes"
-	"io"
 	"os"
 )
 
@@ -29,18 +27,3 @@ func simulateUserInput(input string, fn func() error) error {
 	return err
 }
 
-// Helper function to capture command output
-func captureOutput(fn func() error) (string, error) {
-	old := os.Stdout
-	r, w, _ := os.Pipe()
-	os.Stdout = w
-
-	err := fn()
-
-	_ = w.Close()
-	os.Stdout = old
-
-	var buf bytes.Buffer
-	_, _ = io.Copy(&buf, r)
-	return buf.String(), err
-}

@@ -23,12 +23,6 @@
 
 ### Phase 2: Build on Patterns (Medium-Low Complexity)
 
-- [ ] **Extract worktreeSyncer interface for cmd/sync.go**
-  - Create interface with: GetSyncStatus(), SyncWithConfirmation()
-  - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreeSyncer.go . worktreeSyncer`
-  - Refactor command functions to use interface
-  - Write unit tests with mocks
-  - Additionally, move any integration tests that use real git repos, worktrees, etc. out of the cmd layer and into the internal layer where they belong
 
 - [ ] **Extract worktreeValidator interface for cmd/validate.go**
   - Create interface with: GetWorktreeMapping(), BranchExists()

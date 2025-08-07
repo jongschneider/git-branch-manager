@@ -9,6 +9,14 @@ import (
 	"github.com/spf13/cobra"
 )
 
+//go:generate go run github.com/matryer/moq@latest -out ./autogen_worktreeSyncer.go . worktreeSyncer
+
+// worktreeSyncer interface abstracts the Manager operations needed for sync operations
+type worktreeSyncer interface {
+	GetSyncStatus() (*internal.SyncStatus, error)
+	SyncWithConfirmation(dryRun, force bool, confirmFunc internal.ConfirmationFunc) error
+}
+
 func newSyncCommand() *cobra.Command {
 	cmd := &cobra.Command{
 		Use:   "sync",
@@ -27,72 +35,10 @@ updates existing worktrees if branch references have changed, and optionally rem
 			}
 
 			if syncDryRun {
-				iconManager := internal.GetGlobalIconManager()
-				PrintInfo("%s", internal.FormatStatusIcon(iconManager.DryRun(), "Dry run mode - showing what would be changed:"))
-				status, err := manager.GetSyncStatus()
-				if err != nil {
-					return err
-				}
-
-				if status.InSync {
-					PrintInfo("%s", internal.FormatSuccess("All worktrees are in sync"))
-					return nil
-				}
-
-				if len(status.MissingWorktrees) > 0 {
-					iconManager := internal.GetGlobalIconManager()
-					PrintInfo("%s", internal.FormatStatusIcon(iconManager.Missing(), "Missing worktrees:"))
-					for _, envVar := range status.MissingWorktrees {
-						PrintInfo("  • %s", envVar)
-					}
-				}
-
-				if len(status.BranchChanges) > 0 {
-					iconManager := internal.GetGlobalIconManager()
-					PrintInfo("%s", internal.FormatStatusIcon(iconManager.Changes(), "Branch changes needed:"))
-					for envVar, change := range status.BranchChanges {
-						PrintInfo("  • %s: %s → %s", envVar, change.OldBranch, change.NewBranch)
-					}
-				}
-
-				if len(status.WorktreePromotions) > 0 {
-					iconManager := internal.GetGlobalIconManager()
-					PrintInfo("%s", internal.FormatStatusIcon(iconManager.Changes(), "Worktree promotions (destructive):"))
-					for _, promotion := range status.WorktreePromotions {
-						PrintInfo("  • %s (%s) will be promoted to %s", promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree)
-						PrintInfo("    1. Worktree %s (%s) will be removed", promotion.TargetWorktree, promotion.TargetBranch)
-						PrintInfo("    2. Worktree %s (%s) will be moved to %s", promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree)
-					}
-				}
-
-				if len(status.OrphanedWorktrees) > 0 {
-					iconManager := internal.GetGlobalIconManager()
-					PrintInfo("%s", internal.FormatStatusIcon(iconManager.Orphaned(), "Orphaned worktrees (use --force to remove):"))
-					for _, envVar := range status.OrphanedWorktrees {
-						PrintInfo("  • %s", envVar)
-					}
-				}
-
-				return nil
+				return handleSyncDryRun(manager)
 			}
 
-			PrintVerbose("Synchronizing worktrees (force=%v)", syncForce)
-
-			// Create confirmation function for destructive operations
-			// Always provide confirmation for promotions; only for orphaned worktrees when force is used
-			confirmFunc := func(message string) bool {
-				fmt.Print(message + " [y/N]: ")
-				var response string
-				_, _ = fmt.Scanln(&response)
-				return strings.ToLower(response) == "y" || strings.ToLower(response) == "yes"
-			}
-
-			if err := manager.SyncWithConfirmation(syncDryRun, syncForce, confirmFunc); err != nil {
-				return err
-			}
-
-			PrintInfo("%s", internal.FormatSuccess("Successfully synchronized worktrees"))
-			return nil
+			return handleSync(manager, syncForce)
 		},
 	}
 
@@ -100,4 +46,74 @@ updates existing worktrees if branch references have changed, and optionally rem
 	cmd.Flags().Bool("force", false, "skip confirmation prompts and remove orphaned worktrees")
 
 	return cmd
+}
+
+func handleSyncDryRun(syncer worktreeSyncer) error {
+	iconManager := internal.GetGlobalIconManager()
+	PrintInfo("%s", internal.FormatStatusIcon(iconManager.DryRun(), "Dry run mode - showing what would be changed:"))
+	status, err := syncer.GetSyncStatus()
+	if err != nil {
+		return err
+	}
+
+	if status.InSync {
+		PrintInfo("%s", internal.FormatSuccess("All worktrees are in sync"))
+		return nil
+	}
+
+	if len(status.MissingWorktrees) > 0 {
+		iconManager := internal.GetGlobalIconManager()
+		PrintInfo("%s", internal.FormatStatusIcon(iconManager.Missing(), "Missing worktrees:"))
+		for _, envVar := range status.MissingWorktrees {
+			PrintInfo("  • %s", envVar)
+		}
+	}
+
+	if len(status.BranchChanges) > 0 {
+		iconManager := internal.GetGlobalIconManager()
+		PrintInfo("%s", internal.FormatStatusIcon(iconManager.Changes(), "Branch changes needed:"))
+		for envVar, change := range status.BranchChanges {
+			PrintInfo("  • %s: %s → %s", envVar, change.OldBranch, change.NewBranch)
+		}
+	}
+
+	if len(status.WorktreePromotions) > 0 {
+		iconManager := internal.GetGlobalIconManager()
+		PrintInfo("%s", internal.FormatStatusIcon(iconManager.Changes(), "Worktree promotions (destructive):"))
+		for _, promotion := range status.WorktreePromotions {
+			PrintInfo("  • %s (%s) will be promoted to %s", promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree)
+			PrintInfo("    1. Worktree %s (%s) will be removed", promotion.TargetWorktree, promotion.TargetBranch)
+			PrintInfo("    2. Worktree %s (%s) will be moved to %s", promotion.SourceWorktree, promotion.Branch, promotion.TargetWorktree)
+		}
+	}
+
+	if len(status.OrphanedWorktrees) > 0 {
+		iconManager := internal.GetGlobalIconManager()
+		PrintInfo("%s", internal.FormatStatusIcon(iconManager.Orphaned(), "Orphaned worktrees (use --force to remove):"))
+		for _, envVar := range status.OrphanedWorktrees {
+			PrintInfo("  • %s", envVar)
+		}
+	}
+
+	return nil
+}
+
+func handleSync(syncer worktreeSyncer, force bool) error {
+	PrintVerbose("Synchronizing worktrees (force=%v)", force)
+
+	// Create confirmation function for destructive operations
+	// Always provide confirmation for promotions; only for orphaned worktrees when force is used
+	confirmFunc := func(message string) bool {
+		fmt.Print(message + " [y/N]: ")
+		var response string
+		_, _ = fmt.Scanln(&response)
+		return strings.ToLower(response) == "y" || strings.ToLower(response) == "yes"
+	}
+
+	if err := syncer.SyncWithConfirmation(false, force, confirmFunc); err != nil {
+		return err
+	}
+
+	PrintInfo("%s", internal.FormatSuccess("Successfully synchronized worktrees"))
+	return nil
 }
