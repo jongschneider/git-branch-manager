@@ -83,11 +83,16 @@ func NewManager(repoPath string) (*Manager, error) {
 
 func (m *Manager) LoadGBMConfig(configPath string) error {
 	if configPath == "" {
-		configPath = filepath.Join(m.repoPath, DefaultBranchConfigFilename)
+		configPath = DefaultBranchConfigFilename
 	}
 
 	if !filepath.IsAbs(configPath) {
 		configPath = filepath.Join(m.repoPath, configPath)
+	}
+
+	// Resolve symlinks to handle macOS /var -> /private/var and similar cases
+	if resolved, err := filepath.EvalSymlinks(configPath); err == nil {
+		configPath = resolved
 	}
 
 	gbmConfig, err := ParseGBMConfig(configPath)
@@ -101,7 +106,9 @@ func (m *Manager) LoadGBMConfig(configPath string) error {
 
 func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 	if m.gbmConfig == nil {
-		return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
+		if err := m.LoadGBMConfig(""); err != nil {
+			return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
+		}
 	}
 
 	status := &SyncStatus{
@@ -118,8 +125,18 @@ func (m *Manager) GetSyncStatus() (*SyncStatus, error) {
 	}
 
 	worktreeMap := make(map[string]*WorktreeInfo)
+	// Resolve symlinks for robust prefix checks on systems where /var -> /private/var
+	prefix := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)
+	resolvedPrefix, err := filepath.EvalSymlinks(prefix)
+	if err != nil {
+		resolvedPrefix = prefix
+	}
 	for _, wt := range worktrees {
-		if strings.HasPrefix(wt.Path, filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)) {
+		resolvedPath, err := filepath.EvalSymlinks(wt.Path)
+		if err != nil {
+			resolvedPath = wt.Path
+		}
+		if strings.HasPrefix(resolvedPath, resolvedPrefix) {
 			worktreeMap[wt.Name] = wt
 		}
 	}
@@ -156,8 +173,21 @@ func (m *Manager) detectWorktreePromotions(branchChanges map[string]BranchChange
 
 	// Create a map of branch -> worktree for existing worktrees
 	branchToWorktree := make(map[string]string)
+	expectedPrefix := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)
+
+	// Resolve symlinks for consistent path comparison (e.g., /var vs /private/var on macOS)
+	resolvedExpectedPrefix, err := filepath.EvalSymlinks(expectedPrefix)
+	if err != nil {
+		resolvedExpectedPrefix = expectedPrefix // fallback to original if resolution fails
+	}
+
 	for _, wt := range allWorktrees {
-		if strings.HasPrefix(wt.Path, filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)) {
+		resolvedWorktreePath, err := filepath.EvalSymlinks(wt.Path)
+		if err != nil {
+			resolvedWorktreePath = wt.Path // fallback to original if resolution fails
+		}
+
+		if strings.HasPrefix(resolvedWorktreePath, resolvedExpectedPrefix) {
 			branchToWorktree[wt.Branch] = wt.Name
 		}
 	}
@@ -208,6 +238,12 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 		return nil
 	}
 
+	// Ensure worktrees directory exists before creating/moving worktrees
+	worktreesDir := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix)
+	if err := os.MkdirAll(worktreesDir, 0o755); err != nil {
+		return fmt.Errorf("failed to ensure worktrees directory: %w", err)
+	}
+
 	// Remove orphaned worktrees first (if --force is used) to free up branches
 	if force && len(status.OrphanedWorktrees) > 0 {
 		// Ask for confirmation unless a confirmation function is provided and returns true
@@ -235,13 +271,21 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 
 	for _, worktreeName := range status.MissingWorktrees {
 		worktreeConfig := m.gbmConfig.Worktrees[worktreeName]
+		// If the directory exists but is empty (e.g., created by .gitignore), remove it first
+		worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, worktreeName)
+		if stat, err := os.Stat(worktreePath); err == nil && stat.IsDir() {
+			// Check if directory is empty
+			entries, readErr := os.ReadDir(worktreePath)
+			if readErr == nil && len(entries) == 0 {
+				_ = os.Remove(worktreePath)
+			}
+		}
+
 		err := m.gitManager.CreateWorktree(worktreeName, worktreeConfig.Branch, m.config.Settings.WorktreePrefix)
 		if err != nil {
 			// Special case: if creating a worktree fails because directory already exists,
 			// check if this is the main worktree already present in repository root
 			if errors.Is(err, ErrWorktreeDirectoryExists) {
-				// Check if the main worktree exists in repository root instead
-				// if worktreeName == "main" || worktreeName == "MAIN" {
 				if worktreeName == worktreeConfig.Branch {
 					// Skip creating this worktree since it already exists as the main repository
 					continue
@@ -249,7 +293,6 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 			}
 			return fmt.Errorf("failed to create worktree for %s: %w", worktreeName, err)
 		}
-
 	}
 
 	// Handle worktree promotions with confirmation (always required for destructive operations)
@@ -270,18 +313,30 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 		}
 	}
 
-	// Process worktree promotions first
+	// Process worktree promotions first by removing both worktrees, then recreating with swapped branches
 	for _, promotion := range status.WorktreePromotions {
 		sourceWorktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, promotion.SourceWorktree)
 		targetWorktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, promotion.TargetWorktree)
 
-		err := m.gitManager.PromoteWorktree(sourceWorktreePath, targetWorktreePath)
-		if err != nil {
-			return fmt.Errorf("failed to promote worktree %s to %s: %w", promotion.SourceWorktree, promotion.TargetWorktree, err)
+		// Remove both worktrees to free up branches
+		if err := m.gitManager.RemoveWorktree(sourceWorktreePath); err != nil {
+			return fmt.Errorf("failed to remove source worktree %s: %w", promotion.SourceWorktree, err)
+		}
+		if err := m.gitManager.RemoveWorktree(targetWorktreePath); err != nil {
+			return fmt.Errorf("failed to remove target worktree %s: %w", promotion.TargetWorktree, err)
 		}
 
-		// Remove the promotion from regular branch changes since it's already handled
+		// Recreate worktrees with swapped branches
+		if err := m.gitManager.CreateWorktree(promotion.TargetWorktree, promotion.SourceBranch, m.config.Settings.WorktreePrefix); err != nil {
+			return fmt.Errorf("failed to create target worktree %s with branch %s: %w", promotion.TargetWorktree, promotion.SourceBranch, err)
+		}
+		if err := m.gitManager.CreateWorktree(promotion.SourceWorktree, promotion.TargetBranch, m.config.Settings.WorktreePrefix); err != nil {
+			return fmt.Errorf("failed to create source worktree %s with branch %s: %w", promotion.SourceWorktree, promotion.TargetBranch, err)
+		}
+
+		// Remove from regular branch changes since already handled
 		delete(status.BranchChanges, promotion.TargetWorktree)
+		delete(status.BranchChanges, promotion.SourceWorktree)
 	}
 
 	for worktreeName, change := range status.BranchChanges {
@@ -304,11 +359,13 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 
 func (m *Manager) ValidateConfig() error {
 	if m.gbmConfig == nil {
-		return fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
+		if err := m.LoadGBMConfig(""); err != nil {
+			return fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
+		}
 	}
 
 	for worktreeName, worktreeConfig := range m.gbmConfig.Worktrees {
-		exists, err := m.gitManager.BranchExists(worktreeConfig.Branch)
+		exists, err := m.gitManager.BranchExistsLocalOrRemote(worktreeConfig.Branch)
 		if err != nil {
 			return fmt.Errorf("failed to check branch %s for %s: %w", worktreeConfig.Branch, worktreeName, err)
 		}
@@ -322,7 +379,9 @@ func (m *Manager) ValidateConfig() error {
 
 func (m *Manager) GetWorktreeMapping() (map[string]string, error) {
 	if m.gbmConfig == nil {
-		return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
+		if err := m.LoadGBMConfig(""); err != nil {
+			return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
+		}
 	}
 
 	mapping := make(map[string]string)
@@ -358,7 +417,9 @@ func (m *Manager) GenerateBranchFromJira(jiraKey string) (string, error) {
 
 func (m *Manager) GetWorktreeList() (map[string]*WorktreeListInfo, error) {
 	if m.gbmConfig == nil {
-		return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
+		if err := m.LoadGBMConfig(""); err != nil {
+			return nil, fmt.Errorf("no %s loaded", DefaultBranchConfigFilename)
+		}
 	}
 
 	result := make(map[string]*WorktreeListInfo)
@@ -558,7 +619,7 @@ func (m *Manager) copyFileOrDirectory(sourceWorktreePath, targetWorktreePath, fi
 func (m *Manager) copyFile(sourcePath, targetPath string) error {
 	// Create target directory if it doesn't exist
 	targetDir := filepath.Dir(targetPath)
-	if err := os.MkdirAll(targetDir, 0755); err != nil {
+	if err := os.MkdirAll(targetDir, 0o755); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 
@@ -602,7 +663,7 @@ func (m *Manager) copyFile(sourcePath, targetPath string) error {
 // copyDirectory recursively copies a directory from source to target
 func (m *Manager) copyDirectory(sourcePath, targetPath string) error {
 	// Create target directory
-	if err := os.MkdirAll(targetPath, 0755); err != nil {
+	if err := os.MkdirAll(targetPath, 0o755); err != nil {
 		return fmt.Errorf("failed to create target directory: %w", err)
 	}
 

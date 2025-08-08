@@ -708,7 +708,7 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 		return fmt.Errorf("%w: %s", ErrWorktreeDirectoryExists, worktreePath)
 	}
 
-	branchExists, err := gm.BranchExists(branchName)
+	branchExists, err := gm.BranchExistsLocalOrRemote(branchName)
 	if err != nil {
 		return fmt.Errorf("failed to check if branch exists: %w", err)
 	}
@@ -717,14 +717,21 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 		return fmt.Errorf("branch '%s' does not exist", branchName)
 	}
 
+	// If the target branch is currently checked out in the main repository,
+	// detach HEAD so the branch can be checked out in the new worktree.
+	if current, err := gm.GetCurrentBranch(); err == nil && current == branchName {
+		// Best-effort detach; if it fails, we'll still attempt to add the worktree and report any error
+		_ = execGitCommandRun(gm.repoPath, "checkout", "--detach")
+	}
+
 	// Check if remote tracking branch exists
 	remoteBranch := Remote(branchName)
 	_, err = ExecGitCommand(gm.repoPath, "rev-parse", "--verify", remoteBranch)
 
 	if err == nil {
 		// Remote tracking branch exists, create worktree and set up tracking
-		if err := execGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
-			return enhanceGitError(err, "worktree add")
+		if output, err := ExecGitCommandCombined(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
+			return fmt.Errorf("git worktree add failed: %s", string(output))
 		}
 
 		// Set up tracking for the remote branch
@@ -735,8 +742,8 @@ func (gm *GitManager) CreateWorktree(envVar, branchName, worktreeDir string) err
 		return nil
 	} else {
 		// No remote tracking branch, create worktree normally
-		if err := execGitCommandRun(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
-			return enhanceGitError(err, "worktree add")
+		if output, err := ExecGitCommandCombined(gm.repoPath, "worktree", "add", worktreePath, branchName); err != nil {
+			return fmt.Errorf("git worktree add failed: %s", string(output))
 		}
 	}
 
@@ -764,10 +771,8 @@ func (gm *GitManager) UpdateWorktree(worktreePath, newBranch string) error {
 }
 
 func (gm *GitManager) PromoteWorktree(sourceWorktreePath, targetWorktreePath string) error {
-	// First, remove the target worktree
-	if err := gm.RemoveWorktree(targetWorktreePath); err != nil {
-		return fmt.Errorf("failed to remove target worktree: %w", err)
-	}
+	// First, remove the target worktree (best-effort)
+	_ = gm.RemoveWorktree(targetWorktreePath)
 
 	// Then, move the source worktree to the target location
 	if err := gm.MoveWorktree(sourceWorktreePath, targetWorktreePath); err != nil {

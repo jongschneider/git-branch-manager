@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 func TestManager_SyncBasicOperations(t *testing.T) {
 	tests := []struct {
 		name         string
@@ -63,6 +62,10 @@ func TestManager_SyncBasicOperations(t *testing.T) {
 			// Create manager and test sync operations
 			manager, err := NewManager(wd)
 			require.NoError(t, err)
+			// Load gbm.branchconfig.yaml before sync operations
+			require.NoError(t, manager.LoadGBMConfig(""))
+			// Load gbm.branchconfig.yaml before sync operations
+			require.NoError(t, manager.LoadGBMConfig(""))
 
 			// For the idempotent test, run sync twice
 			if len(tt.expectedDirs) == 4 { // Standard config test
@@ -90,7 +93,16 @@ func TestManager_SyncScenarios(t *testing.T) {
 		{
 			name: "branch reference change updates existing worktree",
 			setupRepo: func(t *testing.T) *testutils.GitTestRepo {
-				return testutils.NewMultiBranchRepo(t)
+				repo := testutils.NewMultiBranchRepo(t)
+				// Seed initial GBM config
+				initial := map[string]testutils.WorktreeConfig{
+					"main": {Branch: "main", Description: "Main branch"},
+					"dev":  {Branch: "develop", Description: "Development branch"},
+				}
+				require.NoError(t, repo.CreateGBMConfig(initial))
+				require.NoError(t, repo.CommitChangesWithForceAdd("Add initial gbm config"))
+				require.NoError(t, repo.PushBranch("main"))
+				return repo
 			},
 			modifyGbm: func(t *testing.T, repoPath string) {
 				// Change dev worktree to point to feature-1 instead of dev
@@ -99,10 +111,10 @@ func TestManager_SyncScenarios(t *testing.T) {
     branch: main
     description: "Main branch"
   dev:
-    branch: feature-1
+    branch: feature/auth
     description: "Development branch"
 `
-				require.NoError(t, os.WriteFile(filepath.Join(repoPath, DefaultBranchConfigFilename), []byte(gbmContent), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(repoPath, DefaultBranchConfigFilename), []byte(gbmContent), 0o644))
 				require.NoError(t, execGitCommandRun(repoPath, "add", DefaultBranchConfigFilename))
 				require.NoError(t, execGitCommandRun(repoPath, "commit", "-m", "Update gbm config"))
 				require.NoError(t, execGitCommandRun(repoPath, "push", "origin", "main"))
@@ -111,13 +123,21 @@ func TestManager_SyncScenarios(t *testing.T) {
 				// Check that dev worktree now has feature-1 branch
 				branch, err := manager.GetGitManager().GetCurrentBranchInPath(filepath.Join(repoPath, "worktrees/dev"))
 				require.NoError(t, err)
-				assert.Equal(t, "feature-1", branch)
+				assert.Equal(t, "feature/auth", branch)
 			},
 		},
 		{
 			name: "new worktree added to config creates worktree",
 			setupRepo: func(t *testing.T) *testutils.GitTestRepo {
 				repo := testutils.NewMultiBranchRepo(t)
+				// Seed initial GBM config with main and dev
+				initial := map[string]testutils.WorktreeConfig{
+					"main": {Branch: "main", Description: "Main branch"},
+					"dev":  {Branch: "develop", Description: "Development branch"},
+				}
+				require.NoError(t, repo.CreateGBMConfig(initial))
+				require.NoError(t, repo.CommitChangesWithForceAdd("Add initial gbm config"))
+				require.NoError(t, repo.PushBranch("main"))
 				return repo
 			},
 			modifyGbm: func(t *testing.T, repoPath string) {
@@ -127,13 +147,13 @@ func TestManager_SyncScenarios(t *testing.T) {
     branch: main
     description: "Main branch"
   dev:
-    branch: dev
+    branch: develop
     description: "Development branch"
   feature:
-    branch: feature-1
+    branch: feature/auth
     description: "Feature branch"
 `
-				require.NoError(t, os.WriteFile(filepath.Join(repoPath, DefaultBranchConfigFilename), []byte(gbmContent), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(repoPath, DefaultBranchConfigFilename), []byte(gbmContent), 0o644))
 				require.NoError(t, execGitCommandRun(repoPath, "add", DefaultBranchConfigFilename))
 				require.NoError(t, execGitCommandRun(repoPath, "commit", "-m", "Add feature worktree"))
 				require.NoError(t, execGitCommandRun(repoPath, "push", "origin", "main"))
@@ -143,13 +163,22 @@ func TestManager_SyncScenarios(t *testing.T) {
 				assert.DirExists(t, filepath.Join(repoPath, "worktrees/feature"))
 				branch, err := manager.GetGitManager().GetCurrentBranchInPath(filepath.Join(repoPath, "worktrees/feature"))
 				require.NoError(t, err)
-				assert.Equal(t, "feature-1", branch)
+				assert.Equal(t, "feature/auth", branch)
 			},
 		},
 		{
 			name: "worktree removed from config (no-op without force)",
 			setupRepo: func(t *testing.T) *testutils.GitTestRepo {
-				return testutils.NewMultiBranchRepo(t)
+				repo := testutils.NewMultiBranchRepo(t)
+				// Seed initial GBM config with main and dev
+				initial := map[string]testutils.WorktreeConfig{
+					"main": {Branch: "main", Description: "Main branch"},
+					"dev":  {Branch: "develop", Description: "Development branch"},
+				}
+				require.NoError(t, repo.CreateGBMConfig(initial))
+				require.NoError(t, repo.CommitChangesWithForceAdd("Add initial gbm config"))
+				require.NoError(t, repo.PushBranch("main"))
+				return repo
 			},
 			modifyGbm: func(t *testing.T, repoPath string) {
 				// Remove dev worktree from config
@@ -158,7 +187,7 @@ func TestManager_SyncScenarios(t *testing.T) {
     branch: main
     description: "Main branch"
 `
-				require.NoError(t, os.WriteFile(filepath.Join(repoPath, DefaultBranchConfigFilename), []byte(gbmContent), 0644))
+				require.NoError(t, os.WriteFile(filepath.Join(repoPath, DefaultBranchConfigFilename), []byte(gbmContent), 0o644))
 				require.NoError(t, execGitCommandRun(repoPath, "add", DefaultBranchConfigFilename))
 				require.NoError(t, execGitCommandRun(repoPath, "commit", "-m", "Remove dev worktree"))
 				require.NoError(t, execGitCommandRun(repoPath, "push", "origin", "main"))
@@ -182,16 +211,24 @@ func TestManager_SyncScenarios(t *testing.T) {
 
 			manager, err := NewManager(wd)
 			require.NoError(t, err)
+			// Load gbm.branchconfig.yaml before sync operations
+			require.NoError(t, manager.LoadGBMConfig(""))
 
 			// Initial sync to create worktrees
 			err = manager.SyncWithConfirmation(false, false, func(string) bool { return true })
 			require.NoError(t, err)
 
-			// Modify gbm config as per test
-			tt.modifyGbm(t, wd)
+			// Modify gbm config as per test (in the source repo), then push and pull in clone
+			tt.modifyGbm(t, sourceRepo.GetLocalPath())
+			// Ensure remote has the new commit
+			require.NoError(t, execGitCommandRun(sourceRepo.GetLocalPath(), "push", "origin", "main"))
 
-			// Pull changes and sync again
-			require.NoError(t, execGitCommandRun(wd, "pull"))
+			// Pull changes and sync again (specify remote and branch since main might be in worktree)
+			if output, err := ExecGitCommandCombined(wd, "pull", "origin", "main"); err != nil {
+				t.Fatalf("git pull failed: %s", string(output))
+			}
+			// Reload gbm.branchconfig.yaml after pulling updates
+			require.NoError(t, manager.LoadGBMConfig(""))
 			err = manager.SyncWithConfirmation(false, false, func(string) bool { return true })
 			require.NoError(t, err)
 
@@ -213,6 +250,8 @@ func TestManager_SyncIntegration(t *testing.T) {
 
 		manager, err := NewManager(wd)
 		require.NoError(t, err)
+		// Load gbm.branchconfig.yaml before sync operations
+		require.NoError(t, manager.LoadGBMConfig(""))
 
 		// Initial sync
 		err = manager.SyncWithConfirmation(false, false, func(string) bool { return true })
@@ -233,7 +272,8 @@ func TestManager_SyncIntegration(t *testing.T) {
 		assert.DirExists(t, devWorktreePath)
 		branch, err := manager.GetGitManager().GetCurrentBranchInPath(devWorktreePath)
 		require.NoError(t, err)
-		assert.Equal(t, "dev", branch)
+		// The standard config maps worktree 'dev' to branch 'develop'
+		assert.Equal(t, "develop", branch)
 	})
 }
 
@@ -276,12 +316,14 @@ func TestManager_SyncWorkreePromotion(t *testing.T) {
 
 		manager, err := NewManager(wd)
 		require.NoError(t, err)
+		// Load gbm.branchconfig.yaml before sync operations
+		require.NoError(t, manager.LoadGBMConfig(""))
 
 		// Initial sync creates worktrees
 		err = manager.SyncWithConfirmation(false, false, func(string) bool { return true })
 		require.NoError(t, err)
 
-		// Modify config to cause promotion: production worktree should now point to production-v2
+		// Modify config to cause promotion in source repo: production worktree should now point to production-v2
 		// and production-v2 worktree should point to production
 		newGbmContent := `worktrees:
   main:
@@ -294,13 +336,16 @@ func TestManager_SyncWorkreePromotion(t *testing.T) {
     branch: production
     description: "Production v2 branch (demoted)"
 `
-		require.NoError(t, os.WriteFile(filepath.Join(wd, DefaultBranchConfigFilename), []byte(newGbmContent), 0644))
-		require.NoError(t, execGitCommandRun(wd, "add", DefaultBranchConfigFilename))
-		require.NoError(t, execGitCommandRun(wd, "commit", "-m", "Update gbm config for promotion"))
-		require.NoError(t, execGitCommandRun(wd, "push", "origin", "main"))
+		require.NoError(t, repo.WriteFile(DefaultBranchConfigFilename, newGbmContent))
+		require.NoError(t, repo.CommitChangesWithForceAdd("Update gbm config for promotion"))
+		require.NoError(t, repo.PushBranch("main"))
 
-		// Pull and sync with confirmation
-		require.NoError(t, execGitCommandRun(wd, "pull"))
+		// Pull changes and sync again (specify remote and branch since main might be in worktree)
+		if output, err := ExecGitCommandCombined(wd, "pull", "origin", "main"); err != nil {
+			t.Fatalf("git pull failed: %s", string(output))
+		}
+		// Reload gbm.branchconfig.yaml after pulling updates
+		require.NoError(t, manager.LoadGBMConfig(""))
 		err = manager.SyncWithConfirmation(false, false, func(string) bool { return true })
 		require.NoError(t, err)
 
