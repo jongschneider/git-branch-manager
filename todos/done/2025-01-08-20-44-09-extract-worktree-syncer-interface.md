@@ -1,5 +1,5 @@
 # Extract worktreeSyncer interface for cmd/sync.go
-**Status:** AwaitingCommit
+**Status:** Done
 **Agent PID:** 49661
 
 ## Original Todo
