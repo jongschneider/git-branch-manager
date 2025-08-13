@@ -90,6 +90,15 @@ func ExecGitCommandInteractive(dir string, args ...string) error {
 	return cmd.Run()
 }
 
+// ExecGitCommandSilent executes a git command in the specified directory without output
+func ExecGitCommandSilent(dir string, args ...string) error {
+	cmd := exec.Command("git", args...)
+	if dir != "" {
+		cmd.Dir = dir
+	}
+	return cmd.Run()
+}
+
 // enhanceGitError provides more specific error messages for common git failures
 func enhanceGitError(err error, operation string) error {
 	if err == nil {

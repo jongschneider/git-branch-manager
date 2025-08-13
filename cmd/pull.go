@@ -10,7 +10,7 @@ import (
 	"github.com/spf13/cobra"
 )
 
-//go:generate go tool moq -out ./autogen_worktreePuller.go . worktreePuller
+//go:generate go run github.com/matryer/moq@latest -out ./autogen_worktreePuller.go . worktreePuller
 
 // worktreePuller interface abstracts the Manager operations needed for pulling worktrees
 type worktreePuller interface {

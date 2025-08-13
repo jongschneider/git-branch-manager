@@ -819,6 +819,10 @@ func (m *Manager) GetState() *State {
 	return m.state
 }
 
+func (m *Manager) GetRepoPath() string {
+	return m.repoPath
+}
+
 func (m *Manager) SaveConfig() error {
 	return m.config.Save(m.gbmDir)
 }
