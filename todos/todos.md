@@ -28,13 +28,6 @@
 ### Phase 3: Handle Complex Data (Medium Complexity)
 
 
-- [ ] **Extract hotfixCreator interface for cmd/hotfix.go**
-  - Create interface with: GetGBMConfig(), GetHotfixPrefix(), AddWorktree(), GenerateBranchFromJira(), GetJiraIssues(), FindProductionBranch()
-  - Add mock generation: `//go:generate go tool moq -out ./autogen_hotfixCreator.go . hotfixCreator`
-  - Extract production branch detection logic to internal package
-  - Interface JIRA integration
-  - Write unit tests with mocks
-  - Additionally, move any integration tests that use real git repos, worktrees, etc. out of the cmd layer and into the internal layer where they belong
 
 ### Phase 4: Architectural Refactoring (High Complexity)
 

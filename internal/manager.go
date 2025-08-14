@@ -928,3 +928,39 @@ func (m *Manager) GetWorktrees() ([]*WorktreeInfo, error) {
 func (m *Manager) GetJiraTicketDetails(jiraKey string) (*JiraTicketDetails, error) {
 	return GetJiraTicketDetails(jiraKey)
 }
+
+// FindProductionBranch finds the actual production deployment branch for hotfixes
+// This finds the deepest leaf nodes in the worktree tree - branches that nothing merges into
+func (m *Manager) FindProductionBranch() (string, error) {
+	// Look for gbm.branchconfig.yaml file
+	configPath := filepath.Join(m.repoPath, DefaultBranchConfigFilename)
+	config, err := ParseGBMConfig(configPath)
+	if err != nil {
+		// If no config file, fall back to default branch
+		return m.GetDefaultBranch()
+	}
+
+	// Create worktree tree manager
+	wtManager, err := NewWorktreeManager(config)
+	if err != nil {
+		return "", fmt.Errorf("failed to create worktree tree: %w", err)
+	}
+
+	// Get the deepest leaf nodes - these are the production branches
+	deepestLeaves := wtManager.GetAllDeepestLeafNodes()
+
+	if len(deepestLeaves) == 0 {
+		// No leaves found, fall back to root nodes
+		roots := wtManager.GetRoots()
+		if len(roots) == 0 {
+			return "", fmt.Errorf("no production branch found in mergeback configuration")
+		}
+		// Return the first root branch
+		return roots[0].Config.Branch, nil
+	}
+
+	// Return the first deepest leaf branch
+	// Note: In case of multiple valid production branches (multiple deployment chains),
+	// this returns the first one found. This is consistent with the original behavior.
+	return deepestLeaves[0].Config.Branch, nil
+}

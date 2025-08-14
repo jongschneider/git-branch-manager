@@ -3,14 +3,25 @@ package cmd
 import (
 	"errors"
 	"fmt"
-	"os"
-	"path/filepath"
 	"strings"
 
 	"gbm/internal"
 
 	"github.com/spf13/cobra"
 )
+
+//go:generate go run github.com/matryer/moq@latest -out ./autogen_hotfixCreator.go . hotfixCreator
+
+// hotfixCreator interface abstracts the Manager operations needed for hotfix creation
+type hotfixCreator interface {
+	AddWorktree(worktreeName, branchName string, createBranch bool, baseBranch string) error
+	GetConfig() *internal.Config
+	GetGBMConfig() *internal.GBMConfig
+	FindProductionBranch() (string, error)
+	GetJiraIssues() ([]internal.JiraIssue, error)
+	GenerateBranchFromJira(jiraKey string) (string, error)
+	GetDefaultBranch() (string, error)
+}
 
 func newHotfixCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -34,8 +45,6 @@ Examples:
   gbm hf auth-fix PROJECT-456              # Creates HOTFIX_auth-fix worktree with JIRA integration`,
 		Args: cobra.MinimumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			worktreeName := args[0]
-
 			// Create manager
 			manager, err := createInitializedManager()
 			if err != nil {
@@ -44,75 +53,9 @@ Examples:
 				}
 
 				PrintVerbose("%v", err)
-
 			}
 
-			// Find the production branch (last in mergeback chain)
-			baseBranch, err := findProductionBranch(manager)
-			if err != nil {
-				return fmt.Errorf("failed to determine production branch: %w", err)
-			}
-
-			PrintInfo("Using production branch '%s' as base for hotfix", baseBranch)
-
-			// Generate hotfix branch name
-			var branchName string
-
-			if len(args) > 1 {
-				// If second argument is provided, check if it's already a branch name or a JIRA ticket
-				secondArg := args[1]
-				if strings.HasPrefix(secondArg, "hotfix/") {
-					// It's already a branch name (from autocompletion), use it directly
-					branchName = secondArg
-				} else if internal.IsJiraKey(secondArg) {
-					// It's a JIRA ticket, generate branch name from it
-					branchName, err = generateHotfixBranchName(worktreeName, secondArg, manager)
-					if err != nil {
-						return fmt.Errorf("failed to generate hotfix branch name: %w", err)
-					}
-				} else {
-					// It's some other string, treat as JIRA ticket anyway
-					branchName, err = generateHotfixBranchName(worktreeName, secondArg, manager)
-					if err != nil {
-						return fmt.Errorf("failed to generate hotfix branch name: %w", err)
-					}
-				}
-			} else if internal.IsJiraKey(worktreeName) {
-				// First argument is a JIRA ticket, use it
-				branchName, err = generateHotfixBranchName(worktreeName, worktreeName, manager)
-				if err != nil {
-					return fmt.Errorf("failed to generate hotfix branch name: %w", err)
-				}
-			} else {
-				// No JIRA ticket provided, generate simple branch name
-				branchName, err = generateHotfixBranchName(worktreeName, "", manager)
-				if err != nil {
-					return fmt.Errorf("failed to generate hotfix branch name: %w", err)
-				}
-			}
-
-			// Get hotfix prefix from config and build worktree name
-			hotfixPrefix := manager.GetConfig().Settings.HotfixPrefix
-			var hotfixWorktreeName string
-			if hotfixPrefix != "" {
-				hotfixWorktreeName = hotfixPrefix + "_" + worktreeName
-			} else {
-				hotfixWorktreeName = worktreeName
-			}
-
-			PrintInfo("Creating hotfix worktree '%s' on branch '%s'", hotfixWorktreeName, branchName)
-
-			// Add the hotfix worktree
-			if err := manager.AddWorktree(hotfixWorktreeName, branchName, true, baseBranch); err != nil {
-				return fmt.Errorf("failed to add hotfix worktree: %w", err)
-			}
-
-			PrintInfo("Hotfix worktree '%s' added successfully", hotfixWorktreeName)
-			// Build the deployment chain message
-			deploymentChain := buildDeploymentChain(baseBranch, manager.GetGBMConfig())
-			PrintInfo("Remember to merge back through the deployment chain: %s", deploymentChain)
-
-			return nil
+			return handleHotfix(manager, args)
 		},
 	}
 
@@ -130,7 +73,7 @@ Examples:
 			}
 
 			// Complete JIRA keys with summaries for context
-			jiraIssues, err := internal.GetJiraIssues(manager)
+			jiraIssues, err := manager.GetJiraIssues()
 			if err != nil {
 				return nil, cobra.ShellCompDirectiveNoFileComp
 			}
@@ -155,7 +98,7 @@ Examples:
 
 				// Generate hotfix branch name from JIRA
 				// In autocompletion, worktreeName is the JIRA key, so use it as both worktree and JIRA ticket
-				branchName, err := generateHotfixBranchName(worktreeName, worktreeName, manager)
+				branchName, err := generateHotfixBranchNameWithCreator(worktreeName, worktreeName, manager)
 				if err != nil {
 					// Fallback to default branch name generation
 					branchName = fmt.Sprintf("hotfix/%s", strings.ToUpper(worktreeName))
@@ -170,75 +113,76 @@ Examples:
 	return cmd
 }
 
-// findProductionBranch finds the actual production deployment branch for hotfixes
-// This is the branch that has a merge_into target but nothing merges into it (start of chain)
-func findProductionBranch(manager *internal.Manager) (string, error) {
-	// Get current working directory and find git root
-	wd, err := os.Getwd()
+// handleHotfix handles the hotfix creation logic using the hotfixCreator interface
+func handleHotfix(creator hotfixCreator, args []string) error {
+	worktreeName := args[0]
+
+	// Find the production branch (last in mergeback chain)
+	baseBranch, err := creator.FindProductionBranch()
 	if err != nil {
-		return "", fmt.Errorf("failed to get working directory: %w", err)
+		return fmt.Errorf("failed to determine production branch: %w", err)
 	}
 
-	repoRoot, err := internal.FindGitRoot(wd)
-	if err != nil {
-		return "", fmt.Errorf("failed to find git root: %w", err)
-	}
+	PrintInfo("Using production branch '%s' as base for hotfix", baseBranch)
 
-	// Look for gbm.branchconfig.yaml file
-	configPath := filepath.Join(repoRoot, internal.DefaultBranchConfigFilename)
-	config, err := internal.ParseGBMConfig(configPath)
-	if err != nil {
-		// If no config file, fall back to default branch
-		PrintVerbose("No gbm.branchconfig.yaml found, using default branch as production")
-		return manager.GetGitManager().GetDefaultBranch()
-	}
+	// Generate hotfix branch name
+	var branchName string
 
-	// Find the branch that has a merge_into target but no other branch merges into it
-	var productionWorktree string
-	var productionBranch string
-
-	for worktreeName, worktreeConfig := range config.Worktrees {
-		// Skip branches that don't merge into anything (these are root branches)
-		if worktreeConfig.MergeInto == "" {
-			continue
-		}
-
-		// Check if any other branch merges into this one
-		hasIncomingMerge := false
-		for _, otherConfig := range config.Worktrees {
-			if otherConfig.MergeInto == worktreeConfig.Branch {
-				hasIncomingMerge = true
-				break
+	if len(args) > 1 {
+		// If second argument is provided, check if it's already a branch name or a JIRA ticket
+		secondArg := args[1]
+		if strings.HasPrefix(secondArg, "hotfix/") {
+			// It's already a branch name (from autocompletion), use it directly
+			branchName = secondArg
+		} else if internal.IsJiraKey(secondArg) {
+			// It's a JIRA ticket, generate branch name from it
+			branchName, err = generateHotfixBranchNameWithCreator(worktreeName, secondArg, creator)
+			if err != nil {
+				return fmt.Errorf("failed to generate hotfix branch name: %w", err)
+			}
+		} else {
+			// It's some other string, treat as JIRA ticket anyway
+			branchName, err = generateHotfixBranchNameWithCreator(worktreeName, secondArg, creator)
+			if err != nil {
+				return fmt.Errorf("failed to generate hotfix branch name: %w", err)
 			}
 		}
-
-		// If this branch merges into something but nothing merges into it, it's the production branch
-		if !hasIncomingMerge {
-			productionWorktree = worktreeName
-			productionBranch = worktreeConfig.Branch
-			PrintVerbose("Found production branch (start of chain): %s -> %s", worktreeName, productionBranch)
-			break
+	} else if internal.IsJiraKey(worktreeName) {
+		// First argument is a JIRA ticket, use it
+		branchName, err = generateHotfixBranchNameWithCreator(worktreeName, worktreeName, creator)
+		if err != nil {
+			return fmt.Errorf("failed to generate hotfix branch name: %w", err)
+		}
+	} else {
+		// No JIRA ticket provided, generate simple branch name
+		branchName, err = generateHotfixBranchNameWithCreator(worktreeName, "", creator)
+		if err != nil {
+			return fmt.Errorf("failed to generate hotfix branch name: %w", err)
 		}
 	}
 
-	// Fallback to the branch with no merge_into target if no production branch found
-	if productionBranch == "" {
-		for worktreeName, worktreeConfig := range config.Worktrees {
-			if worktreeConfig.MergeInto == "" {
-				productionWorktree = worktreeName
-				productionBranch = worktreeConfig.Branch
-				PrintVerbose("Using root branch as production fallback: %s -> %s", worktreeName, productionBranch)
-				break
-			}
-		}
+	// Get hotfix prefix from config and build worktree name
+	hotfixPrefix := creator.GetConfig().Settings.HotfixPrefix
+	var hotfixWorktreeName string
+	if hotfixPrefix != "" {
+		hotfixWorktreeName = hotfixPrefix + "_" + worktreeName
+	} else {
+		hotfixWorktreeName = worktreeName
 	}
 
-	if productionBranch == "" {
-		return "", fmt.Errorf("no production branch found in mergeback configuration")
+	PrintInfo("Creating hotfix worktree '%s' on branch '%s'", hotfixWorktreeName, branchName)
+
+	// Add the hotfix worktree
+	if err := creator.AddWorktree(hotfixWorktreeName, branchName, true, baseBranch); err != nil {
+		return fmt.Errorf("failed to add hotfix worktree: %w", err)
 	}
 
-	PrintVerbose("Found production branch: %s (worktree: %s)", productionBranch, productionWorktree)
-	return productionBranch, nil
+	PrintInfo("Hotfix worktree '%s' added successfully", hotfixWorktreeName)
+	// Build the deployment chain message
+	deploymentChain := buildDeploymentChain(baseBranch, creator.GetGBMConfig())
+	PrintInfo("Remember to merge back through the deployment chain: %s", deploymentChain)
+
+	return nil
 }
 
 // isProductionBranchName returns true if the branch name suggests it's a production branch
@@ -301,4 +245,10 @@ func findMergeIntoTarget(sourceBranch string, config *internal.GBMConfig) string
 var generateHotfixBranchName = func(worktreeName, jiraTicket string, manager *internal.Manager) (string, error) {
 	generator := createBranchNameGenerator("hotfix")
 	return generator(worktreeName, jiraTicket, "", manager)
+}
+
+// generateHotfixBranchNameWithCreator creates a hotfix branch name using the hotfixCreator interface
+func generateHotfixBranchNameWithCreator(worktreeName, jiraTicket string, creator hotfixCreator) (string, error) {
+	generator := createBranchNameGeneratorWithCreator("hotfix", creator)
+	return generator(worktreeName, jiraTicket, "")
 }
