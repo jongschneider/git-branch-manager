@@ -26,4 +26,3 @@ func simulateUserInput(input string, fn func() error) error {
 
 	return err
 }
-

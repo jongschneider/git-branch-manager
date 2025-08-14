@@ -227,7 +227,7 @@ func setupWorktreeStructure(initializer repositoryInitializer, branchName string
 
 func createGBMConfig(initializer repositoryInitializer, branchName string) error {
 	configPath := filepath.Join(initializer.GetRepoPath(), internal.DefaultBranchConfigFilename)
-	
+
 	content := fmt.Sprintf(`# Git Branch Manager Configuration
 
 # Worktree definitions - key is the worktree name, value defines the branch and merge strategy
@@ -237,11 +237,11 @@ worktrees:
     branch: %s
     description: "Main production branch"
 `, branchName, branchName)
-	
+
 	if err := os.WriteFile(configPath, []byte(content), 0o644); err != nil {
 		return fmt.Errorf("failed to create %s: %w", internal.DefaultBranchConfigFilename, err)
 	}
-	
+
 	return nil
 }
 
@@ -249,43 +249,43 @@ func initializeGBMState(initializer repositoryInitializer) error {
 	if err := initializer.SaveConfig(); err != nil {
 		return fmt.Errorf("failed to save initial config: %w", err)
 	}
-	
+
 	if err := initializer.SaveState(); err != nil {
 		return fmt.Errorf("failed to save initial state: %w", err)
 	}
-	
+
 	return nil
 }
 
 func createInitialCommit(initializer repositoryInitializer, branchName string) error {
 	worktreePath := filepath.Join(initializer.GetRepoPath(), initializer.GetConfig().Settings.WorktreePrefix, branchName)
-	
+
 	// Copy gbm.branchconfig.yaml from repository root to worktree
 	configFile := internal.DefaultBranchConfigFilename
 	sourceConfig := filepath.Join(initializer.GetRepoPath(), configFile)
 	targetConfig := filepath.Join(worktreePath, configFile)
-	
+
 	// Read the config from the repository root
 	configContent, err := os.ReadFile(sourceConfig)
 	if err != nil {
 		return fmt.Errorf("failed to read %s: %w", configFile, err)
 	}
-	
+
 	// Write it to the worktree
 	if err := os.WriteFile(targetConfig, configContent, 0o644); err != nil {
 		return fmt.Errorf("failed to copy %s to worktree: %w", configFile, err)
 	}
-	
+
 	// Add gbm.branchconfig.yaml to the commit
 	if err := internal.ExecGitCommandSilent(worktreePath, "add", configFile); err != nil {
 		return fmt.Errorf("failed to add %s to git: %w", configFile, err)
 	}
-	
+
 	// Create initial commit
 	commitMessage := "Initial commit with gbm configuration"
 	if err := internal.ExecGitCommandSilent(worktreePath, "commit", "-m", commitMessage); err != nil {
 		return fmt.Errorf("failed to create initial commit: %w", err)
 	}
-	
+
 	return nil
 }

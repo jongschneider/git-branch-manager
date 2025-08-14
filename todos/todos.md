@@ -27,13 +27,6 @@
 
 ### Phase 3: Handle Complex Data (Medium Complexity)
 
-- [ ] **Extract worktreeInfoProvider interface for cmd/info.go**
-  - Create interface with: GetWorktrees(), GetWorktreeStatus(), GetCommitHistory(), GetFileChanges(), GetCurrentBranchInPath(), GetUpstreamBranch(), GetAheadBehindCount(), VerifyRefInPath(), GetWorktreeBaseBranch(), GetConfig()
-  - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreeInfoProvider.go . worktreeInfoProvider`
-  - Mock external JIRA CLI calls
-  - Separate data aggregation logic for better testing
-  - Write comprehensive unit tests
-  - Additionally, move any integration tests that use real git repos, worktrees, etc. out of the cmd layer and into the internal layer where they belong
 
 - [ ] **Extract hotfixCreator interface for cmd/hotfix.go**
   - Create interface with: GetGBMConfig(), GetHotfixPrefix(), AddWorktree(), GenerateBranchFromJira(), GetJiraIssues(), FindProductionBranch()

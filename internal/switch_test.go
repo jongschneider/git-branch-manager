@@ -32,7 +32,7 @@ func TestManager_SetCurrentWorktree_GetPreviousWorktree(t *testing.T) {
 	// Set current worktree to dev
 	err = manager.SetCurrentWorktree("dev")
 	assert.NoError(t, err)
-	
+
 	// Still no previous since this is the first
 	previous = manager.GetPreviousWorktree()
 	assert.Empty(t, previous)
@@ -79,7 +79,7 @@ func TestManager_GetSortedWorktreeNames(t *testing.T) {
 		},
 		"preview": {
 			Branch:      "preview",
-			MergeInto:   "main", 
+			MergeInto:   "main",
 			Description: "Preview branch",
 		},
 	})
@@ -91,8 +91,8 @@ func TestManager_GetSortedWorktreeNames(t *testing.T) {
 	// Create Manager
 	manager, err := NewManager(repo.GetLocalPath())
 	require.NoError(t, err)
-	
-	// Load GBM config to enable tracked/ad hoc worktree distinction 
+
+	// Load GBM config to enable tracked/ad hoc worktree distinction
 	err = manager.LoadGBMConfig("")
 	require.NoError(t, err)
 
@@ -105,7 +105,7 @@ func TestManager_GetSortedWorktreeNames(t *testing.T) {
 		},
 		"main": {
 			Path:           "/fake/path/to/main", // tracked worktree (in config)
-			CurrentBranch:  "main", 
+			CurrentBranch:  "main",
 			ExpectedBranch: "main",
 		},
 		"dev": {
@@ -126,15 +126,15 @@ func TestManager_GetSortedWorktreeNames(t *testing.T) {
 	}
 
 	sortedNames := manager.GetSortedWorktreeNames(worktrees)
-	
+
 	// Should return all names in sorted order
 	assert.Len(t, sortedNames, 5)
-	
+
 	// Tracked worktrees (from gbm.branchconfig.yaml) should come first, sorted alphabetically,
 	// followed by ad hoc worktrees sorted alphabetically (since fake paths cause os.Stat to fail)
 	expectedOrder := []string{"dev", "main", "preview", "bugfix", "feat"}
 	assert.Equal(t, expectedOrder, sortedNames)
-	
+
 	// Also verify it returns a consistent order on multiple calls
 	sortedNames2 := manager.GetSortedWorktreeNames(worktrees)
 	assert.Equal(t, sortedNames, sortedNames2)

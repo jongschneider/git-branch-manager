@@ -879,3 +879,52 @@ func (m *Manager) GetSortedWorktreeNames(worktrees map[string]*WorktreeListInfo)
 
 	return result
 }
+
+// Wrapper methods for GitManager operations used by cmd/info.go
+
+// GetWorktreeCommitHistory retrieves commit history for a specific worktree
+func (m *Manager) GetWorktreeCommitHistory(worktreePath string, limit int) ([]CommitInfo, error) {
+	return m.gitManager.GetCommitHistory(worktreePath, CommitHistoryOptions{
+		Limit: limit,
+	})
+}
+
+// GetWorktreeFileChanges retrieves modified files for a specific worktree
+func (m *Manager) GetWorktreeFileChanges(worktreePath string) ([]FileChange, error) {
+	return m.gitManager.GetFileChanges(worktreePath, FileChangeOptions{
+		Staged:   true,
+		Unstaged: true,
+	})
+}
+
+// GetWorktreeCurrentBranch gets the current branch for a specific worktree
+func (m *Manager) GetWorktreeCurrentBranch(worktreePath string) (string, error) {
+	return m.gitManager.GetCurrentBranchInPath(worktreePath)
+}
+
+// GetWorktreeUpstreamBranch gets the upstream branch for a specific worktree
+func (m *Manager) GetWorktreeUpstreamBranch(worktreePath string) (string, error) {
+	return m.gitManager.GetUpstreamBranch(worktreePath)
+}
+
+// GetWorktreeAheadBehindCount gets the ahead/behind count for a specific worktree
+func (m *Manager) GetWorktreeAheadBehindCount(worktreePath string) (int, int, error) {
+	return m.gitManager.GetAheadBehindCount(worktreePath)
+}
+
+// VerifyWorktreeRef verifies if a ref exists in a specific worktree
+func (m *Manager) VerifyWorktreeRef(ref string, worktreePath string) (bool, error) {
+	return m.gitManager.VerifyRefInPath(worktreePath, ref)
+}
+
+// GetWorktrees retrieves all worktrees from the git repository
+func (m *Manager) GetWorktrees() ([]*WorktreeInfo, error) {
+	return m.gitManager.GetWorktrees()
+}
+
+// JIRA interaction methods - delegate to jira package
+
+// GetJiraTicketDetails retrieves detailed JIRA ticket information using the JIRA CLI
+func (m *Manager) GetJiraTicketDetails(jiraKey string) (*JiraTicketDetails, error) {
+	return GetJiraTicketDetails(jiraKey)
+}

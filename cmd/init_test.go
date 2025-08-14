@@ -75,7 +75,7 @@ func TestGetNativeDefaultBranch(t *testing.T) {
 	// we expect it to fall back to "main"
 	branchName, err := getNativeDefaultBranch()
 	assert.NoError(t, err)
-	
+
 	// Should either return configured branch or fall back to "main"
 	assert.NotEmpty(t, branchName)
 	// Most common cases
@@ -106,7 +106,7 @@ func TestValidateInitDirectory(t *testing.T) {
 			name: "file exists at path",
 			setupDir: func() string {
 				file := "/tmp/test-file"
-				os.WriteFile(file, []byte("test"), 0o644)
+				_ = os.WriteFile(file, []byte("test"), 0o644)
 				return file
 			},
 			expectErr: func(t *testing.T, err error) {
@@ -114,7 +114,7 @@ func TestValidateInitDirectory(t *testing.T) {
 				assert.Error(t, err)
 				// The error message depends on order of checks
 				assert.True(t, err.Error() == "current directory is already in a git repository" ||
-					       strings.Contains(err.Error(), "path exists but is not a directory"))
+					strings.Contains(err.Error(), "path exists but is not a directory"))
 			},
 		},
 	}
@@ -122,8 +122,8 @@ func TestValidateInitDirectory(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			path := tt.setupDir()
-			defer os.RemoveAll(path)
-			
+			defer func() { _ = os.RemoveAll(path) }()
+
 			err := validateInitDirectory(path)
 			tt.expectErr(t, err)
 		})
@@ -132,11 +132,11 @@ func TestValidateInitDirectory(t *testing.T) {
 
 func TestSetupWorktreeStructure(t *testing.T) {
 	tests := []struct {
-		name          string
-		branchName    string
-		mockSetup     func() *repositoryInitializerMock
-		expectErr     func(t *testing.T, err error)
-		expectCalls   func(t *testing.T, mock *repositoryInitializerMock)
+		name        string
+		branchName  string
+		mockSetup   func() *repositoryInitializerMock
+		expectErr   func(t *testing.T, err error)
+		expectCalls func(t *testing.T, mock *repositoryInitializerMock)
 	}{
 		{
 			name:       "successful worktree creation",
@@ -186,9 +186,9 @@ func TestSetupWorktreeStructure(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.mockSetup()
-			
+
 			err := setupWorktreeStructure(mock, tt.branchName)
-			
+
 			tt.expectErr(t, err)
 			tt.expectCalls(t, mock)
 		})
@@ -225,7 +225,7 @@ func TestCreateGBMConfig(t *testing.T) {
 				configPath := filepath.Join(repoPath, internal.DefaultBranchConfigFilename)
 				content, err := os.ReadFile(configPath)
 				assert.NoError(t, err)
-				
+
 				contentStr := string(content)
 				assert.Contains(t, contentStr, "# Git Branch Manager Configuration")
 				assert.Contains(t, contentStr, "worktrees:")
@@ -255,7 +255,7 @@ func TestCreateGBMConfig(t *testing.T) {
 				configPath := filepath.Join(repoPath, internal.DefaultBranchConfigFilename)
 				content, err := os.ReadFile(configPath)
 				assert.NoError(t, err)
-				
+
 				contentStr := string(content)
 				assert.Contains(t, contentStr, "develop:")
 				assert.Contains(t, contentStr, "branch: develop")
@@ -267,13 +267,13 @@ func TestCreateGBMConfig(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.mockSetup()
 			repoPath := mock.GetRepoPath()
-			
+
 			// Create test directory
-			os.MkdirAll(repoPath, 0o755)
-			defer os.RemoveAll(repoPath)
-			
+			_ = os.MkdirAll(repoPath, 0o755)
+			defer func() { _ = os.RemoveAll(repoPath) }()
+
 			err := createGBMConfig(mock, tt.branchName)
-			
+
 			tt.expectErr(t, err)
 			tt.expectCalls(t, mock)
 			if err == nil {
@@ -357,9 +357,9 @@ func TestInitializeGBMState(t *testing.T) {
 	for _, tt := range tests {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.mockSetup()
-			
+
 			err := initializeGBMState(mock)
-			
+
 			tt.expectErr(t, err)
 			tt.expectCalls(t, mock)
 		})
@@ -394,14 +394,14 @@ func TestCreateInitialCommit(t *testing.T) {
 			},
 			setupRepo: func(repoPath string) {
 				// Create repo structure
-				os.MkdirAll(repoPath, 0o755)
-				os.MkdirAll(filepath.Join(repoPath, "worktrees", "main"), 0o755)
-				
+				_ = os.MkdirAll(repoPath, 0o755)
+				_ = os.MkdirAll(filepath.Join(repoPath, "worktrees", "main"), 0o755)
+
 				// Create gbm.branchconfig.yaml in repo root
 				configContent := `worktrees:
   main:
     branch: main`
-				os.WriteFile(filepath.Join(repoPath, internal.DefaultBranchConfigFilename), []byte(configContent), 0o644)
+				_ = os.WriteFile(filepath.Join(repoPath, internal.DefaultBranchConfigFilename), []byte(configContent), 0o644)
 			},
 			expectErr: func(t *testing.T, err error) {
 				// This might fail in test environment without proper git setup, but we test the logic
@@ -418,12 +418,12 @@ func TestCreateInitialCommit(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.mockSetup()
 			repoPath := mock.GetRepoPath()
-			
+
 			tt.setupRepo(repoPath)
-			defer os.RemoveAll(repoPath)
-			
+			defer func() { _ = os.RemoveAll(repoPath) }()
+
 			err := createInitialCommit(mock, tt.branchName)
-			
+
 			tt.expectErr(t, err)
 			tt.expectCalls(t, mock)
 		})
@@ -432,17 +432,17 @@ func TestCreateInitialCommit(t *testing.T) {
 
 func TestNewInitCommand(t *testing.T) {
 	cmd := newInitCommand()
-	
+
 	// Test command structure
 	assert.Equal(t, "init [directory] [--branch=<branch-name>]", cmd.Use)
 	assert.Equal(t, "Initialize a new git repository with gbm structure", cmd.Short)
 	assert.True(t, len(cmd.Long) > 0)
-	
+
 	// Test flags
 	branchFlag := cmd.Flags().Lookup("branch")
 	assert.NotNil(t, branchFlag)
 	assert.Equal(t, "", branchFlag.DefValue)
-	
+
 	// Test args validation
 	assert.NotNil(t, cmd.Args)
 }
@@ -450,12 +450,12 @@ func TestNewInitCommand(t *testing.T) {
 // Integration-style test for the full command execution flow (using mocks)
 func TestInitCommand_Execute(t *testing.T) {
 	tests := []struct {
-		name          string
-		args          []string
-		mockSetup     func() *repositoryInitializerMock
-		setupEnv      func() string
-		expectErr     func(t *testing.T, err error)
-		expectCalls   func(t *testing.T, mock *repositoryInitializerMock)
+		name        string
+		args        []string
+		mockSetup   func() *repositoryInitializerMock
+		setupEnv    func() string
+		expectErr   func(t *testing.T, err error)
+		expectCalls func(t *testing.T, mock *repositoryInitializerMock)
 	}{
 		{
 			name: "successful initialization with current directory",
@@ -486,9 +486,9 @@ func TestInitCommand_Execute(t *testing.T) {
 			setupEnv: func() string {
 				// Create a clean test directory
 				testDir := "/tmp/test-integration-repo"
-				os.RemoveAll(testDir)
-				os.MkdirAll(testDir, 0o755)
-				os.MkdirAll(filepath.Join(testDir, "worktrees", "main"), 0o755)
+				_ = os.RemoveAll(testDir)
+				_ = os.MkdirAll(testDir, 0o755)
+				_ = os.MkdirAll(filepath.Join(testDir, "worktrees", "main"), 0o755)
 				return testDir
 			},
 			expectErr: func(t *testing.T, err error) {
@@ -497,7 +497,7 @@ func TestInitCommand_Execute(t *testing.T) {
 			expectCalls: func(t *testing.T, mock *repositoryInitializerMock) {
 				// Verify the main interface methods were called
 				assert.True(t, len(mock.AddWorktreeCalls()) > 0)
-				assert.True(t, len(mock.SaveConfigCalls()) > 0)  
+				assert.True(t, len(mock.SaveConfigCalls()) > 0)
 				assert.True(t, len(mock.SaveStateCalls()) > 0)
 			},
 		},
@@ -507,17 +507,17 @@ func TestInitCommand_Execute(t *testing.T) {
 		t.Run(tt.name, func(t *testing.T) {
 			mock := tt.mockSetup()
 			testDir := tt.setupEnv()
-			defer os.RemoveAll(testDir)
-			
+			defer func() { _ = os.RemoveAll(testDir) }()
+
 			// Note: This tests the individual functions, not the full command execution
 			// since the full execution requires git operations and Manager creation
-			
+
 			// Test the individual components that our mocks cover
 			err := setupWorktreeStructure(mock, "main")
 			if err == nil {
 				err = initializeGBMState(mock)
 			}
-			
+
 			tt.expectErr(t, err)
 			tt.expectCalls(t, mock)
 		})

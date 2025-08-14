@@ -176,7 +176,7 @@ func TestHandleListWorktrees(t *testing.T) {
 
 			// Verify GetAllWorktrees was called
 			assert.Len(t, mock.GetAllWorktreesCalls(), 1)
-			
+
 			// For the first test case, we expect additional method calls
 			if tt.name == "list worktrees success" {
 				assert.Len(t, mock.GetSortedWorktreeNamesCalls(), 1)

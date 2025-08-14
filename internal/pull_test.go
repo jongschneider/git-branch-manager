@@ -11,7 +11,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-
 // createRemoteChanges simulates changes made to a branch in the remote repository
 func createRemoteChanges(t *testing.T, repo *testutils.GitTestRepo, branch, fileName, content, commitMsg string) {
 	t.Helper()
