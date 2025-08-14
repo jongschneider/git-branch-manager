@@ -2,16 +2,14 @@ package cmd
 
 import (
 	"bytes"
-	"os"
-	"os/exec"
-	"path/filepath"
+	"fmt"
 	"regexp"
 	"strings"
 	"testing"
 
 	"gbm/internal"
-	"gbm/internal/testutils"
 
+	"github.com/spf13/cobra"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -64,363 +62,400 @@ func findWorktreeInRows(rows []WorktreeRow, name string) (WorktreeRow, bool) {
 	return WorktreeRow{}, false
 }
 
-func TestListCommand_EmptyRepository(t *testing.T) {
-	repo := testutils.NewBasicRepo(t)
+func TestHandleList_EmptyWorktrees(t *testing.T) {
+	mock := &worktreeListerMock{
+		GetSyncStatusFunc: func() (*internal.SyncStatus, error) {
+			return &internal.SyncStatus{
+				InSync:            true,
+				MissingWorktrees:  []string{},
+				OrphanedWorktrees: []string{},
+				BranchChanges:     map[string]internal.BranchChange{},
+			}, nil
+		},
+		GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+			return map[string]*internal.WorktreeListInfo{}, nil
+		},
+	}
 
-	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { _ = os.Chdir(originalDir) })
-
-	_ = os.Chdir(repo.GetLocalPath())
-
-	assert.NoError(t, repo.WriteFile(internal.DefaultBranchConfigFilename, "# Empty gbm.branchconfig.yaml"))
-	assert.NoError(t, repo.CommitChanges("Add empty gbm.branchconfig.yaml"))
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
-
+	cmd := &cobra.Command{}
 	var output bytes.Buffer
 	cmd.SetOut(&output)
 
-	err := cmd.Execute()
+	err := handleList(mock, cmd)
 	require.NoError(t, err)
 
 	outputStr := output.String()
 	assert.Equal(t, "", strings.TrimSpace(outputStr))
 }
 
-func TestListCommand_WithGBMConfigWorktrees(t *testing.T) {
-	repo := testutils.NewGBMConfigRepo(t, map[string]string{
-		"main": "main",
-		"dev":  "develop",
-		"feat": "feature/auth",
-	})
+func TestHandleList_WithTrackedWorktrees(t *testing.T) {
+	worktrees := map[string]*internal.WorktreeListInfo{
+		"main": {
+			Path:           "/path/to/worktrees/main",
+			ExpectedBranch: "main",
+			CurrentBranch:  "main",
+			GitStatus:      &internal.GitStatus{IsDirty: false},
+		},
+		"dev": {
+			Path:           "/path/to/worktrees/dev",
+			ExpectedBranch: "develop",
+			CurrentBranch:  "develop",
+			GitStatus:      &internal.GitStatus{IsDirty: false},
+		},
+	}
 
-	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { _ = os.Chdir(originalDir) })
+	mock := &worktreeListerMock{
+		GetSyncStatusFunc: func() (*internal.SyncStatus, error) {
+			return &internal.SyncStatus{
+				InSync:            true,
+				MissingWorktrees:  []string{},
+				OrphanedWorktrees: []string{},
+				BranchChanges:     map[string]internal.BranchChange{},
+			}, nil
+		},
+		GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+			return worktrees, nil
+		},
+		GetSortedWorktreeNamesFunc: func(wt map[string]*internal.WorktreeListInfo) []string {
+			return []string{"dev", "main"}
+		},
+		GetWorktreeMappingFunc: func() (map[string]string, error) {
+			return map[string]string{
+				"main": "main",
+				"dev":  "develop",
+			}, nil
+		},
+	}
 
-	_ = os.Chdir(repo.GetLocalPath())
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
-
+	cmd := &cobra.Command{}
 	var output bytes.Buffer
 	cmd.SetOut(&output)
 
-	err := cmd.Execute()
+	err := handleList(mock, cmd)
 	require.NoError(t, err)
 
 	outputStr := output.String()
-	// Since no worktrees exist, list should show nothing
-	assert.Equal(t, "", strings.TrimSpace(outputStr))
-}
-
-func TestListCommand_UntrackedWorktrees(t *testing.T) {
-	// Create a repository with branches
-	sourceRepo := testutils.NewMultiBranchRepo(t)
-
-	// Clone the repository (no sync needed since NewMultiBranchRepo doesn't have gbm.branchconfig.yaml)
-	setupClonedRepo(t, sourceRepo)
-
-	// Create an additional worktree that's not in gbm.branchconfig.yaml (untracked)
-	addCmd := newRootCommand()
-	addCmd.SetArgs([]string{"add", "--new-branch", "UNTRACKED", "develop"})
-	err := addCmd.Execute()
-	require.NoError(t, err)
-
-	// Now test the list command
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
-
-	var output bytes.Buffer
-	cmd.SetOut(&output)
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	outputStr := output.String()
-
-	// Parse the table output
 	rows, err := parseListOutput(outputStr)
 	require.NoError(t, err)
 
-	// Should have exactly 2 worktrees
 	assert.Len(t, rows, 2)
 
 	// Verify main worktree
 	mainWorktree, found := findWorktreeInRows(rows, "main")
-	require.True(t, found, "main worktree should be present")
+	require.True(t, found)
 	assert.Equal(t, "main", mainWorktree.Branch)
-	// With the improved clone command, main worktree is now properly tracked in config
+	assert.Contains(t, mainWorktree.SyncStatus, "IN_SYNC")
+
+	// Verify dev worktree
+	devWorktree, found := findWorktreeInRows(rows, "dev")
+	require.True(t, found)
+	assert.Equal(t, "develop", devWorktree.Branch)
+	assert.Contains(t, devWorktree.SyncStatus, "IN_SYNC")
+}
+
+func TestHandleList_UntrackedWorktrees(t *testing.T) {
+	worktrees := map[string]*internal.WorktreeListInfo{
+		"main": {
+			Path:           "/path/to/worktrees/main",
+			ExpectedBranch: "main",
+			CurrentBranch:  "main",
+			GitStatus:      &internal.GitStatus{IsDirty: false},
+		},
+		"UNTRACKED": {
+			Path:           "/path/to/worktrees/UNTRACKED",
+			ExpectedBranch: "",
+			CurrentBranch:  "develop",
+			GitStatus:      &internal.GitStatus{IsDirty: false},
+		},
+	}
+
+	mock := &worktreeListerMock{
+		GetSyncStatusFunc: func() (*internal.SyncStatus, error) {
+			return &internal.SyncStatus{
+				InSync:            false,
+				MissingWorktrees:  []string{},
+				OrphanedWorktrees: []string{},
+				BranchChanges:     map[string]internal.BranchChange{},
+			}, nil
+		},
+		GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+			return worktrees, nil
+		},
+		GetSortedWorktreeNamesFunc: func(wt map[string]*internal.WorktreeListInfo) []string {
+			return []string{"main", "UNTRACKED"}
+		},
+		GetWorktreeMappingFunc: func() (map[string]string, error) {
+			return map[string]string{
+				"main": "main",
+				// UNTRACKED is not in mapping
+			}, nil
+		},
+	}
+
+	cmd := &cobra.Command{}
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+
+	err := handleList(mock, cmd)
+	require.NoError(t, err)
+
+	outputStr := output.String()
+	rows, err := parseListOutput(outputStr)
+	require.NoError(t, err)
+
+	assert.Len(t, rows, 2)
+
+	// Verify main worktree
+	mainWorktree, found := findWorktreeInRows(rows, "main")
+	require.True(t, found)
+	assert.Equal(t, "main", mainWorktree.Branch)
 	assert.Contains(t, mainWorktree.SyncStatus, "IN_SYNC")
 
 	// Verify UNTRACKED worktree
 	untrackedWorktree, found := findWorktreeInRows(rows, "UNTRACKED")
-	require.True(t, found, "UNTRACKED worktree should be present")
+	require.True(t, found)
 	assert.Equal(t, "develop", untrackedWorktree.Branch)
 	assert.Contains(t, untrackedWorktree.SyncStatus, "UNTRACKED")
 }
 
-func TestListCommand_OrphanedWorktrees(t *testing.T) {
-	// Create a repository with branches
-	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
-		"main": "main",
-		"DEV":  "develop",
-	})
+func TestHandleList_OrphanedWorktrees(t *testing.T) {
+	worktrees := map[string]*internal.WorktreeListInfo{
+		"main": {
+			Path:           "/path/to/worktrees/main",
+			ExpectedBranch: "main",
+			CurrentBranch:  "main",
+			GitStatus:      &internal.GitStatus{IsDirty: false},
+		},
+		"DEV": {
+			Path:           "/path/to/worktrees/DEV",
+			ExpectedBranch: "develop",
+			CurrentBranch:  "develop",
+			GitStatus:      &internal.GitStatus{IsDirty: false},
+		},
+	}
 
-	// Clone the repository and sync worktrees
-	setupClonedRepoWithWorktrees(t, sourceRepo)
+	mock := &worktreeListerMock{
+		GetSyncStatusFunc: func() (*internal.SyncStatus, error) {
+			return &internal.SyncStatus{
+				InSync:            false,
+				MissingWorktrees:  []string{},
+				OrphanedWorktrees: []string{"DEV"}, // DEV is orphaned
+				BranchChanges:     map[string]internal.BranchChange{},
+			}, nil
+		},
+		GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+			return worktrees, nil
+		},
+		GetSortedWorktreeNamesFunc: func(wt map[string]*internal.WorktreeListInfo) []string {
+			return []string{"main", "DEV"}
+		},
+		GetWorktreeMappingFunc: func() (map[string]string, error) {
+			return map[string]string{
+				"main": "main",
+				// DEV not in mapping anymore (orphaned)
+			}, nil
+		},
+	}
 
-	// Remove DEV from gbm.branchconfig.yaml to make it orphaned
-	err := os.WriteFile(internal.DefaultBranchConfigFilename, []byte("worktrees:\n  main:\n    branch: main\n"), 0o644)
-	require.NoError(t, err)
-
-	// Now test the list command
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
-
+	cmd := &cobra.Command{}
 	var output bytes.Buffer
 	cmd.SetOut(&output)
 
-	err = cmd.Execute()
+	err := handleList(mock, cmd)
 	require.NoError(t, err)
 
 	outputStr := output.String()
-
-	// Parse the table output
 	rows, err := parseListOutput(outputStr)
 	require.NoError(t, err)
 
-	// Should have exactly 2 worktrees
 	assert.Len(t, rows, 2)
 
-	// Verify MAIN worktree (should be in sync)
+	// Verify main worktree (should be in sync)
 	mainWorktree, found := findWorktreeInRows(rows, "main")
-	require.True(t, found, "main worktree should be present")
+	require.True(t, found)
 	assert.Equal(t, "main", mainWorktree.Branch)
 	assert.Contains(t, mainWorktree.SyncStatus, "IN_SYNC")
 
 	// Verify DEV worktree (should be untracked/orphaned)
 	devWorktree, found := findWorktreeInRows(rows, "DEV")
-	require.True(t, found, "DEV worktree should be present")
+	require.True(t, found)
 	assert.Equal(t, "develop", devWorktree.Branch)
 	assert.Contains(t, devWorktree.SyncStatus, "UNTRACKED")
 }
 
-func TestListCommand_GitStatus(t *testing.T) {
-	// Create a repository with branches
-	sourceRepo := testutils.NewMultiBranchRepo(t)
+func TestHandleList_BranchChanges(t *testing.T) {
+	worktrees := map[string]*internal.WorktreeListInfo{
+		"main": {
+			Path:           "/path/to/worktrees/main",
+			ExpectedBranch: "main",
+			CurrentBranch:  "main",
+			GitStatus:      &internal.GitStatus{IsDirty: false},
+		},
+		"DEV": {
+			Path:           "/path/to/worktrees/DEV",
+			ExpectedBranch: "develop",
+			CurrentBranch:  "feature/auth",
+			GitStatus:      &internal.GitStatus{IsDirty: false},
+		},
+	}
 
-	// Clone the repository (no sync needed since NewMultiBranchRepo doesn't have gbm.branchconfig.yaml)
-	repoPath := setupClonedRepo(t, sourceRepo)
+	mock := &worktreeListerMock{
+		GetSyncStatusFunc: func() (*internal.SyncStatus, error) {
+			return &internal.SyncStatus{
+				InSync:            false,
+				MissingWorktrees:  []string{},
+				OrphanedWorktrees: []string{},
+				BranchChanges: map[string]internal.BranchChange{
+					"DEV": {
+						OldBranch: "develop",
+						NewBranch: "feature/auth",
+					},
+				},
+			}, nil
+		},
+		GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+			return worktrees, nil
+		},
+		GetSortedWorktreeNamesFunc: func(wt map[string]*internal.WorktreeListInfo) []string {
+			return []string{"main", "DEV"}
+		},
+		GetWorktreeMappingFunc: func() (map[string]string, error) {
+			return map[string]string{
+				"main": "main",
+				"DEV":  "develop",
+			}, nil
+		},
+	}
 
-	// Create a file in the main worktree to create git status
-	mainWorktreePath := filepath.Join(repoPath, "worktrees", "main")
-	err := os.WriteFile(filepath.Join(mainWorktreePath, "test.txt"), []byte("test content"), 0o644)
-	require.NoError(t, err)
-
-	// Now test the list command
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
-
+	cmd := &cobra.Command{}
 	var output bytes.Buffer
 	cmd.SetOut(&output)
 
-	err = cmd.Execute()
+	err := handleList(mock, cmd)
 	require.NoError(t, err)
 
 	outputStr := output.String()
-
-	// Parse the table output
 	rows, err := parseListOutput(outputStr)
 	require.NoError(t, err)
 
-	// Should have exactly 1 worktree (main)
-	assert.Len(t, rows, 1)
+	assert.Len(t, rows, 2)
 
 	// Verify main worktree
 	mainWorktree, found := findWorktreeInRows(rows, "main")
-	require.True(t, found, "main worktree should be present")
+	require.True(t, found)
 	assert.Equal(t, "main", mainWorktree.Branch)
-	// Should have some git status indication (the exact symbol may vary)
+	assert.Contains(t, mainWorktree.SyncStatus, "IN_SYNC")
+
+	// Verify DEV worktree shows branch change
+	devWorktree, found := findWorktreeInRows(rows, "DEV")
+	require.True(t, found)
+	assert.Equal(t, "feature/auth (expected: develop)", devWorktree.Branch)
+	assert.Contains(t, devWorktree.SyncStatus, "OUT_OF_SYNC (develop → feature/auth)")
+}
+
+func TestHandleList_GitStatusDisplay(t *testing.T) {
+	worktrees := map[string]*internal.WorktreeListInfo{
+		"main": {
+			Path:           "/path/to/worktrees/main",
+			ExpectedBranch: "main",
+			CurrentBranch:  "main",
+			GitStatus:      &internal.GitStatus{IsDirty: true, Modified: 1},
+		},
+	}
+
+	mock := &worktreeListerMock{
+		GetSyncStatusFunc: func() (*internal.SyncStatus, error) {
+			return &internal.SyncStatus{
+				InSync:            true,
+				MissingWorktrees:  []string{},
+				OrphanedWorktrees: []string{},
+				BranchChanges:     map[string]internal.BranchChange{},
+			}, nil
+		},
+		GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+			return worktrees, nil
+		},
+		GetSortedWorktreeNamesFunc: func(wt map[string]*internal.WorktreeListInfo) []string {
+			return []string{"main"}
+		},
+		GetWorktreeMappingFunc: func() (map[string]string, error) {
+			return map[string]string{
+				"main": "main",
+			}, nil
+		},
+	}
+
+	cmd := &cobra.Command{}
+	var output bytes.Buffer
+	cmd.SetOut(&output)
+
+	err := handleList(mock, cmd)
+	require.NoError(t, err)
+
+	outputStr := output.String()
+	rows, err := parseListOutput(outputStr)
+	require.NoError(t, err)
+
+	assert.Len(t, rows, 1)
+
+	// Verify main worktree shows git status
+	mainWorktree, found := findWorktreeInRows(rows, "main")
+	require.True(t, found)
+	assert.Equal(t, "main", mainWorktree.Branch)
 	assert.NotEmpty(t, mainWorktree.GitStatus, "Git status should not be empty")
 }
 
-func TestListCommand_ExpectedBranchDisplay(t *testing.T) {
-	// Create a repository with branches
-	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
-		"main": "main",
-		"DEV":  "develop",
-	})
-
-	// Clone the repository and sync worktrees
-	repoPath := setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Change DEV worktree to a different branch to test expected branch display
-	devWorktreePath := filepath.Join(repoPath, "worktrees", "DEV")
-	_ = os.Chdir(devWorktreePath)
-
-	// Switch to feature/auth branch instead of develop to create branch mismatch
-	gitOutput, err := exec.Command("git", "checkout", "feature/auth").CombinedOutput()
-	if err != nil {
-		t.Logf("Git checkout failed: %s", string(gitOutput))
-	}
-	require.NoError(t, err)
-
-	// Change back to repo root
-	_ = os.Chdir(repoPath)
-
-	// Now test the list command
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
-
-	var output bytes.Buffer
-	cmd.SetOut(&output)
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	outputStr := output.String()
-
-	// Parse the table output
-	rows, err := parseListOutput(outputStr)
-	require.NoError(t, err)
-
-	// Should have exactly 2 worktrees
-	assert.Len(t, rows, 2)
-
-	// Verify main worktree (should show just "main")
-	mainWorktree, found := findWorktreeInRows(rows, "main")
-	require.True(t, found, "main worktree should be present")
-	assert.Equal(t, "main", mainWorktree.Branch)
-
-	// Verify DEV worktree (should show "feature/auth (expected: develop)")
-	devWorktree, found := findWorktreeInRows(rows, "DEV")
-	require.True(t, found, "DEV worktree should be present")
-	assert.Equal(t, "feature/auth (expected: develop)", devWorktree.Branch)
-}
-
-func TestListCommand_SortedOutput(t *testing.T) {
-	// Create a repository with branches
-	sourceRepo := testutils.NewGBMConfigRepo(t, map[string]string{
-		"main": "main",
-		"dev":  "develop",
-		"feat": "feature/auth",
-	})
-
-	// Clone the repository and sync worktrees
-	setupClonedRepoWithWorktrees(t, sourceRepo)
-
-	// Create an additional ad-hoc worktree to test sorting
-	addCmd := newRootCommand()
-	addCmd.SetArgs([]string{"add", "--new-branch", "adhoc", "production/v2.0"})
-	err := addCmd.Execute()
-	require.NoError(t, err)
-
-	// Now test the list command
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
-
-	var output bytes.Buffer
-	cmd.SetOut(&output)
-
-	err = cmd.Execute()
-	require.NoError(t, err)
-
-	outputStr := output.String()
-
-	// Parse the table output
-	rows, err := parseListOutput(outputStr)
-	require.NoError(t, err)
-
-	// Should have exactly 4 worktrees
-	assert.Len(t, rows, 4)
-
-	// Verify all expected worktrees are present
-	mainWorktree, found := findWorktreeInRows(rows, "main")
-	require.True(t, found, "main worktree should be present")
-	assert.Equal(t, "main", mainWorktree.Branch)
-
-	devWorktree, found := findWorktreeInRows(rows, "dev")
-	require.True(t, found, "dev worktree should be present")
-	assert.Equal(t, "develop", devWorktree.Branch)
-
-	featWorktree, found := findWorktreeInRows(rows, "feat")
-	require.True(t, found, "feat worktree should be present")
-	assert.Equal(t, "feature/auth", featWorktree.Branch)
-
-	adhocWorktree, found := findWorktreeInRows(rows, "adhoc")
-	require.True(t, found, "adhoc worktree should be present")
-	assert.Equal(t, "production/v2.0", adhocWorktree.Branch)
-
-	// Verify sorting: gbm.branchconfig.yaml worktrees (main, dev, feat) should come before ad-hoc (adhoc)
-	// The order in the rows slice should reflect the display order
-	worktreeNames := make([]string, len(rows))
-	for i, row := range rows {
-		worktreeNames[i] = row.Name
+func TestHandleList_ErrorHandling(t *testing.T) {
+	tests := []struct {
+		name        string
+		mockSetup   func() *worktreeListerMock
+		expectError bool
+		errorMsg    string
+	}{
+		{
+			name: "GetSyncStatus error",
+			mockSetup: func() *worktreeListerMock {
+				return &worktreeListerMock{
+					GetSyncStatusFunc: func() (*internal.SyncStatus, error) {
+						return nil, fmt.Errorf("sync status error")
+					},
+				}
+			},
+			expectError: true,
+			errorMsg:    "sync status error",
+		},
+		{
+			name: "GetAllWorktrees error",
+			mockSetup: func() *worktreeListerMock {
+				return &worktreeListerMock{
+					GetSyncStatusFunc: func() (*internal.SyncStatus, error) {
+						return &internal.SyncStatus{}, nil
+					},
+					GetAllWorktreesFunc: func() (map[string]*internal.WorktreeListInfo, error) {
+						return nil, fmt.Errorf("worktree list error")
+					},
+				}
+			},
+			expectError: true,
+			errorMsg:    "failed to get worktree list: worktree list error",
+		},
 	}
 
-	// Find positions
-	mainPos := -1
-	devPos := -1
-	featPos := -1
-	adhocPos := -1
-	for i, name := range worktreeNames {
-		switch name {
-		case "main":
-			mainPos = i
-		case "dev":
-			devPos = i
-		case "feat":
-			featPos = i
-		case "adhoc":
-			adhocPos = i
-		}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			mock := tt.mockSetup()
+			cmd := &cobra.Command{}
+			var output bytes.Buffer
+			cmd.SetOut(&output)
+
+			err := handleList(mock, cmd)
+
+			if tt.expectError {
+				require.Error(t, err)
+				assert.Contains(t, err.Error(), tt.errorMsg)
+			} else {
+				require.NoError(t, err)
+			}
+		})
 	}
-
-	// gbm.branchconfig.yaml worktrees should come before ad-hoc worktrees
-	assert.True(t, mainPos < adhocPos, "main should come before adhoc")
-	assert.True(t, devPos < adhocPos, "dev should come before adhoc")
-	assert.True(t, featPos < adhocPos, "feat should come before adhoc")
-
-	// Verify the exact order of worktrees as they appear in the output
-	// Tracked worktrees should be sorted alphabetically, followed by ad-hoc worktrees
-	expectedOrder := []string{"dev", "feat", "main", "adhoc"}
-	actualOrder := worktreeNames
-	assert.Equal(t, expectedOrder, actualOrder, "Worktrees should be in the expected sorted order")
-}
-
-func TestListCommand_NoGitRepository(t *testing.T) {
-	tempDir := t.TempDir()
-	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { _ = os.Chdir(originalDir) })
-
-	_ = os.Chdir(tempDir)
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
-
-	err := cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to find git repository root")
-}
-
-func TestListCommand_NoGBMConfigFile(t *testing.T) {
-	repo := testutils.NewBasicRepo(t)
-
-	originalDir, _ := os.Getwd()
-	t.Cleanup(func() { _ = os.Chdir(originalDir) })
-
-	_ = os.Chdir(repo.GetLocalPath())
-
-	gbmConfigPath := filepath.Join(repo.GetLocalPath(), internal.DefaultBranchConfigFilename)
-	if _, err := os.Stat(gbmConfigPath); err == nil {
-		_ = os.Remove(gbmConfigPath)
-	}
-
-	cmd := newRootCommand()
-	cmd.SetArgs([]string{"list"})
-
-	err := cmd.Execute()
-	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "failed to load gbm.branchconfig.yaml")
 }

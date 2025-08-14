@@ -24,12 +24,6 @@
 ### Phase 2: Build on Patterns (Medium-Low Complexity)
 
 
-- [ ] **Extract worktreeLister interface for cmd/list.go**
-  - Create interface with: GetSyncStatus(), GetAllWorktrees(), GetSortedWorktreeNames(), GetWorktreeMapping()
-  - Add mock generation: `//go:generate go tool moq -out ./autogen_worktreeLister.go . worktreeLister`
-  - Refactor command functions to use interface
-  - Write unit tests with mocks
-  - Additionally, move any integration tests that use real git repos, worktrees, etc. out of the cmd layer and into the internal layer where they belong
 
 ### Phase 3: Handle Complex Data (Medium Complexity)
 
