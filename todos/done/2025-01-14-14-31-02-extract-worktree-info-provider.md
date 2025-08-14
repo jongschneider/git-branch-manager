@@ -1,6 +1,6 @@
 # Extract worktreeInfoProvider interface for cmd/info.go
-**Status:** AwaitingCommit
-**Agent PID:** 19462
+**Status:** Done
+**Agent PID:** 5836
 
 ## Original Todo
 **Extract worktreeInfoProvider interface for cmd/info.go**
