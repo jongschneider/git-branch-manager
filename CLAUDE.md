@@ -26,3 +26,6 @@ To test the latest version of gbm (git branch manager):
 3. **Availability**: After installation with `goi`, gbm will be available in the tmux session for testing
 
 This allows for quick iteration and testing of changes to the gbm tool.
+
+- Never run a Git command that will make a change to a remote repository (includes the following binaries - git, gbm, wt).
+- When taking a Git commit, always use conventional commit style.
