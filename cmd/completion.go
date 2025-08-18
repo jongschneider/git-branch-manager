@@ -1,7 +1,12 @@
 package cmd
 
 import (
+	"errors"
+	"fmt"
 	"os"
+	"strings"
+
+	"gbm/internal"
 
 	"github.com/spf13/cobra"
 )
@@ -65,4 +70,52 @@ PowerShell:
 }
 
 func init() {
+}
+
+// worktreeProvider interface defines the common interface for getting worktrees
+// This is used by both switch and remove commands for completion
+type worktreeProvider interface {
+	GetAllWorktrees() (map[string]*internal.WorktreeListInfo, error)
+}
+
+// getWorktreeCompletions creates tab-separated completion entries showing worktree names and branch info
+// Returns entries in format "WORKTREE_NAME\t    branch_name" for shell completion
+// The part before \t gets completed, the part after is just descriptive
+func getWorktreeCompletions(provider worktreeProvider) []string {
+	worktrees, err := provider.GetAllWorktrees()
+	if err != nil {
+		return nil
+	}
+
+	if len(worktrees) == 0 {
+		return nil
+	}
+
+	// Find the maximum worktree name length for alignment
+	maxNameLen := 0
+	for name := range worktrees {
+		maxNameLen = max(maxNameLen, len(name))
+	}
+
+	var completions []string
+	for name, info := range worktrees {
+		// Use tab separator: "WORKTREE_NAME\t    branch_name"
+		// Everything before \t gets completed, everything after is just description
+		padding := strings.Repeat(" ", maxNameLen-len(name)+4) // 4 spaces minimum
+		completion := fmt.Sprintf("%s\t%s%s", name, padding, info.CurrentBranch)
+		completions = append(completions, completion)
+	}
+	return completions
+}
+
+// getWorktreeCompletionsWithManager is a convenience function that creates a manager and gets completions
+func getWorktreeCompletionsWithManager() []string {
+	manager, err := createInitializedManager()
+	if err != nil {
+		if !errors.Is(err, ErrLoadGBMConfig) {
+			return nil
+		}
+		PrintVerbose("%v", err)
+	}
+	return getWorktreeCompletions(manager)
 }

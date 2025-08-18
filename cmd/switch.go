@@ -87,7 +87,7 @@ Examples:
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return getWorktreeNames(), cobra.ShellCompDirectiveNoFileComp
+		return getWorktreeCompletionsWithManager(), cobra.ShellCompDirectiveNoFileComp
 	}
 
 	return cmd
@@ -211,38 +211,3 @@ func handleListWorktrees(switcher worktreeSwitcher) error {
 	return nil
 }
 
-func getWorktreeNames() []string {
-	manager, err := createInitializedManager()
-	if err != nil {
-		if !errors.Is(err, ErrLoadGBMConfig) {
-			return nil
-		}
-
-		PrintVerbose("%v", err)
-	}
-
-	worktrees, err := manager.GetAllWorktrees()
-	if err != nil {
-		return nil
-	}
-
-	if len(worktrees) == 0 {
-		return nil
-	}
-
-	// Find the maximum worktree name length for alignment
-	maxNameLen := 0
-	for name := range worktrees {
-		maxNameLen = max(maxNameLen, len(name))
-	}
-
-	var completions []string
-	for name, info := range worktrees {
-		// Use tab separator: "WORKTREE_NAME\t    branch_name"
-		// Everything before \t gets completed, everything after is just description
-		padding := strings.Repeat(" ", maxNameLen-len(name)+4) // 4 spaces minimum
-		completion := fmt.Sprintf("%s\t%s%s", name, padding, info.CurrentBranch)
-		completions = append(completions, completion)
-	}
-	return completions
-}

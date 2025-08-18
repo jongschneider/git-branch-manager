@@ -69,7 +69,7 @@ The command will automatically set upstream (-u) if not already set.`,
 		if len(args) != 0 {
 			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return getWorktreeNames(), cobra.ShellCompDirectiveNoFileComp
+		return getWorktreeCompletionsWithManager(), cobra.ShellCompDirectiveNoFileComp
 	}
 
 	return cmd

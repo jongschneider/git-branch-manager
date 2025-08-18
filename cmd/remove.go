@@ -73,19 +73,6 @@ func handleRemoveWithConfirmation(remover worktreeRemover, worktreeName string, 
 	return nil
 }
 
-// getWorktreeCompletions gets worktree names for shell completion
-func getWorktreeCompletions(remover worktreeRemover) ([]string, error) {
-	worktrees, err := remover.GetAllWorktrees()
-	if err != nil {
-		return nil, err
-	}
-
-	var completions []string
-	for worktreeName := range worktrees {
-		completions = append(completions, worktreeName)
-	}
-	return completions, nil
-}
 
 func newRemoveCommand() *cobra.Command {
 	cmd := &cobra.Command{
@@ -122,25 +109,10 @@ Examples:
 
 	// Add completion for worktree names
 	cmd.ValidArgsFunction = func(cmd *cobra.Command, args []string, toComplete string) ([]string, cobra.ShellCompDirective) {
-		if len(args) == 0 {
-			// Create manager
-			manager, err := createInitializedManager()
-			if err != nil {
-				if !errors.Is(err, ErrLoadGBMConfig) {
-					return nil, cobra.ShellCompDirectiveNoFileComp
-				}
-
-				PrintVerbose("%v", err)
-			}
-
-			// Get worktree completions
-			completions, err := getWorktreeCompletions(manager)
-			if err != nil {
-				return nil, cobra.ShellCompDirectiveNoFileComp
-			}
-			return completions, cobra.ShellCompDirectiveNoFileComp
+		if len(args) != 0 {
+			return nil, cobra.ShellCompDirectiveNoFileComp
 		}
-		return nil, cobra.ShellCompDirectiveNoFileComp
+		return getWorktreeCompletionsWithManager(), cobra.ShellCompDirectiveNoFileComp
 	}
 
 	return cmd
