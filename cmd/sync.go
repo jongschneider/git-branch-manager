@@ -14,7 +14,7 @@ import (
 // worktreeSyncer interface abstracts the Manager operations needed for sync operations
 type worktreeSyncer interface {
 	GetSyncStatus() (*internal.SyncStatus, error)
-	SyncWithConfirmation(dryRun, force bool, confirmFunc internal.ConfirmationFunc) error
+	SyncWithConfirmation(dryRun, force bool, removeOrphans bool, confirmFunc internal.ConfirmationFunc) error
 }
 
 func newSyncCommand() *cobra.Command {
@@ -24,10 +24,12 @@ func newSyncCommand() *cobra.Command {
 		Long: `Synchronize all worktrees with current gbm.branchconfig.yaml definitions.
 
 Fetches from remote first, then creates missing worktrees for new worktree configurations,
-updates existing worktrees if branch references have changed, and optionally removes orphaned worktrees.`,
+updates existing worktrees if branch references have changed. Use --remove-orphans to also
+remove untracked worktrees not defined in the configuration.`,
 		RunE: func(cmd *cobra.Command, args []string) error {
 			syncDryRun, _ := cmd.Flags().GetBool("dry-run")
 			syncForce, _ := cmd.Flags().GetBool("force")
+			removeOrphans, _ := cmd.Flags().GetBool("remove-orphans")
 
 			manager, err := createInitializedManager()
 			if err != nil {
@@ -35,20 +37,21 @@ updates existing worktrees if branch references have changed, and optionally rem
 			}
 
 			if syncDryRun {
-				return handleSyncDryRun(manager)
+				return handleSyncDryRun(manager, removeOrphans)
 			}
 
-			return handleSync(manager, syncForce)
+			return handleSync(manager, syncForce, removeOrphans)
 		},
 	}
 
 	cmd.Flags().Bool("dry-run", false, "show what would be changed without making changes")
-	cmd.Flags().Bool("force", false, "skip confirmation prompts and remove orphaned worktrees")
+	cmd.Flags().Bool("force", false, "skip confirmation prompts for sync operations")
+	cmd.Flags().Bool("remove-orphans", false, "remove untracked worktrees not in gbm.branchconfig.yaml")
 
 	return cmd
 }
 
-func handleSyncDryRun(syncer worktreeSyncer) error {
+func handleSyncDryRun(syncer worktreeSyncer, removeOrphans bool) error {
 	iconManager := internal.GetGlobalIconManager()
 	PrintInfo("%s", internal.FormatStatusIcon(iconManager.DryRun(), "Dry run mode - showing what would be changed:"))
 	status, err := syncer.GetSyncStatus()
@@ -87,9 +90,9 @@ func handleSyncDryRun(syncer worktreeSyncer) error {
 		}
 	}
 
-	if len(status.OrphanedWorktrees) > 0 {
+	if removeOrphans && len(status.OrphanedWorktrees) > 0 {
 		iconManager := internal.GetGlobalIconManager()
-		PrintInfo("%s", internal.FormatStatusIcon(iconManager.Orphaned(), "Orphaned worktrees (use --force to remove):"))
+		PrintInfo("%s", internal.FormatStatusIcon(iconManager.Orphaned(), "Orphaned worktrees (will be removed):"))
 		for _, envVar := range status.OrphanedWorktrees {
 			PrintInfo("  • %s", envVar)
 		}
@@ -98,7 +101,7 @@ func handleSyncDryRun(syncer worktreeSyncer) error {
 	return nil
 }
 
-func handleSync(syncer worktreeSyncer, force bool) error {
+func handleSync(syncer worktreeSyncer, force bool, removeOrphans bool) error {
 	PrintVerbose("Synchronizing worktrees (force=%v)", force)
 
 	// Create confirmation function for destructive operations
@@ -110,7 +113,7 @@ func handleSync(syncer worktreeSyncer, force bool) error {
 		return strings.ToLower(response) == "y" || strings.ToLower(response) == "yes"
 	}
 
-	if err := syncer.SyncWithConfirmation(false, force, confirmFunc); err != nil {
+	if err := syncer.SyncWithConfirmation(false, force, removeOrphans, confirmFunc); err != nil {
 		return err
 	}
 

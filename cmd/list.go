@@ -88,8 +88,8 @@ func handleList(lister worktreeLister, cmd *cobra.Command) error {
 	_, _ = fmt.Fprint(cmd.OutOrStdout(), table.String())
 	_, _ = fmt.Fprintln(cmd.OutOrStdout())
 
-	// Only show sync hint if there are actual sync issues with existing worktrees
-	hasExistingSyncIssues := len(status.BranchChanges) > 0 || len(status.OrphanedWorktrees) > 0
+	// Only show sync hint if there are actual sync issues that gbm sync can resolve
+	hasExistingSyncIssues := len(status.BranchChanges) > 0
 	if hasExistingSyncIssues {
 		_, _ = fmt.Fprintln(cmd.OutOrStdout())
 		_, _ = fmt.Fprintln(cmd.OutOrStdout(), internal.FormatInfo("Run 'gbm sync' to synchronize changes"))

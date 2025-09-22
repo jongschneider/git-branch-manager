@@ -211,10 +211,10 @@ func (m *Manager) detectWorktreePromotions(branchChanges map[string]BranchChange
 }
 
 func (m *Manager) Sync(dryRun, force bool) error {
-	return m.SyncWithConfirmation(dryRun, force, nil)
+	return m.SyncWithConfirmation(dryRun, force, false, nil)
 }
 
-func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc ConfirmationFunc) error {
+func (m *Manager) SyncWithConfirmation(dryRun, force bool, removeOrphans bool, confirmFunc ConfirmationFunc) error {
 	// Validate all branches exist before performing any operations
 	if err := m.ValidateConfig(); err != nil {
 		return err
@@ -244,10 +244,10 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 		return fmt.Errorf("failed to ensure worktrees directory: %w", err)
 	}
 
-	// Remove orphaned worktrees first (if --force is used) to free up branches
-	if force && len(status.OrphanedWorktrees) > 0 {
-		// Ask for confirmation unless a confirmation function is provided and returns true
-		if confirmFunc != nil {
+	// Remove orphaned worktrees first (if --remove-orphans is used) to free up branches
+	if removeOrphans && len(status.OrphanedWorktrees) > 0 {
+		// Ask for confirmation unless --force is used
+		if !force && confirmFunc != nil {
 			message := "The following worktrees will be PERMANENTLY DELETED:\n"
 			for _, envVar := range status.OrphanedWorktrees {
 				worktreePath := filepath.Join(m.repoPath, m.config.Settings.WorktreePrefix, envVar)
@@ -256,7 +256,7 @@ func (m *Manager) SyncWithConfirmation(dryRun, force bool, confirmFunc Confirmat
 			message += "Do you want to continue?"
 
 			if !confirmFunc(message) {
-				return fmt.Errorf("sync cancelled by user")
+				return fmt.Errorf("orphan removal cancelled by user")
 			}
 		}
 

@@ -21,7 +21,7 @@ var _ worktreeSyncer = &worktreeSyncerMock{}
 //			GetSyncStatusFunc: func() (*internal.SyncStatus, error) {
 //				panic("mock out the GetSyncStatus method")
 //			},
-//			SyncWithConfirmationFunc: func(dryRun bool, force bool, confirmFunc internal.ConfirmationFunc) error {
+//			SyncWithConfirmationFunc: func(dryRun bool, force bool, removeOrphans bool, confirmFunc internal.ConfirmationFunc) error {
 //				panic("mock out the SyncWithConfirmation method")
 //			},
 //		}
@@ -35,7 +35,7 @@ type worktreeSyncerMock struct {
 	GetSyncStatusFunc func() (*internal.SyncStatus, error)
 
 	// SyncWithConfirmationFunc mocks the SyncWithConfirmation method.
-	SyncWithConfirmationFunc func(dryRun bool, force bool, confirmFunc internal.ConfirmationFunc) error
+	SyncWithConfirmationFunc func(dryRun bool, force bool, removeOrphans bool, confirmFunc internal.ConfirmationFunc) error
 
 	// calls tracks calls to the methods.
 	calls struct {
@@ -48,6 +48,8 @@ type worktreeSyncerMock struct {
 			DryRun bool
 			// Force is the force argument value.
 			Force bool
+			// RemoveOrphans is the removeOrphans argument value.
+			RemoveOrphans bool
 			// ConfirmFunc is the confirmFunc argument value.
 			ConfirmFunc internal.ConfirmationFunc
 		}
@@ -84,23 +86,25 @@ func (mock *worktreeSyncerMock) GetSyncStatusCalls() []struct {
 }
 
 // SyncWithConfirmation calls SyncWithConfirmationFunc.
-func (mock *worktreeSyncerMock) SyncWithConfirmation(dryRun bool, force bool, confirmFunc internal.ConfirmationFunc) error {
+func (mock *worktreeSyncerMock) SyncWithConfirmation(dryRun bool, force bool, removeOrphans bool, confirmFunc internal.ConfirmationFunc) error {
 	if mock.SyncWithConfirmationFunc == nil {
 		panic("worktreeSyncerMock.SyncWithConfirmationFunc: method is nil but worktreeSyncer.SyncWithConfirmation was just called")
 	}
 	callInfo := struct {
-		DryRun      bool
-		Force       bool
-		ConfirmFunc internal.ConfirmationFunc
+		DryRun        bool
+		Force         bool
+		RemoveOrphans bool
+		ConfirmFunc   internal.ConfirmationFunc
 	}{
-		DryRun:      dryRun,
-		Force:       force,
-		ConfirmFunc: confirmFunc,
+		DryRun:        dryRun,
+		Force:         force,
+		RemoveOrphans: removeOrphans,
+		ConfirmFunc:   confirmFunc,
 	}
 	mock.lockSyncWithConfirmation.Lock()
 	mock.calls.SyncWithConfirmation = append(mock.calls.SyncWithConfirmation, callInfo)
 	mock.lockSyncWithConfirmation.Unlock()
-	return mock.SyncWithConfirmationFunc(dryRun, force, confirmFunc)
+	return mock.SyncWithConfirmationFunc(dryRun, force, removeOrphans, confirmFunc)
 }
 
 // SyncWithConfirmationCalls gets all the calls that were made to SyncWithConfirmation.
@@ -108,14 +112,16 @@ func (mock *worktreeSyncerMock) SyncWithConfirmation(dryRun bool, force bool, co
 //
 //	len(mockedworktreeSyncer.SyncWithConfirmationCalls())
 func (mock *worktreeSyncerMock) SyncWithConfirmationCalls() []struct {
-	DryRun      bool
-	Force       bool
-	ConfirmFunc internal.ConfirmationFunc
+	DryRun        bool
+	Force         bool
+	RemoveOrphans bool
+	ConfirmFunc   internal.ConfirmationFunc
 } {
 	var calls []struct {
-		DryRun      bool
-		Force       bool
-		ConfirmFunc internal.ConfirmationFunc
+		DryRun        bool
+		Force         bool
+		RemoveOrphans bool
+		ConfirmFunc   internal.ConfirmationFunc
 	}
 	mock.lockSyncWithConfirmation.RLock()
 	calls = mock.calls.SyncWithConfirmation
