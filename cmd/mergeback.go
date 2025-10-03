@@ -44,8 +44,6 @@ Tab Completion:
   or press ENTER for automatic detection with confirmation prompt.`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(cmd *cobra.Command, args []string) error {
-			var worktreeName string
-
 			// Create manager
 			manager, err := createInitializedManager()
 			if err != nil {
@@ -56,25 +54,23 @@ Tab Completion:
 				PrintVerbose("%v", err)
 			}
 
-			// Handle auto-detection if no worktree name provided
-			if len(args) == 0 {
-				worktreeName, err = autoDetectMergebackTarget(manager)
-				if err != nil {
-					return fmt.Errorf("failed to auto-detect mergeback target: %w", err)
-				}
-				PrintVerbose("Auto-detected mergeback target: %s", worktreeName)
-			} else {
-				worktreeName = args[0]
-			}
-
-			// Find the target branch for merging and source branch with changes
-			sourceBranch, baseBranch, baseWorktreeName, err := findMergeTargetBranchAndWorktree(manager)
+			// Find the source and target branches for merging
+			sourceBranch, baseBranch, baseWorktreeName, sourceWorktreeName, err := findMergeTargetBranchAndWorktree(manager)
 			if err != nil {
 				return fmt.Errorf("failed to determine merge target branch: %w", err)
 			}
 
-			PrintInfo("Using branch '%s' (worktree '%s') as base for mergeback", baseBranch, baseWorktreeName)
+			PrintInfo("Mergeback needed: '%s' → '%s'", sourceWorktreeName, baseWorktreeName)
 			PrintVerbose("Will merge from '%s' into '%s'", sourceBranch, baseBranch)
+
+			// Use source worktree name for naming (e.g., "production" for production → preview)
+			// User can override by passing worktree name as argument
+			var worktreeName string
+			if len(args) == 0 {
+				worktreeName = sourceWorktreeName
+			} else {
+				worktreeName = args[0]
+			}
 
 			// Generate mergeback branch name
 			branchName := fmt.Sprintf("merge/%s_%s", worktreeName, strings.ToLower(baseWorktreeName))
@@ -121,17 +117,17 @@ Tab Completion:
 
 // findMergeTargetBranchAndWorktree finds the source branch with changes and target branch/worktree for mergeback
 // Uses tree structure and git log to find branches that need merging
-// Returns: sourceBranch, targetBranch, targetWorktreeName, error
-func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string, string, error) {
+// Returns: sourceBranch, targetBranch, targetWorktreeName, sourceWorktreeName, error
+func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string, string, string, error) {
 	// Get current working directory and find git root
 	wd, err := os.Getwd()
 	if err != nil {
-		return "", "", "", fmt.Errorf("failed to get working directory: %w", err)
+		return "", "", "", "", fmt.Errorf("failed to get working directory: %w", err)
 	}
 
 	repoRoot, err := internal.FindGitRoot(wd)
 	if err != nil {
-		return "", "", "", fmt.Errorf("failed to find git root: %w", err)
+		return "", "", "", "", fmt.Errorf("failed to find git root: %w", err)
 	}
 
 	// Load config
@@ -141,16 +137,16 @@ func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string
 		PrintVerbose("No gbm.branchconfig.yaml found, using default branch as merge target")
 		defaultBranch, err := manager.GetGitManager().GetDefaultBranch()
 		if err != nil {
-			return "", "", "", err
+			return "", "", "", "", err
 		}
 		// Without config, we can't determine source branch reliably
-		return "", defaultBranch, "main", fmt.Errorf("cannot determine source branch without gbm.branchconfig.yaml")
+		return "", defaultBranch, "main", "", fmt.Errorf("cannot determine source branch without gbm.branchconfig.yaml")
 	}
 
 	// Get deepest leaf nodes (production branches) from all trees
 	deepestLeaves := config.Tree.GetAllDeepestLeafNodes()
 	if len(deepestLeaves) == 0 {
-		return "", "", "", fmt.Errorf("no leaf nodes found in branch configuration")
+		return "", "", "", "", fmt.Errorf("no leaf nodes found in branch configuration")
 	}
 
 	// Check each deepest leaf node (production branch) to see if it needs mergeback
@@ -165,9 +161,9 @@ func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string
 
 			if hasCommits {
 				PrintVerbose("Found mergeback needed: %s -> %s (worktree '%s')", leaf.Config.Branch, leaf.Parent.Config.Branch, leaf.Parent.Name)
-				// Return source branch (leaf with changes), target branch, target worktree name
+				// Return source branch (leaf with changes), target branch, target worktree name, source worktree name
 				// Use origin/ prefix to ensure we merge from remote state
-				return "origin/" + leaf.Config.Branch, leaf.Parent.Config.Branch, leaf.Parent.Name, nil
+				return "origin/" + leaf.Config.Branch, leaf.Parent.Config.Branch, leaf.Parent.Name, leaf.Name, nil
 			}
 		}
 	}
@@ -195,7 +191,7 @@ func hasCommitsBetweenBranches(targetBranch, sourceBranch string) (bool, error) 
 }
 
 // findNextMergeTargetInChain recursively checks parent branches for merge opportunities
-func findNextMergeTargetInChain(leaves []*internal.WorktreeNode) (string, string, string, error) {
+func findNextMergeTargetInChain(leaves []*internal.WorktreeNode) (string, string, string, string, error) {
 	// Check parent branches of the leaves
 	checkedBranches := make(map[string]bool)
 
@@ -213,15 +209,15 @@ func findNextMergeTargetInChain(leaves []*internal.WorktreeNode) (string, string
 
 				if hasCommits {
 					PrintVerbose("Found mergeback needed: %s -> %s (worktree '%s')", leaf.Parent.Config.Branch, leaf.Parent.Parent.Config.Branch, leaf.Parent.Parent.Name)
-					// Return source branch, target branch, target worktree name
+					// Return source branch, target branch, target worktree name, source worktree name
 					// Use origin/ prefix to ensure we merge from remote state
-					return "origin/" + leaf.Parent.Config.Branch, leaf.Parent.Parent.Config.Branch, leaf.Parent.Parent.Name, nil
+					return "origin/" + leaf.Parent.Config.Branch, leaf.Parent.Parent.Config.Branch, leaf.Parent.Parent.Name, leaf.Parent.Name, nil
 				}
 			}
 		}
 	}
 
-	return "", "", "", fmt.Errorf("no mergeback targets found")
+	return "", "", "", "", fmt.Errorf("no mergeback targets found")
 }
 
 // autoDetectMergebackTarget analyzes recent git history to suggest a mergeback target
