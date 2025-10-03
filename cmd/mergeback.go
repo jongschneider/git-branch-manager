@@ -67,13 +67,14 @@ Tab Completion:
 				worktreeName = args[0]
 			}
 
-			// Find the target branch for merging
-			baseBranch, baseWorktreeName, err := findMergeTargetBranchAndWorktree(manager)
+			// Find the target branch for merging and source branch with changes
+			sourceBranch, baseBranch, baseWorktreeName, err := findMergeTargetBranchAndWorktree(manager)
 			if err != nil {
 				return fmt.Errorf("failed to determine merge target branch: %w", err)
 			}
 
 			PrintInfo("Using branch '%s' (worktree '%s') as base for mergeback", baseBranch, baseWorktreeName)
+			PrintVerbose("Will merge from '%s' into '%s'", sourceBranch, baseBranch)
 
 			// Generate mergeback branch name
 			branchName := fmt.Sprintf("merge/%s_%s", worktreeName, strings.ToLower(baseWorktreeName))
@@ -98,7 +99,7 @@ Tab Completion:
 			PrintInfo("Ready to merge changes into '%s'", baseBranch)
 
 			// Offer to perform the merge automatically
-			if err := offerMergeExecution(manager, mergebackWorktreeName, worktreeName, baseBranch); err != nil {
+			if err := offerMergeExecution(manager, mergebackWorktreeName, worktreeName, sourceBranch, baseBranch); err != nil {
 				return fmt.Errorf("merge execution failed: %w", err)
 			}
 
@@ -118,18 +119,19 @@ Tab Completion:
 	return cmd
 }
 
-// findMergeTargetBranchAndWorktree finds the branch and worktree that should be used as the base for mergeback
+// findMergeTargetBranchAndWorktree finds the source branch with changes and target branch/worktree for mergeback
 // Uses tree structure and git log to find branches that need merging
-func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string, error) {
+// Returns: sourceBranch, targetBranch, targetWorktreeName, error
+func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string, string, error) {
 	// Get current working directory and find git root
 	wd, err := os.Getwd()
 	if err != nil {
-		return "", "", fmt.Errorf("failed to get working directory: %w", err)
+		return "", "", "", fmt.Errorf("failed to get working directory: %w", err)
 	}
 
 	repoRoot, err := internal.FindGitRoot(wd)
 	if err != nil {
-		return "", "", fmt.Errorf("failed to find git root: %w", err)
+		return "", "", "", fmt.Errorf("failed to find git root: %w", err)
 	}
 
 	// Load config
@@ -139,15 +141,16 @@ func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string
 		PrintVerbose("No gbm.branchconfig.yaml found, using default branch as merge target")
 		defaultBranch, err := manager.GetGitManager().GetDefaultBranch()
 		if err != nil {
-			return "", "", err
+			return "", "", "", err
 		}
-		return defaultBranch, "main", nil
+		// Without config, we can't determine source branch reliably
+		return "", defaultBranch, "main", fmt.Errorf("cannot determine source branch without gbm.branchconfig.yaml")
 	}
 
 	// Get deepest leaf nodes (production branches) from all trees
 	deepestLeaves := config.Tree.GetAllDeepestLeafNodes()
 	if len(deepestLeaves) == 0 {
-		return "", "", fmt.Errorf("no leaf nodes found in branch configuration")
+		return "", "", "", fmt.Errorf("no leaf nodes found in branch configuration")
 	}
 
 	// Check each deepest leaf node (production branch) to see if it needs mergeback
@@ -162,7 +165,9 @@ func findMergeTargetBranchAndWorktree(manager *internal.Manager) (string, string
 
 			if hasCommits {
 				PrintVerbose("Found mergeback needed: %s -> %s (worktree '%s')", leaf.Config.Branch, leaf.Parent.Config.Branch, leaf.Parent.Name)
-				return leaf.Parent.Config.Branch, leaf.Parent.Name, nil
+				// Return source branch (leaf with changes), target branch, target worktree name
+				// Use origin/ prefix to ensure we merge from remote state
+				return "origin/" + leaf.Config.Branch, leaf.Parent.Config.Branch, leaf.Parent.Name, nil
 			}
 		}
 	}
@@ -190,7 +195,7 @@ func hasCommitsBetweenBranches(targetBranch, sourceBranch string) (bool, error) 
 }
 
 // findNextMergeTargetInChain recursively checks parent branches for merge opportunities
-func findNextMergeTargetInChain(leaves []*internal.WorktreeNode) (string, string, error) {
+func findNextMergeTargetInChain(leaves []*internal.WorktreeNode) (string, string, string, error) {
 	// Check parent branches of the leaves
 	checkedBranches := make(map[string]bool)
 
@@ -208,13 +213,15 @@ func findNextMergeTargetInChain(leaves []*internal.WorktreeNode) (string, string
 
 				if hasCommits {
 					PrintVerbose("Found mergeback needed: %s -> %s (worktree '%s')", leaf.Parent.Config.Branch, leaf.Parent.Parent.Config.Branch, leaf.Parent.Parent.Name)
-					return leaf.Parent.Parent.Config.Branch, leaf.Parent.Parent.Name, nil
+					// Return source branch, target branch, target worktree name
+					// Use origin/ prefix to ensure we merge from remote state
+					return "origin/" + leaf.Parent.Config.Branch, leaf.Parent.Parent.Config.Branch, leaf.Parent.Parent.Name, nil
 				}
 			}
 		}
 	}
 
-	return "", "", fmt.Errorf("no mergeback targets found")
+	return "", "", "", fmt.Errorf("no mergeback targets found")
 }
 
 // autoDetectMergebackTarget analyzes recent git history to suggest a mergeback target
@@ -477,7 +484,7 @@ func getSmartMergebackCompletions() []string {
 }
 
 // offerMergeExecution prompts user to perform the merge and executes it if confirmed
-func offerMergeExecution(manager *internal.Manager, mergebackWorktreeName, sourceName, targetBranch string) error {
+func offerMergeExecution(manager *internal.Manager, mergebackWorktreeName, sourceName, sourceBranch, targetBranch string) error {
 	// Get git root
 	wd, err := os.Getwd()
 	if err != nil {
@@ -493,8 +500,8 @@ func offerMergeExecution(manager *internal.Manager, mergebackWorktreeName, sourc
 	worktreePath := filepath.Join(repoRoot, internal.DefaultWorktreeDirname, mergebackWorktreeName)
 
 	// Get commits that will be merged
-	sourceBranch := fmt.Sprintf("merge/%s_%s", sourceName, strings.ToLower(targetBranch))
-	commits, err := getCommitsToMerge(repoRoot, targetBranch, sourceName)
+	mergeBranch := fmt.Sprintf("merge/%s_%s", sourceName, strings.ToLower(targetBranch))
+	commits, err := getCommitsToMerge(repoRoot, targetBranch, sourceBranch)
 	if err != nil {
 		PrintVerbose("Could not get commits to merge: %v", err)
 		commits = []string{"(unable to determine commits)"}
@@ -503,8 +510,9 @@ func offerMergeExecution(manager *internal.Manager, mergebackWorktreeName, sourc
 	// Display merge information
 	fmt.Printf("\n%s\n", internal.FormatSubHeader("Merge Information:"))
 	fmt.Printf("  %s: %s\n", internal.FormatInfo("Source"), sourceName)
+	fmt.Printf("  %s: %s\n", internal.FormatInfo("Source Branch"), sourceBranch)
 	fmt.Printf("  %s: %s\n", internal.FormatInfo("Target Branch"), targetBranch)
-	fmt.Printf("  %s: %s\n", internal.FormatInfo("Merge Branch"), sourceBranch)
+	fmt.Printf("  %s: %s\n", internal.FormatInfo("Merge Branch"), mergeBranch)
 	fmt.Printf("  %s: %d commits\n", internal.FormatInfo("Commits to Merge"), len(commits))
 
 	if len(commits) > 0 && commits[0] != "(unable to determine commits)" {
@@ -535,10 +543,10 @@ func offerMergeExecution(manager *internal.Manager, mergebackWorktreeName, sourc
 	}
 
 	// Perform the merge
-	PrintInfo("Performing merge of '%s' into '%s'...", sourceName, targetBranch)
+	PrintInfo("Performing merge of '%s' into '%s'...", sourceBranch, targetBranch)
 
 	// Execute the merge in the worktree
-	if err := performMerge(worktreePath, sourceName, targetBranch); err != nil {
+	if err := performMerge(worktreePath, sourceBranch, targetBranch); err != nil {
 		if isMergeConflict(err) {
 			PrintInfo("Merge conflicts detected. Please resolve conflicts manually in worktree '%s'", mergebackWorktreeName)
 			PrintInfo("After resolving conflicts, use: git add . && git commit")
@@ -554,26 +562,15 @@ func offerMergeExecution(manager *internal.Manager, mergebackWorktreeName, sourc
 }
 
 // getCommitsToMerge gets the list of commits that will be merged
-func getCommitsToMerge(repoRoot, targetBranch, sourceName string) ([]string, error) {
-	// Try to find the source branch (could be the original branch or a remote tracking branch)
-	possibleBranches := []string{
-		sourceName,
-		"origin/" + sourceName,
-		fmt.Sprintf("hotfix/%s", sourceName),
-		fmt.Sprintf("origin/hotfix/%s", sourceName),
-	}
-
-	var sourceBranch string
-	for _, branch := range possibleBranches {
-		output, err := internal.ExecGitCommand(repoRoot, "rev-parse", "--verify", branch)
-		if err == nil && strings.TrimSpace(string(output)) != "" {
-			sourceBranch = branch
-			break
+func getCommitsToMerge(repoRoot, targetBranch, sourceBranch string) ([]string, error) {
+	// Verify the source branch exists
+	if _, err := internal.ExecGitCommand(repoRoot, "rev-parse", "--verify", sourceBranch); err != nil {
+		// Try with origin/ prefix if not found
+		originBranch := "origin/" + sourceBranch
+		if _, err := internal.ExecGitCommand(repoRoot, "rev-parse", "--verify", originBranch); err != nil {
+			return nil, fmt.Errorf("could not find source branch %s or %s", sourceBranch, originBranch)
 		}
-	}
-
-	if sourceBranch == "" {
-		return nil, fmt.Errorf("could not find source branch for %s", sourceName)
+		sourceBranch = originBranch
 	}
 
 	// Get commits that are in source but not in target
@@ -598,37 +595,22 @@ func getCommitsToMerge(repoRoot, targetBranch, sourceName string) ([]string, err
 }
 
 // performMerge executes the actual merge operation
-func performMerge(worktreePath, sourceName, targetBranch string) error {
-	// First, make sure we're on the correct branch (the merge branch)
-	cmd := exec.Command("git", "checkout", fmt.Sprintf("merge/%s_%s", sourceName, strings.ToLower(targetBranch)))
-	cmd.Dir = worktreePath
-	if err := cmd.Run(); err != nil {
-		return fmt.Errorf("failed to checkout merge branch: %w", err)
-	}
-
-	// Try to find the source branch to merge from
-	possibleBranches := []string{
-		sourceName,
-		"origin/" + sourceName,
-		fmt.Sprintf("hotfix/%s", sourceName),
-		fmt.Sprintf("origin/hotfix/%s", sourceName),
-	}
-
-	var sourceBranch string
-	for _, branch := range possibleBranches {
-		output, err := internal.ExecGitCommand(worktreePath, "rev-parse", "--verify", branch)
-		if err == nil && strings.TrimSpace(string(output)) != "" {
-			sourceBranch = branch
-			break
+// sourceBranch is the branch being merged FROM (e.g., "production")
+// targetBranch is the branch being merged INTO (e.g., "preview")
+// The worktree should already be on a merge branch created from targetBranch
+func performMerge(worktreePath, sourceBranch, targetBranch string) error {
+	// Verify we can access the source branch
+	if _, err := internal.ExecGitCommand(worktreePath, "rev-parse", "--verify", sourceBranch); err != nil {
+		// Try with origin/ prefix
+		originBranch := "origin/" + sourceBranch
+		if _, err := internal.ExecGitCommand(worktreePath, "rev-parse", "--verify", originBranch); err != nil {
+			return fmt.Errorf("could not find source branch %s or %s", sourceBranch, originBranch)
 		}
-	}
-
-	if sourceBranch == "" {
-		return fmt.Errorf("could not find source branch for %s", sourceName)
+		sourceBranch = originBranch
 	}
 
 	// Perform the merge
-	output, err := internal.ExecGitCommandCombined(worktreePath, "merge", "--no-ff", "-m", fmt.Sprintf("Merge %s into %s", sourceName, targetBranch), sourceBranch)
+	output, err := internal.ExecGitCommandCombined(worktreePath, "merge", "--no-ff", "-m", fmt.Sprintf("Merge %s into %s", sourceBranch, targetBranch), sourceBranch)
 	if err != nil {
 		// Include output in error for better debugging
 		return fmt.Errorf("git merge failed: %w\nOutput: %s", err, string(output))
